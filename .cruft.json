@@ -1,0 +1,16 @@
+{
+  "template": "https://github.com/ecmwf-projects/cookiecutter-conda-package",
+  "commit": "2e5f6d990e8a5e0944a07f24b6524cd861053138",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "cads-broker",
+      "project_slug": "cads_broker",
+      "project_short_description": "CADS broker service",
+      "copyright_holder": "European Union",
+      "copyright_year": "2022",
+      "_template": "https://github.com/ecmwf-projects/cookiecutter-conda-package"
+    }
+  },
+  "directory": null
+}
