@@ -7,13 +7,13 @@ metadata = sa.MetaData()
 BaseModel = declarative_base(metadata=metadata)
 
 
-status_enum = sa.Enum("queued", "running", "failed", "compelted")
+status_enum = sa.Enum("queued", "running", "failed", "completed")
 
 
 class SystemRequest(BaseModel):
     """Resource ORM model."""
 
-    __tablename__ = "requests"
+    __tablename__ = "system_requests"
 
     resource_id = sa.Column(sa.Integer, primary_key=True)
     resource_uid = sa.Column(sa.VARCHAR(1024), index=True)
