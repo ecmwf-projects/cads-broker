@@ -15,8 +15,8 @@ class SystemRequest(BaseModel):
 
     __tablename__ = "system_requests"
 
-    resource_id = sa.Column(sa.Integer, primary_key=True)
-    resource_uid = sa.Column(sa.VARCHAR(1024), index=True)
+    request_id = sa.Column(sa.Integer, primary_key=True)
+    request_uid = sa.Column(sa.VARCHAR(1024), index=True)
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
