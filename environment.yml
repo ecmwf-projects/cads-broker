@@ -16,4 +16,4 @@ dependencies:
 - typer
 - pip:
   - pytest-postgresql
-  - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
+  - git+ssh://git@github.com/ecmwf-projects/ogc-api-processes-fastapi.git
