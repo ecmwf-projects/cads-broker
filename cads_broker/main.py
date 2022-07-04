@@ -38,6 +38,13 @@ class ComputeClient(clients.BaseClient):
         ]
         return available_processes
 
+    def get_process_description(self, process_id: str) -> models.Process:
+        process_description = models.Process(
+            inputs=[],
+            outputs=[],
+        )
+        return process_description
+
 
 app = fastapi.FastAPI()
 app = main.include_ogc_api_processes_routers(app=app, client=ComputeClient())
