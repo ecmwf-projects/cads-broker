@@ -7,7 +7,7 @@ metadata = sa.MetaData()
 BaseModel = declarative_base(metadata=metadata)
 
 
-status_enum = sa.Enum("queued", "running", "failed", "completed")
+status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
 
 
 class SystemRequest(BaseModel):
@@ -25,7 +25,7 @@ class SystemRequest(BaseModel):
     expire = sa.Column(sa.DateTime)
 
 
-def init_db(connection_string: str) -> sa.engine.Engine:
+def init_database(connection_string: str) -> sa.engine.Engine:
     """
     Initialize the database located at URI `connection_string` and return the engine object.
 
