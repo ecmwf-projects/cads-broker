@@ -1,9 +1,6 @@
 """module for entry points"""
-import os.path
-
 import sqlalchemy as sa
 import typer
-from sqlalchemy.orm import sessionmaker
 
 from cads_broker import database
 

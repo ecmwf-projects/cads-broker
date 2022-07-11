@@ -1,13 +1,10 @@
 import os.path
-import subprocess
-from pathlib import Path
 
-from psycopg import Connection
 import sqlalchemy as sa
-from sqlalchemy.orm import sessionmaker
+from psycopg import Connection
 from typer.testing import CliRunner
 
-from cads_catalogue import entry_points, database
+from cads_broker import database, entry_points
 
 THIS_PATH = os.path.abspath(os.path.dirname(__file__))
 TESTDATA_PATH = os.path.join(THIS_PATH, "data")
@@ -31,8 +28,8 @@ def test_init_db(postgresql: Connection[str]) -> None:
     assert set(conn.execute(query).scalars()) == set(database.metadata.tables)  # type: ignore
 
     # uncomment to update testdb.sql
-    dump_path = os.path.join(TESTDATA_PATH, "testdb.sql")
-    with open(dump_path, "w") as dumped_file:
-        ret = subprocess.call(["pg_dump", connection_string], stdout=dumped_file)
-    assert ret == 0
-    assert os.path.exists(dump_path)
+    # dump_path = os.path.join(TESTDATA_PATH, "testdb.sql")
+    # with open(dump_path, "w") as dumped_file:
+    #     ret = subprocess.call(["pg_dump", connection_string], stdout=dumped_file)
+    # assert ret == 0
+    # assert os.path.exists(dump_path)
