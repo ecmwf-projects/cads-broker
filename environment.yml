@@ -2,6 +2,8 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
+- dask
+- distributed
 - make
 - mypy
 - pip
@@ -13,6 +15,7 @@ dependencies:
 - psycopg2
 - sqlalchemy==1.4*
 - sqlalchemy-stubs
+- tornado==6.1
 - typer
 - uvicorn
 - pip:
