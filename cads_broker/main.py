@@ -14,6 +14,8 @@
 # limitations under the License
 
 
+from typing import Any
+
 import attrs
 import fastapi
 from ogc_api_processes_fastapi import clients, main, models
@@ -39,13 +41,21 @@ class ComputeClient(clients.BaseClient):
         ]
         return available_processes
 
-    def get_process_description(self, process_id: str) -> models.Process:
-        process_description = models.Process(
+    def get_process_description(self, process_id: str) -> models.ProcessDescription:
+        process_description = models.ProcessDescription(
             inputs=[],
             outputs=[],
         )
         return process_description
 
+    def post_process_execute(
+        self, process_id: str, execution_content: models.Execute
+    ) -> Any:
+        return None
+
+    def get_job_status(self, job_id: str) -> models.StatusInfo:
+        return None
+
 
 app = fastapi.FastAPI()
-app = main.include_ogc_api_processes_routers(app=app, client=ComputeClient())
+app = main.include_routers(app=app, client=ComputeClient())
