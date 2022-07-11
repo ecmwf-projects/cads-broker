@@ -6,6 +6,9 @@ from sqlalchemy.ext.declarative import declarative_base
 metadata = sa.MetaData()
 BaseModel = declarative_base(metadata=metadata)
 
+CONNECTION_STRING = "postgresql://broker:password@compute-db/broker"
+ENGINE = sa.create_engine(CONNECTION_STRING)
+SESSION_OBJ = sa.orm.sessionmaker(ENGINE)
 
 status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
 
@@ -23,6 +26,38 @@ class SystemRequest(BaseModel):
     response_body = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
     expire = sa.Column(sa.DateTime)
+
+
+def set_request_status(
+    request_uid: str, status: str, session_obj: sa.orm.sessionmaker = SESSION_OBJ
+) -> None:
+    """Set the status of a request."""
+    with session_obj() as session:
+        statement = sa.select(SystemRequest).where(
+            SystemRequest.request_uid == request_uid
+        )
+        request = session.scalars(statement).one()
+        request.status = status
+        session.commit()
+
+
+def create_request(
+    seconds: int, session_obj: sa.orm.sessionmaker = SESSION_OBJ
+) -> SystemRequest:
+    """Temporary function to create a request."""
+    import time
+    import uuid
+
+    with session_obj() as session:
+        request = SystemRequest(
+            request_uid=uuid.uuid4().hex,
+            status="queued",
+            request_body={"seconds": seconds},
+            request_metadata={"created_at": time.time()},
+        )
+        session.add(request)
+        session.commit()
+    return request
 
 
 def init_database(connection_string: str) -> sa.engine.Engine:
