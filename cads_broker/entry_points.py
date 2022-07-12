@@ -2,7 +2,7 @@
 import sqlalchemy as sa
 import typer
 
-from cads_broker import database
+from cads_broker import database, dispatcher
 
 app = typer.Typer()
 
@@ -29,6 +29,43 @@ def init_db(connection_string: str) -> None:
     """
     database.init_database(connection_string)
     print("successfully created the broker database structure.")
+
+
+@app.command()
+def run(
+    max_running_requests: int = 4,
+    scheduler_address: str = "scheduler:8786",
+) -> None:
+    """
+    Start the broker
+
+    :param max_running_requests: maximum number of requests to run in parallel
+    :param scheduler_address: address of the scheduler
+    """
+
+    broker = dispatcher.Broker(
+        max_running_requests=max_running_requests, scheduler_address=scheduler_address
+    )
+    broker.run()
+
+
+@app.command()
+def add_system_request(
+    seconds: int,
+    connection_string: str | None = None,
+) -> None:
+    """
+    Add a system request to the database
+
+    :param seconds: number of seconds to sleep
+    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    """
+    if connection_string is None:
+        database.create_request(seconds)
+    else:
+        engine = database.init_database(connection_string)
+        session_obj = sa.orm.sessionmaker(engine)
+        database.create_request(seconds, session_obj)
 
 
 def main() -> None:
