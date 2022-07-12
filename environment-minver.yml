@@ -8,5 +8,6 @@ dependencies:
 - pytest-cov
 - psycopg
 - psycopg2
+- sqlalchemy==1.4*
 - pip:
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
