@@ -137,9 +137,9 @@ class Broker:
             self.update_database()
             self.running_requests = len(
                 [
-                    future_status
-                    for future_status in self.futures.values()
-                    if DASK_STATUS_TO_STATUS.get(future_status)
+                    future
+                    for future in self.futures.values()
+                    if DASK_STATUS_TO_STATUS.get(future.status)
                     not in ("completed", "failed")
                 ]
             )
