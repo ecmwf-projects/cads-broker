@@ -10,6 +10,7 @@ dependencies:
 - pre-commit
 - pytest
 - pytest-cov
+- pytest-mock
 - postgresql
 - psycopg
 - psycopg2
