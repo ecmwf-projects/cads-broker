@@ -6,5 +6,7 @@ dependencies:
 - pip
 - pytest
 - pytest-cov
+- psycopg
+- psycopg2
 - pip:
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
