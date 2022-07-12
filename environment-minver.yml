@@ -2,12 +2,22 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
+- dask
+- distributed
 - make
 - pip
+- pre-commit
 - pytest
 - pytest-cov
+- pytest-mock
+- postgresql
 - psycopg
 - psycopg2
 - sqlalchemy==1.4*
+- sqlalchemy-stubs
+- tornado==6.1
+- typer
+- uvicorn
 - pip:
+  - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
