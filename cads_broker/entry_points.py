@@ -61,11 +61,10 @@ def add_system_request(
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     if connection_string is None:
-        database.create_request(seconds)
-    else:
-        engine = database.init_database(connection_string)
-        session_obj = sa.orm.sessionmaker(engine)
-        database.create_request(seconds, session_obj)
+        connection_string = database.dbsettings.connection_string
+    engine = sa.create_engine(connection_string)
+    session_obj = sa.orm.sessionmaker(engine)
+    database.create_request(seconds, session_obj)
 
 
 def main() -> None:
