@@ -51,8 +51,9 @@ class Broker:
             self.client = distributed.Client(self.scheduler_address)
 
     def update_queue(
-        self, session_obj: sa.orm.sessionmaker = db.SESSION_OBJ
+        self, session_obj: sa.orm.sessionmaker | None = None
     ) -> list[db.SystemRequest] | Any:
+        session_obj = db.ensure_session_obj(session_obj)
         with session_obj() as session:
             stmt = sa.select(db.SystemRequest).where(
                 db.SystemRequest.status == "queued"
@@ -87,12 +88,11 @@ class Broker:
         else:
             return "queued"
 
-    def update_database(
-        self, session_obj: sa.orm.sessionmaker = db.SESSION_OBJ
-    ) -> None:
+    def update_database(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
         """Update the database with the current status of the dask tasks.
         If the task is not in the dask scheduler, it is re-queued.
         """
+        session_obj = db.ensure_session_obj(session_obj)
         with session_obj() as session:
             statement = sa.select(db.SystemRequest).where(
                 db.SystemRequest.status == "running"

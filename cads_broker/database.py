@@ -3,12 +3,12 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 
+from cads_broker import config
+
 metadata = sa.MetaData()
 BaseModel = declarative_base(metadata=metadata)
 
-CONNECTION_STRING = "postgresql://broker:password@compute-db/broker"
-ENGINE = sa.create_engine(CONNECTION_STRING)
-SESSION_OBJ = sa.orm.sessionmaker(ENGINE)
+dbsettings = config.SqlalchemySettings()
 
 status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
 
@@ -28,10 +28,22 @@ class SystemRequest(BaseModel):
     expire = sa.Column(sa.DateTime)
 
 
+def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
+    """
+    If `session_obj` is None, create a new session object.
+
+    :param session_obj:
+    """
+    return session_obj or sa.orm.sessionmaker(
+        sa.create_engine(dbsettings.connection_string)
+    )
+
+
 def set_request_status(
-    request_uid: str, status: str, session_obj: sa.orm.sessionmaker = SESSION_OBJ
+    request_uid: str, status: str, session_obj: sa.orm.sessionmaker | None = None
 ) -> None:
     """Set the status of a request."""
+    session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
         statement = sa.select(SystemRequest).where(
             SystemRequest.request_uid == request_uid
@@ -42,9 +54,10 @@ def set_request_status(
 
 
 def create_request(
-    seconds: int, session_obj: sa.orm.sessionmaker = SESSION_OBJ
+    seconds: int, session_obj: sa.orm.sessionmaker | None = None
 ) -> SystemRequest:
     """Temporary function to create a request."""
+    session_obj = ensure_session_obj(session_obj)
     import time
     import uuid
 
@@ -60,7 +73,9 @@ def create_request(
     return request
 
 
-def init_database(connection_string: str) -> sa.engine.Engine:
+def init_database(
+    connection_string: str = dbsettings.connection_string,
+) -> sa.engine.Engine:
     """
     Initialize the database located at URI `connection_string` and return the engine object.
 
