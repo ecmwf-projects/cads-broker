@@ -23,9 +23,7 @@ from ogc_api_processes_fastapi import clients, main, models
 
 @attrs.define
 class ComputeClient(clients.BaseClient):
-    def get_processes_list(
-        self, limit: int, offset: int
-    ) -> list[models.ProcessSummary]:
+    def get_processes(self, limit: int, offset: int) -> list[models.ProcessSummary]:
         available_processes = [
             models.ProcessSummary(
                 title="Retrieve from interal MARS archive",
@@ -41,7 +39,7 @@ class ComputeClient(clients.BaseClient):
         ]
         return available_processes
 
-    def get_process_description(self, process_id: str) -> models.ProcessDescription:
+    def get_process(self, process_id: str) -> models.ProcessDescription:
         process_description = models.ProcessDescription(
             inputs=[],
             outputs=[],
@@ -53,8 +51,11 @@ class ComputeClient(clients.BaseClient):
     ) -> Any:
         return None
 
-    def get_job_status(self, job_id: str) -> models.StatusInfo:
+    def get_job(self, job_id: str) -> models.StatusInfo:
         return None
+
+    def get_job_results(self, job_id: str):
+        return
 
 
 app = fastapi.FastAPI()
