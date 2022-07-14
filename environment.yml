@@ -2,17 +2,22 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
+- dask
+- distributed
 - make
 - mypy
 - pip
 - pre-commit
-- pytest
-- pytest-cov
 - postgresql
 - psycopg
 - psycopg2
+- pydantic
+- pytest
+- pytest-cov
+- pytest-mock
 - sqlalchemy==1.4*
 - sqlalchemy-stubs
+- tornado==6.1
 - typer
 - uvicorn
 - pip:
