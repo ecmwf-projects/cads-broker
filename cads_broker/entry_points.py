@@ -1,4 +1,4 @@
-"""module for entry points"""
+"""module for entry points."""
 import sqlalchemy as sa
 import typer
 
@@ -10,7 +10,7 @@ app = typer.Typer()
 @app.command()
 def info(connection_string: str) -> None:
     """
-    Test connection to the database located at URI `connection_string`
+    Test connection to the database located at URI `connection_string`.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
@@ -23,7 +23,7 @@ def info(connection_string: str) -> None:
 @app.command()
 def init_db(connection_string: str) -> None:
     """
-    Create the database structure
+    Create the database structure.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
@@ -36,13 +36,11 @@ def run(
     max_running_requests: int = 4,
     scheduler_address: str = "scheduler:8786",
 ) -> None:
-    """
-    Start the broker
+    """Start the broker.
 
     :param max_running_requests: maximum number of requests to run in parallel
     :param scheduler_address: address of the scheduler
     """
-
     broker = dispatcher.Broker(
         max_running_requests=max_running_requests, scheduler_address=scheduler_address
     )
@@ -55,7 +53,7 @@ def add_system_request(
     connection_string: str | None = None,
 ) -> None:
     """
-    Add a system request to the database
+    Add a system request to the database.
 
     :param seconds: number of seconds to sleep
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
@@ -68,5 +66,5 @@ def add_system_request(
 
 
 def main() -> None:
-    """run main broker entry points"""
+    """Run main broker entry points."""
     app()

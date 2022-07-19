@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM model"""
+"""SQLAlchemy ORM model."""
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
