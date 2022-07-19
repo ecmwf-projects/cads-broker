@@ -90,6 +90,7 @@ class Broker:
 
     def update_database(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
         """Update the database with the current status of the dask tasks.
+
         If the task is not in the dask scheduler, it is re-queued.
         """
         session_obj = db.ensure_session_obj(session_obj)

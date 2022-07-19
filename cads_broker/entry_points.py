@@ -8,12 +8,16 @@ app = typer.Typer()
 
 
 @app.command()
-def info(connection_string: str) -> None:
-    """
-    Test connection to the database located at URI `connection_string`.
+def info(connection_string: str | None = None) -> None:
+    """Test connection to the database located at URI `connection_string`.
 
-    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    Parameters
+    ----------
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
+    if not connection_string:
+        dbsettings = database.ensure_settings(database.dbsettings)
+        connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     connection = engine.connect()
     connection.close()
@@ -21,12 +25,16 @@ def info(connection_string: str) -> None:
 
 
 @app.command()
-def init_db(connection_string: str) -> None:
-    """
-    Create the database structure.
+def init_db(connection_string: str | None = None) -> None:
+    """Create the database structure.
 
-    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    Parameters
+    ----------
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
+    if not connection_string:
+        dbsettings = database.ensure_settings(database.dbsettings)
+        connection_string = dbsettings.connection_string
     database.init_database(connection_string)
     print("successfully created the broker database structure.")
 
@@ -38,10 +46,12 @@ def run(
 ) -> None:
     """Start the broker.
 
-    :param max_running_requests: maximum number of requests to run in parallel
-    :param scheduler_address: address of the scheduler
+    Parameters
+    ----------
+    max_running_requests: maximum number of requests to run in parallel
+    scheduler_address: address of the scheduler
     """
-    broker = dispatcher.Broker(
+    broker = dispatcher.Broker(  # type: ignore
         max_running_requests=max_running_requests, scheduler_address=scheduler_address
     )
     broker.run()
@@ -52,14 +62,16 @@ def add_system_request(
     seconds: int,
     connection_string: str | None = None,
 ) -> None:
-    """
-    Add a system request to the database.
+    """Add a system request to the database.
 
-    :param seconds: number of seconds to sleep
-    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    Parameters
+    ----------
+    seconds: number of seconds to sleep
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     if connection_string is None:
-        connection_string = database.dbsettings.connection_string
+        dbsettings = database.ensure_settings(database.dbsettings)
+        connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     session_obj = sa.orm.sessionmaker(engine)
     database.create_request(seconds, session_obj)

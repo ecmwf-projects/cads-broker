@@ -22,7 +22,9 @@ def test_init_db(postgresql: Connection[str]) -> None:
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
 
-    result = runner.invoke(entry_points.app, ["init-db", connection_string])
+    result = runner.invoke(
+        entry_points.app, ["init-db", "--connection-string", connection_string]
+    )
 
     assert result.exit_code == 0
     assert set(conn.execute(query).scalars()) == set(database.metadata.tables)  # type: ignore
