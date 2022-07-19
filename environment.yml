@@ -20,6 +20,7 @@ dependencies:
 - sphinx
 - sphinxcontrib-apidoc
 - sqlalchemy==1.4*
+- sqlalchemy-utils
 - sqlalchemy-stubs
 - tornado==6.1
 - typer
@@ -27,3 +28,4 @@ dependencies:
 - pip:
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
+  - types-sqlalchemy-utils
