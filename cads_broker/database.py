@@ -7,7 +7,7 @@ from cads_broker import config
 
 metadata = sa.MetaData()
 BaseModel = sa.ext.declarative.declarative_base(metadata=metadata)
-dbsettings = None
+
 
 status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
 
@@ -27,28 +27,6 @@ class SystemRequest(BaseModel):
     expire = sa.Column(sa.DateTime)
 
 
-def ensure_settings(
-    settings: config.SqlalchemySettings | None = None,
-) -> config.SqlalchemySettings:
-    """If `settings` is None, create a new SqlalchemySettings object.
-
-    Parameters
-    ----------
-    settings: an optional config.SqlalchemySettings to be set
-
-    Returns
-    -------
-    sqlalchemysettings:
-        a SqlalchemySettings object
-    """
-    global dbsettings
-    if settings and isinstance(settings, config.SqlalchemySettings):
-        dbsettings = settings
-    else:
-        dbsettings = config.SqlalchemySettings()
-    return dbsettings
-
-
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
     """If `session_obj` is None, create a new session object.
 
@@ -63,7 +41,7 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     """
     if session_obj:
         return session_obj
-    settings = ensure_settings(dbsettings)
+    settings = config.ensure_settings(config.dbsettings)
     session_obj = sa.orm.sessionmaker(sa.create_engine(settings))
     return session_obj
 

@@ -2,7 +2,7 @@
 import sqlalchemy as sa
 import typer
 
-from cads_broker import database, dispatcher
+from cads_broker import config, database, dispatcher
 
 app = typer.Typer()
 
@@ -16,7 +16,7 @@ def info(connection_string: str | None = None) -> None:
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     if not connection_string:
-        dbsettings = database.ensure_settings(database.dbsettings)
+        dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     connection = engine.connect()
@@ -33,7 +33,7 @@ def init_db(connection_string: str | None = None) -> None:
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     if not connection_string:
-        dbsettings = database.ensure_settings(database.dbsettings)
+        dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     database.init_database(connection_string)
     print("successfully created the broker database structure.")
@@ -70,7 +70,7 @@ def add_system_request(
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     if connection_string is None:
-        dbsettings = database.ensure_settings(database.dbsettings)
+        dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     session_obj = sa.orm.sessionmaker(engine)
