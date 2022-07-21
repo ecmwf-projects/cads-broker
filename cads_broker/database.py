@@ -1,4 +1,8 @@
-"""SQLAlchemy ORM model"""
+"""SQLAlchemy ORM model."""
+import hashlib
+import uuid
+from typing import Any
+
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
@@ -10,7 +14,7 @@ BaseModel = declarative_base(metadata=metadata)
 
 dbsettings = config.SqlalchemySettings()
 
-status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
+status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
 
 
 class SystemRequest(BaseModel):
@@ -20,11 +24,17 @@ class SystemRequest(BaseModel):
 
     request_id = sa.Column(sa.Integer, primary_key=True)
     request_uid = sa.Column(sa.VARCHAR(1024), index=True)
+    request_hash = sa.Column(sa.VARCHAR(1024))
+    process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
     response_body = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
+    created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
+    started_at = sa.Column(sa.TIMESTAMP)
+    finished_at = sa.Column(sa.TIMESTAMP)
+    updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     expire = sa.Column(sa.DateTime)
 
 
@@ -39,38 +49,99 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     )
 
 
+def get_accepted_requests(
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> list[SystemRequest]:
+    """Get all accepted requests."""
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
+        return session.scalars(statement).all()
+
+
 def set_request_status(
-    request_uid: str, status: str, session_obj: sa.orm.sessionmaker | None = None
+    request_uid: str,
+    status: str,
+    result: str | dict[str, str] | None = None,
+    traceback: str | None = None,
+    session_obj: sa.orm.sessionmaker | None = None,
 ) -> None:
     """Set the status of a request."""
     session_obj = ensure_session_obj(session_obj)
+    response_body = {"result": result, "traceback": traceback}
     with session_obj() as session:
         statement = sa.select(SystemRequest).where(
             SystemRequest.request_uid == request_uid
         )
         request = session.scalars(statement).one()
+        if status in ("successful", "failed"):
+            request.finished_at = sa.func.now()
         request.status = status
+        request.response_body = response_body
         session.commit()
+
+
+# temporary implementation of cache
+def get_cached_result(
+    request: SystemRequest,
+    session_obj: sa.orm.sessionmaker | None = None,
+):
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        statement = (
+            sa.select(SystemRequest)
+            .where(SystemRequest.request_hash == request.request_hash)
+            .where(SystemRequest.status == "successful")
+        )
+        return session.scalars(statement).first()
 
 
 def create_request(
-    seconds: int, session_obj: sa.orm.sessionmaker | None = None
-) -> SystemRequest:
+    request_uid: str = None,
+    context: str = "",
+    callable_call: str = "",
+    process_id: str = "",
+    session_obj: sa.orm.sessionmaker | None = None,
+    **kwargs
+) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
-    import time
-    import uuid
 
+    request_hash = hashlib.md5((context + callable_call).encode()).hexdigest()
     with session_obj() as session:
         request = SystemRequest(
-            request_uid=uuid.uuid4().hex,
-            status="queued",
-            request_body={"seconds": seconds},
-            request_metadata={"created_at": time.time()},
+            request_uid=request_uid or str(uuid.uuid4()),
+            request_hash=request_hash,
+            process_id=process_id,
+            status="accepted",
+            request_body={"context": context, "callable_call": callable_call},
+            request_metadata=kwargs,
         )
+        # temporary implementation of cache
+        cached_request = get_cached_result(request, session_obj)
+        if cached_request is not None:
+            request.status = cached_request.status
+            request.response_body["result"] = cached_request.response_body.get("result")
+
         session.add(request)
         session.commit()
-    return request
+        ret_value = {
+            c.key: getattr(request, c.key)
+            for c in sa.inspect(request).mapper.column_attrs
+        }
+    return ret_value
+
+
+def get_request(
+    request_uid: str, session_obj: sa.orm.sessionmaker | None = None
+) -> SystemRequest:
+    """Get a request by its UID."""
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        statement = sa.select(SystemRequest).where(
+            SystemRequest.request_uid == request_uid
+        )
+        return session.scalars(statement).one()
 
 
 def init_database(

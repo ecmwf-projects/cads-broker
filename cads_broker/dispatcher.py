@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 from typing import Any
 
 import attrs
@@ -14,18 +15,18 @@ logging.getLogger().setLevel(logging.INFO)
 DASK_STATUS_TO_STATUS = {
     "pending": "queued_in_dask",
     "processing": "running",
-    "erred": "failed",
-    "finished": "completed",
+    "error": "failed",
+    "finished": "successful",
 }
 
 
 def get_tasks(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
         scheduler_state_to_status = {
-            "waiting": "queued",
+            "waiting": "accepted",
             "processing": "running",
             "erred": "failed",
-            "finished": "completed",
+            "finished": "successful",
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -35,47 +36,75 @@ def get_tasks(client: distributed.Client) -> Any:
     return client.run_on_scheduler(get_tasks_on_scheduler)
 
 
+def submit_to_client(
+    client: distributed.Client,
+    key: str,
+    context: str = "",
+    callable_call: str = "",
+    args=[],
+    kwargs={},
+) -> distributed.Future:
+    def submit_workflow(
+        context: str = "",
+        callable_call: str = "",
+        args=[],
+        kwargs={},
+    ) -> dict[str, Any] | list[dict[str, Any]]:
+        import hashlib
+
+        import xarray as xr
+
+        # temporary implementation of dump
+        def dump_results(
+            results: Any, request_hash: str
+        ) -> dict[str, Any] | list[dict[str, Any]]:
+            if isinstance(results, (list, tuple)):
+                return [dump_results(r, request_hash) for r in results]
+            elif isinstance(results, dict):
+                return {k: dump_results(v, request_hash) for k, v in results.items()}
+            elif isinstance(results, (xr.Dataset, xr.DataArray)):
+                path = f"/tmp/{request_hash}.nc"
+                results.to_netcdf(path=path)
+                return {"path": path, "content_type": "application/x-netcdf"}
+            return results
+
+        exec(context)
+        if callable_call == "":
+            callable_call = "execute(*{args}, **{kwargs})"
+        results = eval(callable_call.format(args=args, kwargs=kwargs))
+        request_hash = hashlib.md5(
+            (context + callable_call + str(time.time())).encode()
+        ).hexdigest()
+        return dump_results(results, request_hash=request_hash)
+
+    return client.submit(submit_workflow, context, callable_call, args, kwargs, key=key)
+
+
 @attrs.define
 class Broker:
-    scheduler_address: str | distributed.LocalCluster = attrs.field(
-        default="scheduler:8786"
-    )
+
+    client: distributed.Client
+    max_running_requests: int
+
     queue: list[db.SystemRequest] = attrs.field(factory=list)
-    max_running_requests: int = attrs.field(default=1)
     running_requests: int = 0
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
-    client: distributed.Client = attrs.field(factory=distributed.Client)
 
-    def __attrs_post_init__(self) -> None:
-        if not self.client:
-            self.client = distributed.Client(self.scheduler_address)
+    @classmethod
+    def from_address(cls, address="scheduler:8786", max_running_requests=1):
+        client = distributed.Client(address)
+        return cls(client=client, max_running_requests=max_running_requests)
 
-    def update_queue(
-        self, session_obj: sa.orm.sessionmaker | None = None
-    ) -> list[db.SystemRequest] | Any:
-        session_obj = db.ensure_session_obj(session_obj)
-        with session_obj() as session:
-            stmt = sa.select(db.SystemRequest).where(
-                db.SystemRequest.status == "queued"
-            )
-            return session.scalars(stmt).all()
-
-    def choose_request(self) -> db.SystemRequest | Any:
-        queue = self.update_queue()
+    def choose_request(self) -> db.SystemRequest:
+        queue = db.get_accepted_requests()
         candidates = sorted(
             queue,
             key=lambda r: self.priority(r),
-            reverse=True,
         )
         return candidates[0]
 
     def priority(self, request: db.SystemRequest) -> float:
-        if request.request_metadata is not None and isinstance(
-            request.request_metadata, dict
-        ):
-            return request.request_metadata.get("created_at", 0.0)
-        else:
-            return 0.0
+        return request.created_at.timestamp()
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
@@ -86,10 +115,11 @@ class Broker:
             return get_tasks(self.client).get(request_uid, "unknown")
         # if request is not in the dask scheduler, re-queue it
         else:
-            return "queued"
+            return "accepted"
 
     def update_database(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
         """Update the database with the current status of the dask tasks.
+
         If the task is not in the dask scheduler, it is re-queued.
         """
         session_obj = db.ensure_session_obj(session_obj)
@@ -99,33 +129,48 @@ class Broker:
             )
             for request in session.scalars(statement):
                 dask_task_status = self.fetch_dask_task_status(request.request_uid)
-                if dask_task_status in ("completed", "failed", "queued"):
+                if dask_task_status in ("successful", "failed", "accepted"):
                     request.status = dask_task_status
-                else:
+                # if the dask status is pending, the request is running for the broker
+                elif dask_task_status == "queued_in_dask":
                     request.status = "running"
+                    if request.started_at is None:
+                        request.started_at = sa.func.now()
+                else:
+                    raise ValueError(f"Unknown dask status: {dask_task_status}")
             session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
-        logging.info(f"Future {future.key} is done")
+        logging.info(f"Future {future.key} is {future.status}")
+        if future.status == "finished":
+            db.set_request_status(future.key, "successful", result=future.result())
+        elif future.status == "error":
+            db.set_request_status(
+                future.key,
+                "failed",
+                traceback="".join(traceback.format_exception(future.exception())),
+            )
+        else:
+            logging.warning(f"Unknown future status {future.status}")
+            db.set_request_status(
+                future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown")
+            )
         self.futures.pop(future.key)
-        db.set_request_status(
-            future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown")
-        )
 
-    def submit_request(self) -> None:
+    def submit_request(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
         request = self.choose_request()
 
         logging.info(
             f"Submitting {request.request_uid}",
         )
 
-        import time
-
-        request_body = request.request_body
-        future = self.client.submit(
-            time.sleep,
-            request_body["seconds"] if isinstance(request_body, dict) else 0,
+        future = submit_to_client(
+            self.client,
             key=request.request_uid,
+            context=request.request_body.get("context", ""),
+            callable_call=request.request_body.get("callable_call", ""),
+            args=request.request_body.get("args", ""),
+            kwargs=request.request_body.get("kwargs", ""),
         )
         future.add_done_callback(self.on_future_done)
         db.set_request_status(request.request_uid, "running")
@@ -140,12 +185,12 @@ class Broker:
                     future
                     for future in self.futures.values()
                     if DASK_STATUS_TO_STATUS.get(future.status)
-                    not in ("completed", "failed")
+                    not in ("successful", "failed")
                 ]
             )
             logging.info(f"running: {self.running_requests}")
             logging.info(f"futures: {self.futures}")
-            queue = self.update_queue()
+            queue = db.get_accepted_requests()
             available_slots = self.max_running_requests - self.running_requests
             if queue and available_slots > 0:
                 logging.info(f"queued: {queue}")
