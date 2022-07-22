@@ -4,15 +4,14 @@ import uuid
 from typing import Any
 
 import sqlalchemy as sa
+import sqlalchemy_utils
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.declarative import declarative_base
 
 from cads_broker import config
 
 metadata = sa.MetaData()
-BaseModel = declarative_base(metadata=metadata)
+BaseModel = sa.ext.declarative.declarative_base(metadata=metadata)
 
-dbsettings = config.SqlalchemySettings()
 
 status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
 
@@ -39,14 +38,22 @@ class SystemRequest(BaseModel):
 
 
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
-    """
-    If `session_obj` is None, create a new session object.
+    """If `session_obj` is None, create a new session object.
 
-    :param session_obj:
+    Parameters
+    ----------
+    session_obj: sqlalchemy Session object
+
+    Returns
+    -------
+    session_obj:
+        a SQLAlchemy Session object
     """
-    return session_obj or sa.orm.sessionmaker(
-        sa.create_engine(dbsettings.connection_string)
-    )
+    if session_obj:
+        return session_obj
+    settings = config.ensure_settings(config.dbsettings)
+    session_obj = sa.orm.sessionmaker(sa.create_engine(settings))
+    return session_obj
 
 
 def get_accepted_requests(
@@ -144,16 +151,15 @@ def get_request(
         return session.scalars(statement).one()
 
 
-def init_database(
-    connection_string: str = dbsettings.connection_string,
-) -> sa.engine.Engine:
+def init_database(connection_string: str) -> sa.engine.Engine:
     """
     Initialize the database located at URI `connection_string` and return the engine object.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
     engine = sa.create_engine(connection_string)
-
+    if not sqlalchemy_utils.database_exists(engine.url):
+        sqlalchemy_utils.create_database(engine.url)
     # cleanup and create the schema
     metadata.drop_all(engine)
     metadata.create_all(engine)

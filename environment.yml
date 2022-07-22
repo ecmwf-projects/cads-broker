@@ -2,24 +2,26 @@ channels:
 - conda-forge
 - nodefaults
 dependencies:
-- dask
-- distributed
 - make
 - mypy
 - myst-parser
-- pip
 - pre-commit
+- pydata-sphinx-theme
+- pytest
+- pytest-cov
+- sphinx
+- sphinxcontrib-apidoc
+# DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+- dask
+- distributed
+- pip
 - postgresql
 - psycopg
 - psycopg2
-- pydata-sphinx-theme
 - pydantic
-- pytest
-- pytest-cov
 - pytest-mock
-- sphinx
-- sphinxcontrib-apidoc
 - sqlalchemy==1.4*
+- sqlalchemy-utils
 - sqlalchemy-stubs
 - tornado==6.1
 - typer
@@ -27,3 +29,4 @@ dependencies:
 - pip:
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
+  - types-sqlalchemy-utils

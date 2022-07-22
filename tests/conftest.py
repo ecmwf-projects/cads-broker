@@ -1,3 +1,6 @@
+import os
+from typing import Any
+
 import pytest
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
@@ -15,3 +18,14 @@ def session_obj(postgresql: Connection[str]) -> sessionmaker:
     engine = database.init_database(connection_string)
     session_obj = sessionmaker(engine)
     return session_obj
+
+
+@pytest.fixture()
+def temp_environ() -> Any:
+    """Create a modifiable environment that affect only the test scope"""
+    old_environ = dict(os.environ)
+
+    yield os.environ
+
+    os.environ.clear()
+    os.environ.update(old_environ)

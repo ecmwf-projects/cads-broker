@@ -4,6 +4,9 @@ version.py
 # Sphinx automatic generation of API
 docs/_api/
 
+# Dask distributed
+dask-worker-space
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,vim,visualstudiocode,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,jupyternotebooks,vim,visualstudiocode,pycharm
 
