@@ -34,9 +34,6 @@ def test_ensure_session_obj(
     assert ret_value is session_obj
 
     # case of session not set
-    with pytest.raises(ValueError) as excinfo:
-        ret_value = database.ensure_session_obj(None)
-        assert "postgres_password" in str(excinfo.value)
     temp_environ["postgres_password"] = postgresql.info.password
     ret_value = database.ensure_session_obj(None)
     assert isinstance(ret_value, sessionmaker)
