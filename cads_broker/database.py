@@ -1,5 +1,4 @@
 """SQLAlchemy ORM model."""
-import hashlib
 import uuid
 from typing import Any
 
@@ -23,7 +22,6 @@ class SystemRequest(BaseModel):
 
     request_id = sa.Column(sa.Integer, primary_key=True)
     request_uid = sa.Column(sa.VARCHAR(1024), index=True)
-    request_hash = sa.Column(sa.VARCHAR(1024))
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
@@ -83,58 +81,42 @@ def set_request_status(
         request = session.scalars(statement).one()
         if status in ("successful", "failed"):
             request.finished_at = sa.func.now()
+        elif status == "running":
+            request.started_at = sa.func.now()
         request.status = status
         request.response_body = response_body
         session.commit()
 
 
-# temporary implementation of cache
-def get_cached_result(
-    request: SystemRequest,
-    session_obj: sa.orm.sessionmaker | None = None,
-):
-    session_obj = ensure_session_obj(session_obj)
-    with session_obj() as session:
-        statement = (
-            sa.select(SystemRequest)
-            .where(SystemRequest.request_hash == request.request_hash)
-            .where(SystemRequest.status == "successful")
-        )
-        return session.scalars(statement).first()
-
-
 def create_request(
+    setup_code: str,
+    entry_point: str,
+    kwargs: dict,
+    metadata: dict,
+    process_id: str,
     request_uid: str = None,
-    context: str = "",
-    callable_call: str = "",
-    process_id: str = "",
     session_obj: sa.orm.sessionmaker | None = None,
-    **kwargs
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
 
-    request_hash = hashlib.md5((context + callable_call).encode()).hexdigest()
     with session_obj() as session:
         request = SystemRequest(
             request_uid=request_uid or str(uuid.uuid4()),
-            request_hash=request_hash,
             process_id=process_id,
             status="accepted",
-            request_body={"context": context, "callable_call": callable_call},
-            request_metadata=kwargs,
+            request_body={
+                "setup_code": setup_code,
+                "entry_point": entry_point,
+                "kwargs": kwargs,
+            },
+            request_metadata=metadata,
         )
-        # temporary implementation of cache
-        cached_request = get_cached_result(request, session_obj)
-        if cached_request is not None:
-            request.status = cached_request.status
-            request.response_body["result"] = cached_request.response_body.get("result")
-
         session.add(request)
         session.commit()
         ret_value = {
-            c.key: getattr(request, c.key)
-            for c in sa.inspect(request).mapper.column_attrs
+            column.key: getattr(request, column.key)
+            for column in sa.inspect(request).mapper.column_attrs
         }
     return ret_value
 

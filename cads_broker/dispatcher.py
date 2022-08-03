@@ -13,7 +13,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 DASK_STATUS_TO_STATUS = {
-    "pending": "queued_in_dask",
+    "pending": "running",  # Pending status in dask is the same as running status in broker
     "processing": "running",
     "error": "failed",
     "finished": "successful",
@@ -23,7 +23,7 @@ DASK_STATUS_TO_STATUS = {
 def get_tasks(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
         scheduler_state_to_status = {
-            "waiting": "accepted",
+            "waiting": "running",  # Waiting status in dask is the same as running status in broker
             "processing": "running",
             "erred": "failed",
             "finished": "successful",
@@ -39,45 +39,31 @@ def get_tasks(client: distributed.Client) -> Any:
 def submit_to_client(
     client: distributed.Client,
     key: str,
-    context: str = "",
-    callable_call: str = "",
-    args=[],
-    kwargs={},
+    setup_code: str,
+    entry_point: str,
+    kwargs: dict[str, Any] = {},
+    metadata: dict[str, Any] = {},
 ) -> distributed.Future:
     def submit_workflow(
-        context: str = "",
-        callable_call: str = "",
-        args=[],
-        kwargs={},
+        setup_code: str,
+        entry_point: str,
+        kwargs: dict[str, Any] = {},
+        metadata: dict[str, Any] = {},
     ) -> dict[str, Any] | list[dict[str, Any]]:
-        import hashlib
+        import cacholote
 
-        import xarray as xr
+        exec(setup_code, globals())
+        results = eval(f"{entry_point}(metadata=metadata, **kwargs)")
+        return cacholote.encode.dumps(results)
 
-        # temporary implementation of dump
-        def dump_results(
-            results: Any, request_hash: str
-        ) -> dict[str, Any] | list[dict[str, Any]]:
-            if isinstance(results, (list, tuple)):
-                return [dump_results(r, request_hash) for r in results]
-            elif isinstance(results, dict):
-                return {k: dump_results(v, request_hash) for k, v in results.items()}
-            elif isinstance(results, (xr.Dataset, xr.DataArray)):
-                path = f"/tmp/{request_hash}.nc"
-                results.to_netcdf(path=path)
-                return {"path": path, "content_type": "application/x-netcdf"}
-            return results
-
-        exec(context)
-        if callable_call == "":
-            callable_call = "execute(*{args}, **{kwargs})"
-        results = eval(callable_call.format(args=args, kwargs=kwargs))
-        request_hash = hashlib.md5(
-            (context + callable_call + str(time.time())).encode()
-        ).hexdigest()
-        return dump_results(results, request_hash=request_hash)
-
-    return client.submit(submit_workflow, context, callable_call, args, kwargs, key=key)
+    return client.submit(
+        submit_workflow,
+        setup_code,
+        entry_point,
+        kwargs=kwargs,
+        metadata=metadata,
+        key=key,
+    )
 
 
 @attrs.define
@@ -128,16 +114,7 @@ class Broker:
                 db.SystemRequest.status == "running"
             )
             for request in session.scalars(statement):
-                dask_task_status = self.fetch_dask_task_status(request.request_uid)
-                if dask_task_status in ("successful", "failed", "accepted"):
-                    request.status = dask_task_status
-                # if the dask status is pending, the request is running for the broker
-                elif dask_task_status == "queued_in_dask":
-                    request.status = "running"
-                    if request.started_at is None:
-                        request.started_at = sa.func.now()
-                else:
-                    raise ValueError(f"Unknown dask status: {dask_task_status}")
+                request.status = self.fetch_dask_task_status(request.request_uid)
             session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
@@ -157,7 +134,7 @@ class Broker:
             )
         self.futures.pop(future.key)
 
-    def submit_request(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
+    def submit_request(self) -> None:
         request = self.choose_request()
 
         logging.info(
@@ -167,10 +144,10 @@ class Broker:
         future = submit_to_client(
             self.client,
             key=request.request_uid,
-            context=request.request_body.get("context", ""),
-            callable_call=request.request_body.get("callable_call", ""),
-            args=request.request_body.get("args", ""),
-            kwargs=request.request_body.get("kwargs", ""),
+            setup_code=request.request_body.get("setup_code", ""),
+            entry_point=request.request_body.get("entry_point", ""),
+            kwargs=request.request_body.get("kwargs", {}),
+            metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
         db.set_request_status(request.request_uid, "running")

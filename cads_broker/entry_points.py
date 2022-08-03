@@ -72,8 +72,6 @@ def add_system_request(
         # resolve_path=True,
         help="Path to the file containing the JSON request to the Broker",
     ),
-    context: str = typer.Option(None, help="Context of the request"),
-    callable_call: str = typer.Option(None, help="Call to the callable"),
     connection_string: str = typer.Option(
         None, help="Connection string to the broker database"
     ),
@@ -90,24 +88,12 @@ def add_system_request(
         connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     session_obj = sa.orm.sessionmaker(engine)
-    if file_path is not None:
-        print(file_path)
-        database.create_request(
-            process_id="submit-workflow",
-            session_obj=session_obj,
-            **json.loads(file_path.read_text())
-        )
-    elif context is not None and callable_call is not None:
-        database.create_request(
-            process_id="submit-workflow",
-            context=context,
-            callable_call=callable_call,
-            session_obj=session_obj,
-        )
-    else:
-        raise ValueError(
-            "either file_path or context and callable_call must be provided"
-        )
+    print(file_path)
+    database.create_request(
+        process_id="submit-workflow",
+        session_obj=session_obj,
+        **json.loads(file_path.read_text())
+    )
 
 
 def main() -> None:
