@@ -17,7 +17,7 @@ def mock_system_request(
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
-        request_uid=request_uid or uuid.uuid4().hex,
+        request_uid=request_uid or str(uuid.uuid4()),
         status=status,
         created_at=created_at,
         started_at=None,
@@ -81,7 +81,14 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
-    request_dict = db.create_request(session_obj=session_obj)
+    request_dict = db.create_request(
+        setup_code="",
+        entry_point="sum",
+        kwargs={},
+        metadata={},
+        process_id="submit-workflow",
+        session_obj=session_obj,
+    )
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_dict["request_uid"]

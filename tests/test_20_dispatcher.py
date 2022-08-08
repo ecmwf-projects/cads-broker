@@ -3,7 +3,6 @@ import random
 import uuid
 
 import distributed
-import pytest
 import pytest_mock
 import sqlalchemy as sa
 
@@ -21,7 +20,7 @@ def mock_system_request(
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
-        request_uid=request_uid or uuid.uuid4().hex,
+        request_uid=request_uid or str(uuid.uuid4()),
         status=status,
         created_at=created_at,
         started_at=None,
@@ -36,40 +35,42 @@ def test_broker_update_database(
 
     broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
 
-    successful_request = mock_system_request(request_uid="successful", status="running")
+    successful_uid = str(uuid.uuid4())
+    queued_in_dask_uid = str(uuid.uuid4())
+    successful_request = mock_system_request(
+        request_uid=successful_uid, status="running"
+    )
     queued_in_dask_request = mock_system_request(
-        request_uid="queued_in_dask", status="running"
+        request_uid=queued_in_dask_uid, status="running"
     )
     with session_obj() as session:
         session.add(successful_request)
         session.add(queued_in_dask_request)
         session.commit()
 
+    def mock_fetch_dask_task_status(_, uid: str) -> str:
+        if uid == successful_uid:
+            return "successful"
+        elif uid == queued_in_dask_uid:
+            return "running"
+
     mocker.patch(
         "cads_broker.dispatcher.Broker.fetch_dask_task_status",
-        new=lambda x, y: y,
+        new=mock_fetch_dask_task_status,
     )
 
     broker.update_database(session_obj)
 
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
-            db.SystemRequest.request_uid == "successful"
+            db.SystemRequest.request_uid == successful_uid
         )
         assert session.scalars(statement).first().status == "successful"
 
         statement = sa.select(db.SystemRequest).where(
-            db.SystemRequest.request_uid == "queued_in_dask"
+            db.SystemRequest.request_uid == queued_in_dask_uid
         )
         assert session.scalars(statement).first().status == "running"
-
-    unknown_request = mock_system_request(request_uid="unknown", status="running")
-    with session_obj() as session:
-        session.add(unknown_request)
-        session.commit()
-
-    with pytest.raises(ValueError):
-        broker.update_database(session_obj)
 
 
 def test_broker_choose_request(mocker: pytest_mock.plugin.MockerFixture) -> None:
