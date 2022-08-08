@@ -73,7 +73,11 @@ def set_request_status(
 ) -> None:
     """Set the status of a request."""
     session_obj = ensure_session_obj(session_obj)
-    response_body = {"result": result, "traceback": traceback}
+    response_body = {}
+    if result:
+        response_body["result"] = result
+    elif traceback:
+        response_body["traceback"] = traceback
     with session_obj() as session:
         statement = sa.select(SystemRequest).where(
             SystemRequest.request_uid == request_uid

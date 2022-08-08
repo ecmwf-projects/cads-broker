@@ -3,6 +3,7 @@ import random
 import uuid
 from typing import Any
 
+import pytest
 import sqlalchemy as sa
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
@@ -60,11 +61,30 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     assert running_request.status == "running"
 
     result = {"content_type": "application/json"}
-    traceback = None
+    status = "successful"
     db.set_request_status(
         request_uid,
-        status="successful",
+        status=status,
         result=result,
+        session_obj=session_obj,
+    )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid
+        )
+        running_request = session.scalars(statement).one()
+
+    assert running_request.status == status
+    assert running_request.response_body["result"] == result
+    with pytest.raises(KeyError):
+        running_request.response_body["traceback"]
+    assert running_request.finished_at is not None
+
+    traceback = "traceback"
+    status = "failed"
+    db.set_request_status(
+        request_uid,
+        status=status,
         traceback=traceback,
         session_obj=session_obj,
     )
@@ -74,9 +94,10 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         )
         running_request = session.scalars(statement).one()
 
-    assert running_request.status == "successful"
-    assert running_request.response_body["result"] == result
+    assert running_request.status == status
     assert running_request.response_body["traceback"] == traceback
+    with pytest.raises(KeyError):
+        running_request.response_body["result"]
     assert running_request.finished_at is not None
 
 
