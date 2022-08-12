@@ -1,0 +1,18 @@
+{
+    "setup_code": "import cacholote\nimport cdsapi\nimport xarray as xr\n\n\n@cacholote.cacheable\ndef adapter(request, config, metadata):\n\n    # parse input options\n    collection_id = request.pop('collection_id', None)\n    if not collection_id:\n        raise ValueError(f'collection_id is required in request')\n    data_format = request.pop('format', 'grib')\n    if data_format not in {'netcdf', 'grib'}:\n        raise ValueError(f'{data_format=} is not supported')\n\n    # retrieve data\n    client = cdsapi.Client()\n    client.retrieve(collection_id, request, 'download.grib')  # TODO\n    data = xr.open_dataset('download.grib')\n\n    # post-process data\n    if data_format == 'netcdf':\n        data = xr.open_dataset('download.grib')\n\n    return data",
+    "entry_point": "adapter",
+    "kwargs": {
+        "request": {
+            "collection_id": "reanalysis-era5-single-levels",
+            "product_type": "reanalysis",
+            "variable": "2m_temperature",
+            "year": "1989",
+            "month": "05",
+            "day": "03",
+            "time": "08:00",
+            "format": "netcdf"
+            },
+        "config": {}
+    },
+    "metadata": {}
+}
