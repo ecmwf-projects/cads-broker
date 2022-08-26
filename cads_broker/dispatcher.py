@@ -6,6 +6,7 @@ from typing import Any
 import attrs
 import distributed
 import sqlalchemy as sa
+from cads_worker import worker
 
 from cads_broker import database as db
 
@@ -34,36 +35,6 @@ def get_tasks(client: distributed.Client) -> Any:
         return tasks
 
     return client.run_on_scheduler(get_tasks_on_scheduler)
-
-
-# def submit_to_client(
-#     client: distributed.Client,
-#     key: str,
-#     setup_code: str,
-#     entry_point: str,
-#     kwargs: dict[str, Any] = {},
-#     metadata: dict[str, Any] = {},
-# ) -> distributed.Future:
-def submit_workflow(
-    setup_code: str,
-    entry_point: str,
-    kwargs: dict[str, Any] = {},
-    metadata: dict[str, Any] = {},
-) -> dict[str, Any] | list[dict[str, Any]]:
-    import cacholote
-
-    exec(setup_code, globals())
-    results = eval(f"{entry_point}(metadata=metadata, **kwargs)")
-    return cacholote.encode.dumps(results)
-
-    # return client.submit(
-    #     submit_workflow,
-    #     setup_code,
-    #     entry_point,
-    #     kwargs=kwargs,
-    #     metadata=metadata,
-    #     key=key,
-    # )
 
 
 @attrs.define
@@ -142,7 +113,7 @@ class Broker:
         )
 
         future = self.client.submit(
-            submit_workflow,
+            worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.request_body.get("entry_point", ""),
