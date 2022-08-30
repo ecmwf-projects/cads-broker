@@ -11,7 +11,7 @@ dependencies:
 - pytest-cov
 - sphinx
 - sphinx-autoapi
-# DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+  # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - dask
 - distributed
 - pip
@@ -29,5 +29,4 @@ dependencies:
 - pip:
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
-  - git+https://github.com/ecmwf-projects/cads-worker.git
   - types-sqlalchemy-utils
