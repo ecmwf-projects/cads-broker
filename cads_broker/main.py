@@ -65,7 +65,10 @@ class ComputeClient(clients.BaseClient):
         return process_description
 
     def post_process_execute(
-        self, process_id: str, request, execution_content: models.Execute
+        self,
+        process_id: str,
+        request: fastapi.Request,
+        execution_content: models.Execute,
     ) -> models.StatusInfo:
         job_id = request.headers["X-Forward-Job-ID"]
         process_id_orig = request.headers["X-Forward-Process-ID"]
