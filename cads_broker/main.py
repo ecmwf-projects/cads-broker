@@ -75,12 +75,11 @@ class ComputeClient(clients.BaseClient):
         inputs = execution_content.dict()["inputs"]
         # workaround for acceping key-value objects as input
         inputs["kwargs"] = inputs["kwargs"]["value"]
-        inputs["metadata"] = inputs["metadata"]["value"]
 
         job = database.create_request(
             process_id=process_id,
             request_uid=job_id,
-            **inputs,
+            metadata={"job_id": job_id, "process_id": process_id_orig} ** inputs,
         )
 
         status_info = dict(
