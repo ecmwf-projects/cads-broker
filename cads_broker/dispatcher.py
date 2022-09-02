@@ -136,8 +136,6 @@ class Broker:
                     not in ("successful", "failed")
                 ]
             )
-            logging.info(f"running: {self.running_requests}")
-            logging.info(f"futures: {self.futures}")
             queue = db.get_accepted_requests()
             available_slots = self.max_running_requests - self.running_requests
             if queue and available_slots > 0:
