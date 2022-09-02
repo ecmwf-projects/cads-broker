@@ -21,10 +21,10 @@ SET row_security = off;
 --
 
 CREATE TYPE public.status AS ENUM (
-    'queued',
+    'accepted',
     'running',
     'failed',
-    'completed'
+    'successful'
 );
 
 
@@ -40,12 +40,17 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.system_requests (
     request_id integer NOT NULL,
-    request_uid character varying(1024),
+    request_uid uuid,
+    process_id character varying(1024),
     status public.status,
     request_body jsonb NOT NULL,
     request_metadata jsonb,
     response_body jsonb,
     response_metadata jsonb,
+    created_at timestamp without time zone,
+    started_at timestamp without time zone,
+    finished_at timestamp without time zone,
+    updated_at timestamp without time zone,
     expire timestamp without time zone
 );
 
@@ -85,7 +90,7 @@ ALTER TABLE ONLY public.system_requests ALTER COLUMN request_id SET DEFAULT next
 -- Data for Name: system_requests; Type: TABLE DATA; Schema: public; Owner: broker
 --
 
-COPY public.system_requests (request_id, request_uid, status, request_body, request_metadata, response_body, response_metadata, expire) FROM stdin;
+COPY public.system_requests (request_id, request_uid, process_id, status, request_body, request_metadata, response_body, response_metadata, created_at, started_at, finished_at, updated_at, expire) FROM stdin;
 \.
 
 
@@ -108,9 +113,10 @@ ALTER TABLE ONLY public.system_requests
 -- Name: ix_system_requests_request_uid; Type: INDEX; Schema: public; Owner: broker
 --
 
-CREATE INDEX ix_system_requests_request_uid ON public.system_requests USING btree (request_uid);
+CREATE UNIQUE INDEX ix_system_requests_request_uid ON public.system_requests USING btree (request_uid);
 
 
 --
 -- PostgreSQL database dump complete
 --
+
