@@ -69,6 +69,7 @@ class ComputeClient(clients.BaseClient):
         self,
         process_id: str,
         request: fastapi.Request,
+        response: fastapi.Response,
         execution_content: models.Execute,
     ) -> models.StatusInfo:
         job_id = request.headers["X-Forward-Job-ID"]
@@ -83,6 +84,7 @@ class ComputeClient(clients.BaseClient):
             metadata={"job_id": job_id, "process_id": process_id_orig},
             **inputs,
         )
+        response.headers["X-Forward-Process-ID"] = process_id_orig
 
         status_info = dict(
             processID=job["process_id"],
@@ -93,7 +95,6 @@ class ComputeClient(clients.BaseClient):
             started=job["started_at"],
             finished=job["finished_at"],
             updated=job["updated_at"],
-            apiProcessID=process_id_orig,
         )
         return status_info
 
