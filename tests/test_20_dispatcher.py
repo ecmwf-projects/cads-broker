@@ -51,8 +51,10 @@ def test_broker_update_database(
     def mock_fetch_dask_task_status(_, uid: str) -> str:
         if uid == successful_uid:
             return "successful"
-        elif uid == queued_in_dask_uid:
+        if uid == queued_in_dask_uid:
             return "running"
+        else:
+            return "failed"
 
     mocker.patch(
         "cads_broker.dispatcher.Broker.fetch_dask_task_status",
