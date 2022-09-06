@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
+import json
 from typing import Any
 
 import attrs
@@ -132,8 +133,8 @@ class ComputeClient(clients.BaseClient):
 
     def get_job_results(self, job_id: str) -> Any:
         job = database.get_request(request_uid=job_id)
-        if job.status == "finished":
-            return job.response_body.get("result")
+        if job.status == "successful":
+            return {"asset": {"value": json.loads(job.response_body.get("result"))}}
         elif job.status == "failed":
             error = models.Exception(
                 type="RuntimeError",
