@@ -73,7 +73,7 @@ class ComputeClient(clients.BaseClient):
         execution_content: models.Execute,
     ) -> models.StatusInfo:
         job_id = request.headers["X-Forward-Job-ID"]
-        process_id_orig = request.headers["X-Forward-Process-ID"]
+        orig_process_id = request.headers["X-Forward-Process-ID"]
         inputs = execution_content.dict()["inputs"]
         # workaround for acceping key-value objects as input
         inputs["kwargs"] = inputs["kwargs"]["value"]
@@ -81,10 +81,10 @@ class ComputeClient(clients.BaseClient):
         job = database.create_request(
             process_id=process_id,
             request_uid=job_id,
-            metadata={"job_id": job_id, "process_id": process_id_orig},
+            metadata={"job_id": job_id, "process_id": orig_process_id},
             **inputs,
         )
-        response.headers["X-Forward-Process-ID"] = process_id_orig
+        response.headers["X-Forward-Process-ID"] = orig_process_id
 
         status_info = dict(
             processID=job["process_id"],
@@ -118,8 +118,11 @@ class ComputeClient(clients.BaseClient):
             for job in jobs
         ]
 
-    def get_job(self, job_id: str) -> models.StatusInfo:
+    def get_job(self, job_id: str, response: fastapi.Response) -> models.StatusInfo:
         job = database.get_request(request_uid=job_id)
+        response.headers["X-Forward-Process-ID"] = job.request_metadata.get(
+            "process_id"
+        )
         status_info = models.StatusInfo(
             processID=job.process_id,
             type=models.JobType("process"),
