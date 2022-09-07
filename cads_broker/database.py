@@ -1,4 +1,7 @@
 """SQLAlchemy ORM model."""
+import uuid
+from typing import Any
+
 import sqlalchemy as sa
 import sqlalchemy_utils
 from sqlalchemy.dialects.postgresql import JSONB
@@ -9,7 +12,7 @@ metadata = sa.MetaData()
 BaseModel = sa.ext.declarative.declarative_base(metadata=metadata)
 
 
-status_enum = sa.Enum("queued", "running", "failed", "completed", name="status")
+status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
 
 
 class SystemRequest(BaseModel):
@@ -18,12 +21,17 @@ class SystemRequest(BaseModel):
     __tablename__ = "system_requests"
 
     request_id = sa.Column(sa.Integer, primary_key=True)
-    request_uid = sa.Column(sa.VARCHAR(1024), index=True)
+    request_uid = sa.Column(sa.dialects.postgresql.UUID(), index=True, unique=True)
+    process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
     response_body = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
+    created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
+    started_at = sa.Column(sa.TIMESTAMP)
+    finished_at = sa.Column(sa.TIMESTAMP)
+    updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     expire = sa.Column(sa.DateTime)
 
 
@@ -46,38 +54,87 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     return session_obj
 
 
+def get_accepted_requests(
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> list[SystemRequest]:
+    """Get all accepted requests."""
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
+        return session.scalars(statement).all()
+
+
 def set_request_status(
-    request_uid: str, status: str, session_obj: sa.orm.sessionmaker | None = None
+    request_uid: str,
+    status: str,
+    result: str | dict[str, str] | None = None,
+    traceback: str | None = None,
+    session_obj: sa.orm.sessionmaker | None = None,
 ) -> None:
     """Set the status of a request."""
     session_obj = ensure_session_obj(session_obj)
+    response_body = {}
+    if result:
+        response_body["result"] = result
+    elif traceback:
+        response_body["traceback"] = traceback
     with session_obj() as session:
         statement = sa.select(SystemRequest).where(
             SystemRequest.request_uid == request_uid
         )
         request = session.scalars(statement).one()
+        if status in ("successful", "failed"):
+            request.finished_at = sa.func.now()
+        elif status == "running":
+            request.started_at = sa.func.now()
         request.status = status
+        request.response_body = response_body
         session.commit()
 
 
 def create_request(
-    seconds: int, session_obj: sa.orm.sessionmaker | None = None
-) -> SystemRequest:
+    setup_code: str,
+    entry_point: str,
+    kwargs: dict,
+    metadata: dict,
+    process_id: str,
+    request_uid: str = None,
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
-    import time
-    import uuid
 
     with session_obj() as session:
         request = SystemRequest(
-            request_uid=uuid.uuid4().hex,
-            status="queued",
-            request_body={"seconds": seconds},
-            request_metadata={"created_at": time.time()},
+            request_uid=request_uid or str(uuid.uuid4()),
+            process_id=process_id,
+            status="accepted",
+            request_body={
+                "setup_code": setup_code,
+                "entry_point": entry_point,
+                "kwargs": kwargs,
+            },
+            request_metadata=metadata,
         )
         session.add(request)
         session.commit()
-    return request
+        ret_value = {
+            column.key: getattr(request, column.key)
+            for column in sa.inspect(request).mapper.column_attrs
+        }
+    return ret_value
+
+
+def get_request(
+    request_uid: str, session_obj: sa.orm.sessionmaker | None = None
+) -> SystemRequest:
+    """Get a request by its UID."""
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        statement = sa.select(SystemRequest).where(
+            SystemRequest.request_uid == request_uid
+        )
+        return session.scalars(statement).one()
 
 
 def init_database(connection_string: str) -> sa.engine.Engine:

@@ -1,3 +1,6 @@
+import datetime
+import random
+import uuid
 from typing import Any
 
 import pytest
@@ -5,7 +8,124 @@ import sqlalchemy as sa
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
 
-from cads_broker import database
+from cads_broker import database as db
+
+
+def mock_system_request(
+    status: str = "accepted",
+    created_at: datetime.datetime = datetime.datetime.now(),
+    request_uid: str | None = None,
+) -> db.SystemRequest:
+    system_request = db.SystemRequest(
+        request_id=random.randrange(1, 100),
+        request_uid=request_uid or str(uuid.uuid4()),
+        status=status,
+        created_at=created_at,
+        started_at=None,
+        request_body={"request_type": "test"},
+    )
+    return system_request
+
+
+def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
+    successful_request = mock_system_request(status="running")
+    accepted_request = mock_system_request(status="accepted")
+    accepted_request_uid = accepted_request.request_uid
+    with session_obj() as session:
+        session.add(successful_request)
+        session.add(accepted_request)
+        session.commit()
+    requests = db.get_accepted_requests(session_obj)
+    assert len(requests) == 1
+    assert requests[0].request_uid == accepted_request_uid
+
+
+def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
+    request = mock_system_request(status="accepted")
+    request_uid = request.request_uid
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
+
+    db.set_request_status(
+        request_uid,
+        status="running",
+        session_obj=session_obj,
+    )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid
+        )
+        running_request = session.scalars(statement).one()
+
+    assert running_request.status == "running"
+
+    result = {"content_type": "application/json"}
+    status = "successful"
+    db.set_request_status(
+        request_uid,
+        status=status,
+        result=result,
+        session_obj=session_obj,
+    )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid
+        )
+        running_request = session.scalars(statement).one()
+
+    assert running_request.status == status
+    assert running_request.response_body["result"] == result
+    with pytest.raises(KeyError):
+        running_request.response_body["traceback"]
+    assert running_request.finished_at is not None
+
+    traceback = "traceback"
+    status = "failed"
+    db.set_request_status(
+        request_uid,
+        status=status,
+        traceback=traceback,
+        session_obj=session_obj,
+    )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid
+        )
+        running_request = session.scalars(statement).one()
+
+    assert running_request.status == status
+    assert running_request.response_body["traceback"] == traceback
+    with pytest.raises(KeyError):
+        running_request.response_body["result"]
+    assert running_request.finished_at is not None
+
+
+def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
+    request_dict = db.create_request(
+        setup_code="",
+        entry_point="sum",
+        kwargs={},
+        metadata={},
+        process_id="submit-workflow",
+        session_obj=session_obj,
+    )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_dict["request_uid"]
+        )
+        request = session.scalars(statement).one()
+    assert request.request_uid == request_dict["request_uid"]
+
+
+def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
+    request = mock_system_request(status="accepted")
+    request_uid = request.request_uid
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
+    request = db.get_request(request_uid, session_obj)
+    assert request.request_uid == request_uid
 
 
 def test_init_database(postgresql: Connection[str]) -> None:
@@ -19,10 +139,10 @@ def test_init_database(postgresql: Connection[str]) -> None:
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
     expected_tables_at_beginning: set[str] = set()
-    expected_tables_complete = set(database.metadata.tables)
+    expected_tables_complete = set(db.metadata.tables)
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
 
-    database.init_database(connection_string)
+    db.init_database(connection_string)
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
 
@@ -30,10 +150,10 @@ def test_ensure_session_obj(
     postgresql: Connection[str], session_obj: sessionmaker, temp_environ: Any
 ) -> None:
     # case of session is already set
-    ret_value = database.ensure_session_obj(session_obj)
+    ret_value = db.ensure_session_obj(session_obj)
     assert ret_value is session_obj
 
     # case of session not set
     temp_environ["postgres_password"] = postgresql.info.password
-    ret_value = database.ensure_session_obj(None)
+    ret_value = db.ensure_session_obj(None)
     assert isinstance(ret_value, sessionmaker)

@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
-
-
+import json
 from typing import Any
 
 import attrs
 import fastapi
-from ogc_api_processes_fastapi import clients, main, models
+from ogc_api_processes_fastapi import clients, exceptions, main, models
+
+from cads_broker import database
 
 
 @attrs.define
@@ -26,8 +27,8 @@ class ComputeClient(clients.BaseClient):
     def get_processes(self, limit: int, offset: int) -> list[models.ProcessSummary]:
         available_processes = [
             models.ProcessSummary(
-                title="Retrieve from interal MARS archive",
-                id="retrieve-internal-mars",
+                title="Submit a workflow",
+                id="submit-workflow",
                 version="1.0.0",
                 jobControlOptions=[
                     "async-execute",
@@ -40,22 +41,111 @@ class ComputeClient(clients.BaseClient):
         return available_processes
 
     def get_process(self, process_id: str) -> models.ProcessDescription:
-        process_description = models.ProcessDescription(
-            inputs=[],
-            outputs=[],
-        )
+        if process_id == "submit-workflow":
+            process_description = models.ProcessDescription(
+                id=process_id,
+                version="1.0.0",
+                inputs={
+                    "setup_code": models.InputDescription(
+                        schema_=models.SchemaItem(type="string")
+                    ),
+                    "entry_point": models.InputDescription(
+                        schema_=models.SchemaItem(type="string")
+                    ),
+                    "kwargs": models.InputDescription(
+                        schema_=models.SchemaItem(type="object")
+                    ),
+                    "metadata": models.InputDescription(
+                        schema_=models.SchemaItem(type="object")
+                    ),
+                },
+                outputs=[],
+            )
+        else:
+            raise exceptions.NoSuchProcess(f"{process_id} is not supported")
         return process_description
 
     def post_process_execute(
-        self, process_id: str, execution_content: models.Execute
-    ) -> Any:
-        return None
+        self,
+        process_id: str,
+        request: fastapi.Request,
+        response: fastapi.Response,
+        execution_content: models.Execute,
+    ) -> models.StatusInfo:
+        job_id = request.headers["X-Forward-Job-ID"]
+        process_id_orig = request.headers["X-Forward-Process-ID"]
+        inputs = execution_content.dict()["inputs"]
+        # workaround for acceping key-value objects as input
+        inputs["kwargs"] = inputs["kwargs"]["value"]
+
+        job = database.create_request(
+            process_id=process_id,
+            request_uid=job_id,
+            metadata={"job_id": job_id, "process_id": process_id_orig},
+            **inputs,
+        )
+        response.headers["X-Forward-Process-ID"] = process_id_orig
+
+        status_info = dict(
+            processID=job["process_id"],
+            type=models.JobType("process"),
+            jobID=job["request_uid"],
+            status=models.StatusCode(job["status"]),
+            created=job["created_at"],
+            started=job["started_at"],
+            finished=job["finished_at"],
+            updated=job["updated_at"],
+        )
+        return status_info
+
+    def get_jobs(self) -> list[models.StatusInfo]:
+        session_obj = database.ensure_session_obj(None)
+        with session_obj() as session:
+            statement = database.sa.select(database.SystemRequest)
+            jobs = session.scalars(statement).all()
+
+        return [
+            dict(
+                type=models.JobType("process"),
+                jobID=job.request_uid,
+                processID=job.process_id,
+                status=models.StatusCode(job.status),
+                created=job.created_at,
+                started=job.started_at,
+                finished=job.finished_at,
+                updated=job.updated_at,
+            )
+            for job in jobs
+        ]
 
     def get_job(self, job_id: str) -> models.StatusInfo:
-        return None
+        job = database.get_request(request_uid=job_id)
+        status_info = models.StatusInfo(
+            processID=job.process_id,
+            type=models.JobType("process"),
+            jobID=job.request_uid,
+            status=models.StatusCode(job.status),
+            created=job.created_at,
+            started=job.started_at,
+            finished=job.finished_at,
+            updated=job.updated_at,
+        )
+        return status_info
 
-    def get_job_results(self, job_id: str):
-        return
+    def get_job_results(self, job_id: str) -> Any:
+        job = database.get_request(request_uid=job_id)
+        if job.status == "successful":
+            return {"asset": {"value": json.loads(job.response_body.get("result"))}}
+        elif job.status == "failed":
+            error = models.Exception(
+                type="RuntimeError",
+                detail=job.request_body.get("traceback"),
+            )
+            return error
+        elif job.status in ("pending", "running"):
+            raise exceptions.ResultsNotReady(f"Status of {job_id} is {job.status}.")
+        else:
+            raise exceptions.NoSuchJob(f"Can't find the job {job_id}.")
 
 
 app = fastapi.FastAPI()

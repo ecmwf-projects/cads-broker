@@ -1,4 +1,7 @@
-"""module for entry points."""
+"""Module for entry points."""
+import json
+import pathlib
+
 import sqlalchemy as sa
 import typer
 
@@ -42,7 +45,7 @@ def init_db(connection_string: str | None = None) -> None:
 @app.command()
 def run(
     max_running_requests: int = 4,
-    scheduler_address: str = "scheduler:8786",
+    address: str = "scheduler:8786",
 ) -> None:
     """Start the broker.
 
@@ -51,16 +54,27 @@ def run(
     max_running_requests: maximum number of requests to run in parallel
     scheduler_address: address of the scheduler
     """
-    broker = dispatcher.Broker(  # type: ignore
-        max_running_requests=max_running_requests, scheduler_address=scheduler_address
+    broker = dispatcher.Broker.from_address(
+        address=address, max_running_requests=max_running_requests
     )
     broker.run()
 
 
 @app.command()
 def add_system_request(
-    seconds: int,
-    connection_string: str | None = None,
+    file_path: pathlib.Path = typer.Option(
+        None,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        writable=False,
+        readable=True,
+        # resolve_path=True,
+        help="Path to the file containing the JSON request to the Broker",
+    ),
+    connection_string: str = typer.Option(
+        None, help="Connection string to the broker database"
+    ),
 ) -> None:
     """Add a system request to the database.
 
@@ -74,7 +88,12 @@ def add_system_request(
         connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
     session_obj = sa.orm.sessionmaker(engine)
-    database.create_request(seconds, session_obj)
+    print(file_path)
+    database.create_request(
+        process_id="submit-workflow",
+        session_obj=session_obj,
+        **json.loads(file_path.read_text())
+    )
 
 
 def main() -> None:
