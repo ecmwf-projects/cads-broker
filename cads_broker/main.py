@@ -84,9 +84,8 @@ class ComputeClient(clients.BaseClient):
             metadata={"job_id": job_id, "process_id": orig_process_id},
             **inputs,
         )
-        response.headers["X-Forward-Process-ID"] = orig_process_id
 
-        status_info = dict(
+        status_info = models.StatusInfo(
             processID=job["process_id"],
             type=models.JobType("process"),
             jobID=job["request_uid"],
@@ -95,6 +94,7 @@ class ComputeClient(clients.BaseClient):
             started=job["started_at"],
             finished=job["finished_at"],
             updated=job["updated_at"],
+            metadata={"apiProcessID": orig_process_id},
         )
         return status_info
 
@@ -105,7 +105,7 @@ class ComputeClient(clients.BaseClient):
             jobs = session.scalars(statement).all()
 
         return [
-            dict(
+            models.StatusInfo(
                 type=models.JobType("process"),
                 jobID=job.request_uid,
                 processID=job.process_id,
@@ -114,15 +114,14 @@ class ComputeClient(clients.BaseClient):
                 started=job.started_at,
                 finished=job.finished_at,
                 updated=job.updated_at,
+                metadata={"apiProcessID": job.request_metadata.get("processID")},
             )
             for job in jobs
         ]
 
     def get_job(self, job_id: str, response: fastapi.Response) -> models.StatusInfo:
         job = database.get_request(request_uid=job_id)
-        response.headers["X-Forward-Process-ID"] = job.request_metadata.get(
-            "process_id"
-        )
+
         status_info = models.StatusInfo(
             processID=job.process_id,
             type=models.JobType("process"),
@@ -132,19 +131,18 @@ class ComputeClient(clients.BaseClient):
             started=job.started_at,
             finished=job.finished_at,
             updated=job.updated_at,
+            metadata={"apiProcessID": job.request_metadata.get("process_id")},
         )
         return status_info
 
-    def get_job_results(self, job_id: str) -> Any:
+    def get_job_results(self, job_id: str) -> dict[str, Any]:
         job = database.get_request(request_uid=job_id)
         if job.status == "successful":
             return {"asset": {"value": json.loads(job.response_body.get("result"))}}
         elif job.status == "failed":
-            error = models.Exception(
-                type="RuntimeError",
-                detail=job.request_body.get("traceback"),
+            raise exceptions.JobResultsFailed(
+                type="RuntimeError", detail=job.request_body.get("traceback")
             )
-            return error
         elif job.status in ("pending", "running"):
             raise exceptions.ResultsNotReady(f"Status of {job_id} is {job.status}.")
         else:
@@ -153,3 +151,4 @@ class ComputeClient(clients.BaseClient):
 
 app = fastapi.FastAPI()
 app = main.include_routers(app=app, client=ComputeClient())
+app = main.include_exception_handlers(app=app)
