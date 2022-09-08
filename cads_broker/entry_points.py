@@ -1,11 +1,13 @@
 """Module for entry points."""
 import json
+import os
 import pathlib
+from typing import Any
 
 import sqlalchemy as sa
 import typer
 
-from cads_broker import config, database, dispatcher
+from cads_broker import config, database, dispatcher, object_storage
 
 app = typer.Typer()
 
@@ -29,7 +31,7 @@ def info(connection_string: str | None = None) -> None:
 
 @app.command()
 def init_db(connection_string: str | None = None) -> None:
-    """Create the database structure.
+    """Create the database structure and the cache area in the object storage.
 
     Parameters
     ----------
@@ -40,6 +42,25 @@ def init_db(connection_string: str | None = None) -> None:
         connection_string = dbsettings.connection_string
     database.init_database(connection_string)
     print("successfully created the broker database structure.")
+
+    # get storage parameters from environment
+    for key in ("OBJECT_STORAGE_URL", "STORAGE_ADMIN", "STORAGE_PASSWORD"):
+        if key not in os.environ:
+            msg = (
+                "key %r must be defined in the environment in order to use the object storage"
+                % key
+            )
+            raise KeyError(msg)
+    object_storage_url = os.environ["OBJECT_STORAGE_URL"]
+    storage_kws: dict[str, Any] = {
+        "access_key": os.environ["STORAGE_ADMIN"],
+        "secret_key": os.environ["STORAGE_PASSWORD"],
+        "secure": False,
+    }
+    object_storage.create_download_bucket(
+        "download-cache", object_storage_url, **storage_kws
+    )
+    print("successfully created the cache area in the object storage.")
 
 
 @app.command()
