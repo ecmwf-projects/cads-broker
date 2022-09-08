@@ -1,4 +1,3 @@
-
 import json
 from typing import Any
 
@@ -26,7 +25,9 @@ def test_create_download_bucket(mocker) -> None:
     patch3 = mocker.patch.object(minio.Minio, "make_bucket")
     patch4 = mocker.patch.object(minio.Minio, "set_bucket_policy")
 
-    object_storage.create_download_bucket(bucket_name, object_storage_url, **storage_kws)
+    object_storage.create_download_bucket(
+        bucket_name, object_storage_url, **storage_kws
+    )
 
     patch1.assert_called_once_with("myobject-storage:myport", **storage_kws)
     patch2.assert_called_once()
