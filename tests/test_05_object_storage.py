@@ -9,7 +9,7 @@ from cads_broker import object_storage
 
 
 @pytest.mark.filterwarnings("ignore:Exception ignored")
-def test_store_file(mocker) -> None:
+def test_create_download_bucket(mocker) -> None:
     object_storage_url = "http://myobject-storage:myport/"
     bucket_name = "download-bucket"
     ro_policy = json.dumps(object_storage.DOWNLOAD_POLICY_TEMPLATE) % {
