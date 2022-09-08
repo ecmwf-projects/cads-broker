@@ -25,7 +25,7 @@ DOWNLOAD_POLICY_TEMPLATE: dict[str, Any] = {
 
 
 def create_download_bucket(bucket_name: str, object_storage_url: str, **storage_kws: Any) -> None:
-    """Create a bucket with download policy in the object storage, if not already existing
+    """Create a bucket with download policy in the object storage, if not already existing.
 
     Parameters
     ----------
