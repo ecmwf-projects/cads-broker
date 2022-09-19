@@ -18,8 +18,10 @@ from typing import Any
 import attrs
 import fastapi
 from ogc_api_processes_fastapi import clients, exceptions, main, models
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from cads_broker import database
+from cads_broker.metrics import get_broker_queue
 
 
 @attrs.define
@@ -150,3 +152,10 @@ class ComputeClient(clients.BaseClient):
 
 app = fastapi.FastAPI()
 app = main.include_routers(app=app, client=ComputeClient())
+
+
+@app.on_event("startup")
+def startup():
+    instrumentator = Instrumentator()
+    instrumentator.add(get_broker_queue())
+    instrumentator.instrument(app).expose(app)
