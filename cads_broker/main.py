@@ -114,7 +114,7 @@ class ComputeClient(clients.BaseClient):
                 started=job.started_at,
                 finished=job.finished_at,
                 updated=job.updated_at,
-                metadata={"apiProcessID": job.request_metadata.get("processID")},
+                metadata={"apiProcessID": job.request_metadata.get("process_id")},
             )
             for job in jobs
         ]
