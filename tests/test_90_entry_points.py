@@ -1,17 +1,16 @@
-import os.path
+from typing import Any
 
 import sqlalchemy as sa
 from psycopg import Connection
 from typer.testing import CliRunner
 
-from cads_broker import database, entry_points
+from cads_broker import database, entry_points, object_storage
 
-THIS_PATH = os.path.abspath(os.path.dirname(__file__))
-TESTDATA_PATH = os.path.join(THIS_PATH, "data")
 runner = CliRunner()
 
 
-def test_init_db(postgresql: Connection[str]) -> None:
+def test_init_db(postgresql: Connection[str], mocker) -> None:
+    patch_storage = mocker.patch.object(object_storage, "create_download_bucket")
     connection_string = (
         f"postgresql://{postgresql.info.user}:"
         f"@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
@@ -21,17 +20,23 @@ def test_init_db(postgresql: Connection[str]) -> None:
     query = (
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
-
+    object_storage_url = "http://myobject-storage:myport/"
+    object_storage_kws: dict[str, Any] = {
+        "access_key": "storage_user",
+        "secret_key": "storage_password",
+        "secure": False,
+    }
     result = runner.invoke(
-        entry_points.app, ["init-db", "--connection-string", connection_string]
+        entry_points.app,
+        ["init-db", "--connection-string", connection_string],
+        env={
+            "OBJECT_STORAGE_URL": object_storage_url,
+            "STORAGE_ADMIN": object_storage_kws["access_key"],
+            "STORAGE_PASSWORD": object_storage_kws["secret_key"],
+        },
     )
-
     assert result.exit_code == 0
+    patch_storage.assert_called_once_with(
+        "download-cache", object_storage_url, **object_storage_kws
+    )
     assert set(conn.execute(query).scalars()) == set(database.metadata.tables)  # type: ignore
-
-    # uncomment to update testdb.sql
-    # dump_path = os.path.join(TESTDATA_PATH, "testdb.sql")
-    # with open(dump_path, "w") as dumped_file:
-    #     ret = subprocess.call(["pg_dump", connection_string], stdout=dumped_file)
-    # assert ret == 0
-    # assert os.path.exists(dump_path)
