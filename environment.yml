@@ -27,6 +27,7 @@ dependencies:
 - typer
 - uvicorn
 - pip:
+  - prometheus_fastapi_instrumentator
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
   - types-sqlalchemy-utils
