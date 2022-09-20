@@ -58,7 +58,7 @@ def init_db(connection_string: str | None = None) -> None:
         "secure": False,
     }
     object_storage.create_download_bucket(
-        "download-cache", object_storage_url, **storage_kws
+        os.environ.get("CACHE_BUCKET", "cache"), object_storage_url, **storage_kws
     )
     print("successfully created the cache area in the object storage.")
 
