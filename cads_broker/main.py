@@ -83,7 +83,7 @@ class ComputeClient(clients.BaseClient):
         job = database.create_request(
             process_id=process_id,
             request_uid=job_id,
-            metadata={"job_id": job_id, "process_id": orig_process_id},
+            metadata={"process_id": orig_process_id},
             **inputs,
         )
 
