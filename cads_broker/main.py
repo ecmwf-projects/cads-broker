@@ -25,6 +25,25 @@ from cads_broker.metrics import get_broker_queue
 
 
 @attrs.define
+class NotValidJobId(Exception):
+    detail: str | None = None
+
+
+def not_valid_job_id_exception_handler(
+    request: fastapi.Request, exc: Exception
+) -> fastapi.responses.JSONResponse:
+    return fastapi.responses.JSONResponse(
+        status_code=fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=models.Exception(
+            type="not-valid-job-id",
+            title="not valid job id",
+            detail=exc.detail,
+            instance=str(request.url),
+        ).dict(exclude_unset=True),
+    )
+
+
+@attrs.define
 class ComputeClient(clients.BaseClient):
     def get_processes(self, limit: int, offset: int) -> list[models.ProcessSummary]:
         available_processes = [
@@ -73,18 +92,24 @@ class ComputeClient(clients.BaseClient):
         request: fastapi.Request,
         execution_content: models.Execute,
     ) -> models.StatusInfo:
+        if process_id != "submit-workflow":
+            raise exceptions.NoSuchProcess(f"{process_id} is not supported")
         job_id = request.headers["X-Forward-Job-ID"]
         orig_process_id = request.headers["X-Forward-Process-ID"]
         inputs = execution_content.dict()["inputs"]
         # workaround for acceping key-value objects as input
         inputs["kwargs"] = inputs["kwargs"]["value"]
-
-        job = database.create_request(
-            process_id=process_id,
-            request_uid=job_id,
-            metadata={"process_id": orig_process_id},
-            **inputs,
-        )
+        try:
+            job = database.create_request(
+                process_id=process_id,
+                request_uid=job_id,
+                metadata={"process_id": orig_process_id},
+                **inputs,
+            )
+        except database.sa.exc.IntegrityError:
+            raise NotValidJobId(detail=f"Job ID {job_id} already exists.")
+        except database.sa.exc.StatementError:
+            raise NotValidJobId(detail=f"Job ID {job_id} is not valid.")
 
         status_info = models.StatusInfo(
             processID=job["process_id"],
@@ -121,7 +146,10 @@ class ComputeClient(clients.BaseClient):
         ]
 
     def get_job(self, job_id: str) -> models.StatusInfo:
-        job = database.get_request(request_uid=job_id)
+        try:
+            job = database.get_request(request_uid=job_id)
+        except (database.sa.exc.StatementError, database.sa.exc.NoResultFound):
+            raise exceptions.NoSuchJob(f"Can't find the job {job_id}.")
 
         status_info = models.StatusInfo(
             processID=job.process_id,
@@ -137,7 +165,10 @@ class ComputeClient(clients.BaseClient):
         return status_info
 
     def get_job_results(self, job_id: str) -> dict[str, Any]:
-        job = database.get_request(request_uid=job_id)
+        try:
+            job = database.get_request(request_uid=job_id)
+        except (database.sa.exc.StatementError, database.sa.exc.NoResultFound):
+            raise exceptions.NoSuchJob(f"Can't find the job {job_id}.")
         if job.status == "successful":
             return {"asset": {"value": json.loads(job.response_body.get("result"))}}
         elif job.status == "failed":
@@ -153,6 +184,7 @@ class ComputeClient(clients.BaseClient):
 app = fastapi.FastAPI()
 app = main.include_routers(app=app, client=ComputeClient())
 app = main.include_exception_handlers(app=app)
+app.add_exception_handler(NotValidJobId, not_valid_job_id_exception_handler)
 
 
 @app.on_event("startup")
