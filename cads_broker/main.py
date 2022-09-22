@@ -145,7 +145,7 @@ class ComputeClient(clients.BaseClient):
             raise exceptions.JobResultsFailed(
                 type="RuntimeError", detail=job.request_body.get("traceback")
             )
-        elif job.status in ("pending", "running"):
+        elif job.status in ("accepted", "running"):
             raise exceptions.ResultsNotReady(f"Status of {job_id} is {job.status}.")
         else:
             raise exceptions.NoSuchJob(f"Can't find the job {job_id}.")
