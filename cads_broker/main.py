@@ -71,7 +71,6 @@ class ComputeClient(clients.BaseClient):
         self,
         process_id: str,
         request: fastapi.Request,
-        response: fastapi.Response,
         execution_content: models.Execute,
     ) -> models.StatusInfo:
         job_id = request.headers["X-Forward-Job-ID"]
@@ -121,7 +120,7 @@ class ComputeClient(clients.BaseClient):
             for job in jobs
         ]
 
-    def get_job(self, job_id: str, response: fastapi.Response) -> models.StatusInfo:
+    def get_job(self, job_id: str) -> models.StatusInfo:
         job = database.get_request(request_uid=job_id)
 
         status_info = models.StatusInfo(
