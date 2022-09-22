@@ -142,7 +142,7 @@ class ComputeClient(clients.BaseClient):
             return {"asset": {"value": json.loads(job.response_body.get("result"))}}
         elif job.status == "failed":
             raise exceptions.JobResultsFailed(
-                type="RuntimeError", detail=job.request_body.get("traceback")
+                type="RuntimeError", detail=job.response_body.get("traceback")
             )
         elif job.status in ("accepted", "running"):
             raise exceptions.ResultsNotReady(f"Status of {job_id} is {job.status}.")
