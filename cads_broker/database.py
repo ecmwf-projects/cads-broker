@@ -64,6 +64,19 @@ def get_accepted_requests(
         return session.scalars(statement).all()
 
 
+def count_accepted_requests(
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> int:
+    """Count all accepted requests."""
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        return (
+            session.query(SystemRequest)
+            .filter(SystemRequest.status == "accepted")
+            .count()
+        )
+
+
 def set_request_status(
     request_uid: str,
     status: str,
