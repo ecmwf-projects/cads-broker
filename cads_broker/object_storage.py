@@ -1,9 +1,9 @@
 """utility module to interface to the object storage."""
 import json
-import minio  # type: ignore
-from typing import Any
 import urllib.parse
+from typing import Any
 
+import minio  # type: ignore
 
 DOWNLOAD_POLICY_TEMPLATE: dict[str, Any] = {
     "Version": "2012-10-17",
