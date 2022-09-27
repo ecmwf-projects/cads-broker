@@ -6,7 +6,11 @@ from typing import Any
 import attrs
 import distributed
 import sqlalchemy as sa
-from cads_worker import worker
+
+try:
+    from cads_worker import worker
+except ModuleNotFoundError:
+    pass
 
 from cads_broker import database as db
 
