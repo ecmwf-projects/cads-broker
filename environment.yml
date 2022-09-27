@@ -31,4 +31,5 @@ dependencies:
   - prometheus_fastapi_instrumentator
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
+  - git+https://github.com/ecmwf-projects/cads-worker.git
   - types-sqlalchemy-utils
