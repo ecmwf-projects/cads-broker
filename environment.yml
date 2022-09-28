@@ -28,7 +28,7 @@ dependencies:
 - typer
 - uvicorn
 - pip:
-  - starlette_exporter
+  - starlette-exporter
   - pytest-postgresql
   - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
   - types-sqlalchemy-utils
