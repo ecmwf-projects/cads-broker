@@ -4,19 +4,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cads_broker import SystemRequest
-from cads_broker.main import app
-from tests.test_02_database import mock_system_request
+from cads_broker.main import app  # type: ignore
+from tests.test_02_database import mock_system_request  # type: ignore
 
 client = TestClient(app)
 
 
-@pytest.mark.skip()
-@pytest.mark.parametrize(
-    "entry_num",
-    [1, 100, 1000, 10000]
-)
+@pytest.mark.skip(reason="performance test, not for coverage")
+@pytest.mark.parametrize("entry_num", [1, 100, 1000, 10000])
 def test_broker_queue(entry_num, session_obj):
-    """ Test custom metric and check performance time (count accepted requests)"""
+    """Test custom metric and check performance time (count accepted requests)"""
     print(f"Num entries {entry_num}")
     with session_obj() as session:
         # clean table
