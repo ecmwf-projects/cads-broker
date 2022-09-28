@@ -20,8 +20,7 @@ import fastapi
 from ogc_api_processes_fastapi import clients, exceptions, main, models
 from starlette_exporter import PrometheusMiddleware, handle_metrics
 
-from cads_broker import database
-from cads_broker.metrics import add_metrics_middleware
+from cads_broker import database, metrics
 
 
 @attrs.define
@@ -185,7 +184,7 @@ class ComputeClient(clients.BaseClient):
 
 app = fastapi.FastAPI()
 app.add_middleware(PrometheusMiddleware)
-add_metrics_middleware(app)
+metrics.add_metrics_middleware(app)
 app = main.include_routers(app=app, client=ComputeClient())
 app.add_route("/metrics", handle_metrics)
 app = main.include_exception_handlers(app=app)
