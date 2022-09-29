@@ -126,7 +126,9 @@ class ComputeClient(clients.BaseClient):
     def get_jobs(self) -> list[models.StatusInfo]:
         session_obj = database.ensure_session_obj(None)
         with session_obj() as session:
-            statement = database.sa.select(database.SystemRequest)
+            statement = database.sa.select(database.SystemRequest).order_by(
+                database.SystemRequest.created_at.desc()
+            )
             jobs = session.scalars(statement).all()
 
         return [
