@@ -21,31 +21,31 @@ dbsettings = None
 class SqlalchemySettings(pydantic.BaseSettings):
     """Postgres-specific API settings.
 
-    - ``postgres_user``: postgres username.
-    - ``postgres_password``: postgres password.
-    - ``postgres_host``: hostname for the connection.
-    - ``postgres_dbname``: database name.
+    - ``compute_db_user``: postgres username.
+    - ``compute_db_password``: postgres password.
+    - ``compute_db_host``: hostname for the connection.
+    - ``compute_db_name``: database name.
     """
 
-    postgres_user: str = "broker"
-    postgres_password: str | None = None
-    postgres_host: str = "compute-db"
-    postgres_dbname: str = "broker"
+    compute_db_user: str = "broker"
+    compute_db_password: str | None = None
+    compute_db_host: str = "compute-db"
+    compute_db_name: str = "broker"
 
-    @pydantic.validator("postgres_password")
+    @pydantic.validator("compute_db_password")
     def password_must_be_set(cls: pydantic.BaseSettings, v: str | None) -> str | None:
         """Check that password is explicitly set."""
         if v is None:
-            raise ValueError("postgres_password must be set")
+            raise ValueError("compute_db_password must be set")
         return v
 
     @property
     def connection_string(self) -> str:
         """Create reader psql connection string."""
         return (
-            f"postgresql://{self.postgres_user}"
-            f":{self.postgres_password}@{self.postgres_host}"
-            f"/{self.postgres_dbname}"
+            f"postgresql://{self.compute_db_user}"
+            f":{self.compute_db_password}@{self.compute_db_host}"
+            f"/{self.compute_db_name}"
         )
 
 

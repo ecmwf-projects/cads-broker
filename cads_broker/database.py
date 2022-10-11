@@ -21,7 +21,12 @@ class SystemRequest(BaseModel):
     __tablename__ = "system_requests"
 
     request_id = sa.Column(sa.Integer, primary_key=True)
-    request_uid = sa.Column(sa.dialects.postgresql.UUID(), index=True, unique=True)
+    request_uid = sa.Column(
+        sa.dialects.postgresql.UUID(),
+        index=True,
+        unique=True,
+        default=str(uuid.uuid4()),
+    )
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
@@ -109,8 +114,8 @@ def create_request(
     setup_code: str,
     entry_point: str,
     kwargs: dict,
-    metadata: dict,
     process_id: str,
+    metadata: dict = {},
     request_uid: str = None,
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> dict[str, Any]:
