@@ -21,8 +21,6 @@ dependencies:
 - sqlalchemy-stubs
 - tornado==6.1
 - typer
-- uvicorn
 - pip:
   - pytest-postgresql
-  - git+https://github.com/ecmwf-projects/ogc-api-processes-fastapi.git
   - types-sqlalchemy-utils
