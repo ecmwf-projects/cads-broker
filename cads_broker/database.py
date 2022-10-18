@@ -25,7 +25,6 @@ class SystemRequest(BaseModel):
         sa.dialects.postgresql.UUID(),
         index=True,
         unique=True,
-        default=str(uuid.uuid4()),
     )
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
@@ -38,6 +37,17 @@ class SystemRequest(BaseModel):
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     expire = sa.Column(sa.DateTime)
+
+
+class CacheEntry(BaseModel):
+    """Cache ORM model."""
+
+    __tablename__ = "cache_entries"
+
+    key = sa.Column(sa.dialects.postgresql.UUID(), unique=True, primary_key=True)
+    result = sa.Column(sa.JSON)
+    timestamp = sa.Column(sa.TIMESTAMP)
+    count = sa.Column(sa.Integer)
 
 
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
