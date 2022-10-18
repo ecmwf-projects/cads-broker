@@ -2,14 +2,14 @@
 import uuid
 from typing import Any
 
+import cacholote
 import sqlalchemy as sa
 import sqlalchemy_utils
 from sqlalchemy.dialects.postgresql import JSONB
 
 from cads_broker import config
 
-metadata = sa.MetaData()
-BaseModel = sa.ext.declarative.declarative_base(metadata=metadata)
+BaseModel = cacholote.config.Base
 
 
 status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
@@ -29,6 +29,11 @@ class SystemRequest(BaseModel):
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     request_body = sa.Column(JSONB, nullable=False)
+    cache_key = sa.Column(
+        sa.String(56),
+        sa.ForeignKey(cacholote.config.CacheEntry.key),
+        unique=True,
+    )
     request_metadata = sa.Column(JSONB)
     response_body = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
@@ -38,16 +43,7 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     expire = sa.Column(sa.DateTime)
 
-
-class CacheEntry(BaseModel):
-    """Cache ORM model."""
-
-    __tablename__ = "cache_entries"
-
-    key = sa.Column(sa.dialects.postgresql.UUID(), unique=True, primary_key=True)
-    result = sa.Column(sa.JSON)
-    timestamp = sa.Column(sa.TIMESTAMP)
-    count = sa.Column(sa.Integer)
+    cache_entry = sa.orm.relationship(cacholote.config.CacheEntry)
 
 
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
@@ -95,28 +91,26 @@ def count_accepted_requests(
 def set_request_status(
     request_uid: str,
     status: str,
-    result: str | dict[str, str] | None = None,
+    cache_key: str | None = None,
     traceback: str | None = None,
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> None:
     """Set the status of a request."""
     session_obj = ensure_session_obj(session_obj)
-    response_body = {}
-    if result:
-        response_body["result"] = result
-    elif traceback:
-        response_body["traceback"] = traceback
     with session_obj() as session:
         statement = sa.select(SystemRequest).where(
             SystemRequest.request_uid == request_uid
         )
         request = session.scalars(statement).one()
-        if status in ("successful", "failed"):
+        if status == "successful":
             request.finished_at = sa.func.now()
+            request.cache_key = cache_key
+        elif status == "failed":
+            request.finished_at = sa.func.now()
+            request.response_body["traceback"] = traceback
         elif status == "running":
             request.started_at = sa.func.now()
         request.status = status
-        request.response_body = response_body
         session.commit()
 
 
@@ -165,6 +159,18 @@ def get_request(
         return session.scalars(statement).one()
 
 
+def get_request_result(
+    request_uid: str, session_obj: sa.orm.sessionmaker | None = None
+) -> dict[str, Any]:
+    session_obj = ensure_session_obj(session_obj)
+    request = get_request(request_uid, session_obj)
+    with session_obj() as session:
+        statement = sa.select(cacholote.config.CacheEntry.result).where(
+            cacholote.config.CacheEntry.key == request.cache_key
+        )
+        return session.scalars(statement).one()
+
+
 def init_database(connection_string: str) -> sa.engine.Engine:
     """
     Initialize the database located at URI `connection_string` and return the engine object.
@@ -175,6 +181,6 @@ def init_database(connection_string: str) -> sa.engine.Engine:
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
     # cleanup and create the schema
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
+    BaseModel.metadata.drop_all(engine)
+    BaseModel.metadata.create_all(engine)
     return engine

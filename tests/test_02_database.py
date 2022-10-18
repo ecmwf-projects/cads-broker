@@ -3,6 +3,7 @@ import random
 import uuid
 from typing import Any
 
+import cacholote
 import pytest
 import sqlalchemy as sa
 from psycopg import Connection
@@ -25,6 +26,14 @@ def mock_system_request(
         request_body={"request_type": "test"},
     )
     return system_request
+
+
+def mock_cache_entry() -> db.SystemRequest:
+    cache_entry = cacholote.config.CacheEntry(
+        key=cacholote.utils.hexdigestify("test"),
+        result={"href": "", "args": [1, 2]},
+    )
+    return cache_entry
 
 
 def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
@@ -126,6 +135,20 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
     request = db.get_request(request_uid, session_obj)
     assert request.request_uid == request_uid
+
+
+def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
+    cache_entry = mock_cache_entry()
+    request = mock_system_request(status="successful")
+    request.cache_key = cache_entry.key
+    with session_obj() as session:
+        session.add(request)
+        session.add(cache_entry)
+        session.commit()
+        request_uid = request.request_uid
+    result = db.get_request_result(request_uid, session_obj)
+    print(result)
+    assert len(result) == 2
 
 
 def test_init_database(postgresql: Connection[str]) -> None:
