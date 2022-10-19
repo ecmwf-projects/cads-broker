@@ -32,7 +32,6 @@ class SystemRequest(BaseModel):
     cache_key = sa.Column(
         sa.String(56),
         sa.ForeignKey(cacholote.config.CacheEntry.key),
-        unique=True,
     )
     request_metadata = sa.Column(JSONB)
     response_body = sa.Column(JSONB)
