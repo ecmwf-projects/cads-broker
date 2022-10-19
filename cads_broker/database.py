@@ -107,7 +107,7 @@ def set_request_status(
             request.cache_key = cache_key
         elif status == "failed":
             request.finished_at = sa.func.now()
-            request.response_body["traceback"] = traceback
+            request.response_body = {"traceback": traceback}
         elif status == "running":
             request.started_at = sa.func.now()
         request.status = status
