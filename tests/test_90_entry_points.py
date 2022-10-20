@@ -39,4 +39,4 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     patch_storage.assert_called_once_with(
         "cache", object_storage_url, **object_storage_kws
     )
-    assert set(conn.execute(query).scalars()) == set(database.metadata.tables)  # type: ignore
+    assert set(conn.execute(query).scalars()) == set(database.BaseModel.metadata.tables)  # type: ignore

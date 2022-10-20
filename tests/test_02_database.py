@@ -52,6 +52,8 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
+
+    # running status
     with session_obj() as session:
         session.add(request)
         session.commit()
@@ -69,31 +71,43 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
     assert running_request.status == "running"
 
-    result = {"content_type": "application/json"}
-    status = "successful"
+    # successful status
+    with session_obj() as session:
+        cache_entry = mock_cache_entry()
+        cache_key = cache_entry.key
+        session.add(cache_entry)
+        session.commit()
+
     db.set_request_status(
         request_uid,
-        status=status,
-        result=result,
+        status="successful",
+        cache_key=cache_key,
         session_obj=session_obj,
     )
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_uid
         )
-        running_request = session.scalars(statement).one()
+        successful_request = session.scalars(statement).one()
 
-    assert running_request.status == status
-    assert running_request.response_body["result"] == result
-    with pytest.raises(KeyError):
-        running_request.response_body["traceback"]
-    assert running_request.finished_at is not None
+    assert successful_request.status == "successful"
+    assert successful_request.cache_key == cache_key
+    with pytest.raises(TypeError):
+        successful_request.response_body["traceback"]
+    assert successful_request.finished_at is not None
+
+    # failed status
+    request = mock_system_request(status="accepted")
+    request_uid = request.request_uid
+
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
 
     traceback = "traceback"
-    status = "failed"
     db.set_request_status(
         request_uid,
-        status=status,
+        status="failed",
         traceback=traceback,
         session_obj=session_obj,
     )
@@ -101,13 +115,12 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_uid
         )
-        running_request = session.scalars(statement).one()
+        failed_request = session.scalars(statement).one()
 
-    assert running_request.status == status
-    assert running_request.response_body["traceback"] == traceback
-    with pytest.raises(KeyError):
-        running_request.response_body["result"]
-    assert running_request.finished_at is not None
+    assert failed_request.status == "failed"
+    assert failed_request.response_body["traceback"] == traceback
+    assert failed_request.cache_key is None
+    assert failed_request.finished_at is not None
 
 
 def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
@@ -162,7 +175,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
     expected_tables_at_beginning: set[str] = set()
-    expected_tables_complete = set(db.metadata.tables)
+    expected_tables_complete = set(db.BaseModel.metadata.tables)
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
 
     db.init_database(connection_string)
