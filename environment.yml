@@ -29,3 +29,4 @@ dependencies:
 - pip:
   - pytest-postgresql
   - types-sqlalchemy-utils
+  - git+https://github.com/ecmwf-projects/cacholote
