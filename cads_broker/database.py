@@ -28,13 +28,13 @@ class SystemRequest(BaseModel):
     )
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
-    request_body = sa.Column(JSONB, nullable=False)
     cache_key = sa.Column(
         sa.String(56),
         sa.ForeignKey(cacholote.config.CacheEntry.key),
     )
+    request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
-    response_body = sa.Column(JSONB)
+    response_traceback = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
     started_at = sa.Column(sa.TIMESTAMP)
@@ -106,7 +106,7 @@ def set_request_status(
             request.cache_key = cache_key
         elif status == "failed":
             request.finished_at = sa.func.now()
-            request.response_body = {"traceback": traceback}
+            request.response_traceback = traceback
         elif status == "running":
             request.started_at = sa.func.now()
         request.status = status

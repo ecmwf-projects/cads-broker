@@ -4,7 +4,6 @@ import uuid
 from typing import Any
 
 import cacholote
-import pytest
 import sqlalchemy as sa
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
@@ -92,8 +91,7 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
     assert successful_request.status == "successful"
     assert successful_request.cache_key == cache_key
-    with pytest.raises(TypeError):
-        successful_request.response_body["traceback"]
+    assert successful_request.response_traceback is None
     assert successful_request.finished_at is not None
 
     # failed status
@@ -118,7 +116,7 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         failed_request = session.scalars(statement).one()
 
     assert failed_request.status == "failed"
-    assert failed_request.response_body["traceback"] == traceback
+    assert failed_request.response_traceback == traceback
     assert failed_request.cache_key is None
     assert failed_request.finished_at is not None
 
