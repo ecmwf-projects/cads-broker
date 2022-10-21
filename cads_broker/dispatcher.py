@@ -94,12 +94,16 @@ class Broker:
 
     def on_future_done(self, future: distributed.Future) -> None:
         logging.info(f"Future {future.key} is {future.status}")
-        if future.status == "finished":
-            db.set_request_status(future.key, "successful", result=future.result())
-        elif future.status == "error":
+        if future.status in "finished":
             db.set_request_status(
                 future.key,
-                "failed",
+                DASK_STATUS_TO_STATUS[future.status],
+                cache_key=future.result(),
+            )
+        elif future.status in "error":
+            db.set_request_status(
+                future.key,
+                DASK_STATUS_TO_STATUS[future.status],
                 traceback="".join(traceback.format_exception(future.exception())),
             )
         else:

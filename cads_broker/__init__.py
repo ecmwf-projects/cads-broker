@@ -23,12 +23,11 @@ except ImportError:  # pragma: no cover
     __version__ = "999"
 
 from .database import SystemRequest, init_database
-from .entry_points import info, main
+from .entry_points import info
 
 __all__ = [
     "__version__",
     "SystemRequest",
     "init_database",
     "info",
-    "main",
 ]
