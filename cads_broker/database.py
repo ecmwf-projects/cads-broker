@@ -168,7 +168,8 @@ def get_request_result(
     request = get_request(request_uid, session_obj)
     with session_obj() as session:
         statement = sa.select(cacholote.config.CacheEntry.result).where(
-            cacholote.config.CacheEntry.key == request.cache_key
+            cacholote.config.CacheEntry.key == request.cache_key,
+            cacholote.config.CacheEntry.expiration == request.cache_expiration,
         )
         return session.scalars(statement).one()
 
