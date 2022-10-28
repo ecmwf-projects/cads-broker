@@ -28,14 +28,8 @@ class SystemRequest(BaseModel):
     )
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
-    cache_key = sa.Column(
-        sa.String(56),
-        sa.ForeignKey(cacholote.config.CacheEntry.key, ondelete="set null"),
-    )
-    cache_expiration = sa.Column(
-        sa.DateTime,
-        sa.ForeignKey(cacholote.config.CacheEntry.expiration, ondelete="set null"),
-    )
+    cache_key = sa.Column(sa.String(56))
+    cache_expiration = sa.Column(sa.DateTime)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
     response_traceback = sa.Column(JSONB)
@@ -44,6 +38,14 @@ class SystemRequest(BaseModel):
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
+
+    __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
+        sa.ForeignKeyConstraint(
+            [cache_key, cache_expiration],
+            [cacholote.config.CacheEntry.key, cacholote.config.CacheEntry.expiration],
+        ),
+        {},
+    )
 
     cache_entry = sa.orm.relationship(cacholote.config.CacheEntry)
 
