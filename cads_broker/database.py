@@ -30,7 +30,7 @@ class SystemRequest(BaseModel):
     status = sa.Column(status_enum)
     cache_key = sa.Column(
         sa.String(56),
-        sa.ForeignKey(cacholote.config.CacheEntry.key),
+        sa.ForeignKey(cacholote.config.CacheEntry.key, ondelete="set null"),
     )
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
