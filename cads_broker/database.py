@@ -43,6 +43,7 @@ class SystemRequest(BaseModel):
         sa.ForeignKeyConstraint(
             [cache_key, cache_expiration],
             [cacholote.config.CacheEntry.key, cacholote.config.CacheEntry.expiration],
+            ondelete="set null",
         ),
         {},
     )
