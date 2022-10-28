@@ -97,6 +97,7 @@ def set_request_status(
     request_uid: str,
     status: str,
     cache_key: str | None = None,
+    cache_expiration: sa.DateTime | None = None,
     traceback: str | None = None,
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> None:
@@ -110,6 +111,7 @@ def set_request_status(
         if status == "successful":
             request.finished_at = sa.func.now()
             request.cache_key = cache_key
+            request.cache_expiration = cache_expiration
         elif status == "failed":
             request.finished_at = sa.func.now()
             request.response_traceback = traceback
