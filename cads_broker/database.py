@@ -32,6 +32,10 @@ class SystemRequest(BaseModel):
         sa.String(56),
         sa.ForeignKey(cacholote.config.CacheEntry.key, ondelete="set null"),
     )
+    cache_expiration = sa.Column(
+        sa.DateTime,
+        sa.ForeignKey(cacholote.config.CacheEntry.expiration, ondelete="set null"),
+    )
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
     response_traceback = sa.Column(JSONB)
@@ -40,7 +44,6 @@ class SystemRequest(BaseModel):
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
-    expire = sa.Column(sa.DateTime)
 
     cache_entry = sa.orm.relationship(cacholote.config.CacheEntry)
 
