@@ -1,5 +1,4 @@
 """SQLAlchemy ORM model."""
-import json
 import uuid
 from typing import Any
 
@@ -177,7 +176,7 @@ def get_request_result(
             cacholote.config.CacheEntry.key == request.cache_key,
             cacholote.config.CacheEntry.expiration == request.cache_expiration,
         )
-        return json.loads(session.scalars(statement).one())
+        return session.scalars(statement).one()
 
 
 def init_database(connection_string: str) -> sa.engine.Engine:
