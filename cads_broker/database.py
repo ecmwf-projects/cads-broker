@@ -154,24 +154,37 @@ def create_request(
     return ret_value
 
 
+def get_request_in_session(request_uid: str, session: sa.orm.session) -> SystemRequest:
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    return session.scalars(statement).one()
+
+
+def delete_request(
+    request_uid: str = None,
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> None:
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        request = get_request_in_session(request_uid, session)
+        session.delete(request)
+        session.commit()
+
+
 def get_request(
     request_uid: str, session_obj: sa.orm.sessionmaker | None = None
 ) -> SystemRequest:
     """Get a request by its UID."""
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        statement = sa.select(SystemRequest).where(
-            SystemRequest.request_uid == request_uid
-        )
-        return session.scalars(statement).one()
+        return get_request_in_session(request_uid, session)
 
 
 def get_request_result(
     request_uid: str, session_obj: sa.orm.sessionmaker | None = None
 ) -> dict[str, Any]:
     session_obj = ensure_session_obj(session_obj)
-    request = get_request(request_uid, session_obj)
     with session_obj() as session:
+        request = get_request_in_session(request_uid, session)
         statement = sa.select(cacholote.config.CacheEntry.result).where(
             cacholote.config.CacheEntry.key == request.cache_key,
             cacholote.config.CacheEntry.expiration == request.cache_expiration,

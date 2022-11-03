@@ -1,5 +1,4 @@
 import datetime
-import json
 import random
 import uuid
 from typing import Any
@@ -35,7 +34,7 @@ def mock_system_request(
 def mock_cache_entry() -> db.SystemRequest:
     cache_entry = cacholote.config.CacheEntry(
         key=cacholote.utils.hexdigestify("test"),
-        result=json.dumps({"href": "", "args": [1, 2]}),
+        result={"href": "", "args": [1, 2]},
         expiration=datetime.datetime.today(),
     )
     return cache_entry
@@ -144,6 +143,17 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
     assert request.request_uid == request_dict["request_uid"]
 
 
+def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
+    request = mock_system_request(status="accepted")
+    request_uid = request.request_uid
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
+    with session_obj() as session:
+        request = db.get_request_in_session(request_uid, session)
+    assert request.request_uid == request_uid
+
+
 def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
@@ -162,13 +172,11 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
         cache_expiration=cache_entry.expiration,
     )
     request_uid = request.request_uid
-    print("---------------", request_uid, request.cache_key, cache_entry.key)
     with session_obj() as session:
         session.add(cache_entry)
         session.add(request)
         session.commit()
     result = db.get_request_result(request_uid, session_obj)
-    print(result)
     assert len(result) == 2
 
 
