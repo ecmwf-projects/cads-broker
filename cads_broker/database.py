@@ -154,7 +154,9 @@ def create_request(
     return ret_value
 
 
-def get_request_in_session(request_uid: str, session: sa.orm.session) -> SystemRequest:
+def get_request_in_session(
+    request_uid: str, session: sa.orm.session.Session
+) -> SystemRequest:
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     return session.scalars(statement).one()
 
@@ -171,7 +173,7 @@ def delete_request(
 
 
 def get_request(
-    request_uid: str, session_obj: sa.orm.sessionmaker | None = None
+    request_uid: str, session_obj: sa.orm.session.Session | None = None
 ) -> SystemRequest:
     """Get a request by its UID."""
     session_obj = ensure_session_obj(session_obj)
