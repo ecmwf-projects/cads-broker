@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
 
+from cads_broker import config
 from cads_broker import database as db
 
 
@@ -204,8 +205,10 @@ def test_ensure_session_obj(
     # case of session is already set
     ret_value = db.ensure_session_obj(session_obj)
     assert ret_value is session_obj
+    config.dbsettings = None
 
     # case of session not set
-    temp_environ["postgres_password"] = postgresql.info.password
+    temp_environ["compute_db_password"] = postgresql.info.password
     ret_value = db.ensure_session_obj(None)
     assert isinstance(ret_value, sessionmaker)
+    config.dbsettings = None
