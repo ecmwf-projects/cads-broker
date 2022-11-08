@@ -179,16 +179,23 @@ def get_request_result(
         return session.scalars(statement).one()
 
 
-def init_database(connection_string: str) -> sa.engine.Engine:
+def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
     """
     Initialize the database located at URI `connection_string` and return the engine object.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     """
+    structure_exists = True
     engine = sa.create_engine(connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
-    # cleanup and create the schema
-    BaseModel.metadata.drop_all(engine)
-    BaseModel.metadata.create_all(engine)
+    else:
+        conn = engine.connect()
+        query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
+            structure_exists = False
+    if not structure_exists or force:
+        # cleanup and create the schema
+        BaseModel.metadata.drop_all(engine)
+        BaseModel.metadata.create_all(engine)
     return engine
