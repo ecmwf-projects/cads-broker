@@ -198,6 +198,17 @@ def test_init_database(postgresql: Connection[str]) -> None:
     db.init_database(connection_string)
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
+    request = mock_system_request()
+    session_obj = sa.orm.sessionmaker(connection_string)
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
+
+    db.init_database(connection_string)
+    assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
+    requests = db.get_accepted_requests(session_obj=session_obj)
+    assert len(requests) == 1
+
 
 def test_ensure_session_obj(
     postgresql: Connection[str], session_obj: sessionmaker, temp_environ: Any
