@@ -30,7 +30,7 @@ def info(connection_string: str | None = None) -> None:
 
 
 @app.command()
-def init_db(connection_string: str | None = None) -> None:
+def init_db(connection_string: str | None = None, force: bool = False) -> None:
     """Create the database structure and the cache area in the object storage.
 
     Parameters
@@ -40,7 +40,7 @@ def init_db(connection_string: str | None = None) -> None:
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
-    database.init_database(connection_string)
+    database.init_database(connection_string, force=force)
     print("successfully created the broker database structure.")
 
     # get storage parameters from environment
