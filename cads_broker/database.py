@@ -204,6 +204,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     engine = sa.create_engine(connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
+        structure_exists = False
     else:
         conn = engine.connect()
         query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
