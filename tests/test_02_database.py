@@ -199,7 +199,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
     request = mock_system_request()
-    session_obj = sa.orm.sessionmaker(connection_string)
+    session_obj = sa.orm.sessionmaker(engine)
     with session_obj() as session:
         session.add(request)
         session.commit()
@@ -208,6 +208,11 @@ def test_init_database(postgresql: Connection[str]) -> None:
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
     requests = db.get_accepted_requests(session_obj=session_obj)
     assert len(requests) == 1
+
+    db.init_database(connection_string, force=True)
+    assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
+    requests = db.get_accepted_requests(session_obj=session_obj)
+    assert len(requests) == 0
 
 
 def test_ensure_session_obj(
