@@ -12,7 +12,9 @@ from cads_broker import config
 BaseModel = cacholote.config.Base
 
 
-status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
+status_enum = sa.Enum(
+    "accepted", "running", "failed", "successful", "dismissed", name="status"
+)
 
 
 class SystemRequest(BaseModel):
@@ -167,9 +169,11 @@ def delete_request(
 ) -> None:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
+        set_request_status(request_uid, "dismissed", session_obj=session_obj)
         request = get_request_in_session(request_uid, session)
         session.delete(request)
         session.commit()
+    return request
 
 
 def get_request(
