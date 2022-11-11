@@ -163,19 +163,6 @@ def get_request_in_session(
     return session.scalars(statement).one()
 
 
-def delete_request(
-    request_uid: str = None,
-    session_obj: sa.orm.sessionmaker | None = None,
-) -> None:
-    session_obj = ensure_session_obj(session_obj)
-    with session_obj() as session:
-        set_request_status(request_uid, "dismissed", session_obj=session_obj)
-        request = get_request_in_session(request_uid, session)
-        session.delete(request)
-        session.commit()
-    return request
-
-
 def get_request(
     request_uid: str, session_obj: sa.orm.session.Session | None = None
 ) -> SystemRequest:
@@ -196,6 +183,19 @@ def get_request_result(
             cacholote.config.CacheEntry.expiration == request.cache_expiration,
         )
         return session.scalars(statement).one()
+
+
+def delete_request(
+    request_uid: str = None,
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> SystemRequest:
+    session_obj = ensure_session_obj(session_obj)
+    set_request_status(request_uid, "dismissed", session_obj=session_obj)
+    with session_obj() as session:
+        request = get_request_in_session(request_uid, session)
+        session.delete(request)
+        session.commit()
+    return request
 
 
 def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
