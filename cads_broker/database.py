@@ -123,9 +123,9 @@ def set_request_status(
 
 
 def create_request(
+    user_id: int,
     setup_code: str,
     entry_point: str,
-    user_id: int,
     kwargs: dict,
     process_id: str,
     metadata: dict = {},

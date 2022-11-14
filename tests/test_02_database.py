@@ -129,6 +129,7 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
 def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
     request_dict = db.create_request(
+        user_id=1,
         setup_code="",
         entry_point="sum",
         kwargs={},
@@ -142,6 +143,7 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
         )
         request = session.scalars(statement).one()
     assert request.request_uid == request_dict["request_uid"]
+    assert request.user_id == request_dict["user_id"]
 
 
 def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
