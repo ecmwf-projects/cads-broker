@@ -26,6 +26,7 @@ class SystemRequest(BaseModel):
         index=True,
         unique=True,
     )
+    user_id = sa.Column(sa.Integer)
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     cache_key = sa.Column(sa.String(56))
@@ -124,6 +125,7 @@ def set_request_status(
 def create_request(
     setup_code: str,
     entry_point: str,
+    user_id: int,
     kwargs: dict,
     process_id: str,
     metadata: dict = {},
