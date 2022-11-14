@@ -138,6 +138,7 @@ def create_request(
     with session_obj() as session:
         request = SystemRequest(
             request_uid=request_uid or str(uuid.uuid4()),
+            user_id=user_id,
             process_id=process_id,
             status="accepted",
             request_body={
