@@ -12,7 +12,9 @@ from cads_broker import config
 BaseModel = cacholote.config.Base
 
 
-status_enum = sa.Enum("accepted", "running", "failed", "successful", name="status")
+status_enum = sa.Enum(
+    "accepted", "running", "failed", "successful", "dismissed", name="status"
+)
 
 
 class SystemRequest(BaseModel):
@@ -93,6 +95,30 @@ def count_accepted_requests(
         )
 
 
+def set_request_status_in_session(
+    request_uid: str,
+    status: str,
+    cache_key: str | None = None,
+    cache_expiration: sa.DateTime | None = None,
+    traceback: str | None = None,
+    session: sa.orm.sessionmaker | None = None,
+) -> None:
+    """Set the status of a request."""
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    if status == "successful":
+        request.finished_at = sa.func.now()
+        request.cache_key = cache_key
+        request.cache_expiration = cache_expiration
+    elif status == "failed":
+        request.finished_at = sa.func.now()
+        request.response_traceback = traceback
+    elif status == "running":
+        request.started_at = sa.func.now()
+    request.status = status
+    session.commit()
+
+
 def set_request_status(
     request_uid: str,
     status: str,
@@ -101,24 +127,16 @@ def set_request_status(
     traceback: str | None = None,
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> None:
-    """Set the status of a request."""
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        statement = sa.select(SystemRequest).where(
-            SystemRequest.request_uid == request_uid
+        set_request_status_in_session(
+            request_uid=request_uid,
+            status=status,
+            cache_key=cache_key,
+            cache_expiration=cache_expiration,
+            traceback=traceback,
+            session=session,
         )
-        request = session.scalars(statement).one()
-        if status == "successful":
-            request.finished_at = sa.func.now()
-            request.cache_key = cache_key
-            request.cache_expiration = cache_expiration
-        elif status == "failed":
-            request.finished_at = sa.func.now()
-            request.response_traceback = traceback
-        elif status == "running":
-            request.started_at = sa.func.now()
-        request.status = status
-        session.commit()
 
 
 def create_request(
@@ -161,17 +179,6 @@ def get_request_in_session(
     return session.scalars(statement).one()
 
 
-def delete_request(
-    request_uid: str = None,
-    session_obj: sa.orm.sessionmaker | None = None,
-) -> None:
-    session_obj = ensure_session_obj(session_obj)
-    with session_obj() as session:
-        request = get_request_in_session(request_uid, session)
-        session.delete(request)
-        session.commit()
-
-
 def get_request(
     request_uid: str, session_obj: sa.orm.session.Session | None = None
 ) -> SystemRequest:
@@ -192,6 +199,19 @@ def get_request_result(
             cacholote.config.CacheEntry.expiration == request.cache_expiration,
         )
         return session.scalars(statement).one()
+
+
+def delete_request(
+    request_uid: str = None,
+    session_obj: sa.orm.sessionmaker | None = None,
+) -> SystemRequest:
+    session_obj = ensure_session_obj(session_obj)
+    with session_obj() as session:
+        set_request_status_in_session(request_uid, "dismissed", session=session)
+        request = get_request_in_session(request_uid, session)
+        session.delete(request)
+        session.commit()
+    return request
 
 
 def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
