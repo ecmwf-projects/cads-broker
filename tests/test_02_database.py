@@ -4,7 +4,9 @@ import uuid
 from typing import Any
 
 import cacholote
+import pytest
 import sqlalchemy as sa
+import sqlalchemy.orm.exc
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
 
@@ -181,6 +183,19 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
     result = db.get_request_result(request_uid, session_obj)
     assert len(result) == 2
+
+
+def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
+    request = mock_system_request(status="accepted")
+    request_uid = request.request_uid
+    with session_obj() as session:
+        session.add(request)
+        session.commit()
+    request = db.delete_request(request_uid, session_obj)
+    assert request.request_uid == request_uid
+    assert request.status == "dismissed"
+    with pytest.raises(sqlalchemy.orm.exc.NoResultFound):
+        request = db.get_request(request_uid, session_obj)
 
 
 def test_init_database(postgresql: Connection[str]) -> None:
