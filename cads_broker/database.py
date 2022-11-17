@@ -28,7 +28,6 @@ class SystemRequest(BaseModel):
         index=True,
         unique=True,
     )
-    user_id = sa.Column(sa.Integer)
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
     cache_key = sa.Column(sa.String(56))
@@ -152,11 +151,10 @@ def create_request(
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
-
+    metadata["user_id"] = user_id
     with session_obj() as session:
         request = SystemRequest(
             request_uid=request_uid or str(uuid.uuid4()),
-            user_id=user_id,
             process_id=process_id,
             status="accepted",
             request_body={
