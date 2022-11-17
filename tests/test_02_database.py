@@ -18,18 +18,21 @@ def mock_system_request(
     status: str = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
+    process_id: str | None = None,
     cache_key: str | None = None,
     cache_expiration: datetime.datetime | None = None,
+    request_body: dict | None = None,
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
         request_uid=request_uid or str(uuid.uuid4()),
+        process_id=process_id,
         status=status,
         created_at=created_at,
         started_at=None,
         cache_key=cache_key,
         cache_expiration=cache_expiration,
-        request_body={"request_type": "test"},
+        request_body=request_body or {"request_type": "test"},
     )
     return system_request
 
@@ -54,6 +57,20 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     requests = db.get_accepted_requests(session_obj)
     assert len(requests) == 1
     assert requests[0].request_uid == accepted_request_uid
+
+
+def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request2 = mock_system_request(status="accepted")
+
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+
+    assert 2 == db.count_accepted_requests(session_obj)
+    assert 1 == db.count_accepted_requests(session_obj, process_id=process_id)
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
@@ -145,7 +162,10 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
         )
         request = session.scalars(statement).one()
     assert request.request_uid == request_dict["request_uid"]
-    assert request.user_id == request_dict["user_id"]
+    assert (
+        request.request_metadata["user_id"]
+        == request_dict["request_metadata"]["user_id"]
+    )
 
 
 def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:

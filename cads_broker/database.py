@@ -84,15 +84,17 @@ def get_accepted_requests(
 
 def count_accepted_requests(
     session_obj: sa.orm.sessionmaker | None = None,
+    process_id: str | None = None,
 ) -> int:
     """Count all accepted requests."""
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        return (
-            session.query(SystemRequest)
-            .filter(SystemRequest.status == "accepted")
-            .count()
+        statement = session.query(SystemRequest).filter(
+            SystemRequest.status == "accepted"
         )
+        if process_id is not None:
+            statement = statement.filter(SystemRequest.process_id == process_id)
+        return statement.count()
 
 
 def set_request_status_in_session(
