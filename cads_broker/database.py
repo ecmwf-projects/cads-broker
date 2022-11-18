@@ -84,15 +84,17 @@ def get_accepted_requests(
 
 def count_accepted_requests(
     session_obj: sa.orm.sessionmaker | None = None,
+    process_id: str | None = None,
 ) -> int:
     """Count all accepted requests."""
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        return (
-            session.query(SystemRequest)
-            .filter(SystemRequest.status == "accepted")
-            .count()
+        statement = session.query(SystemRequest).filter(
+            SystemRequest.status == "accepted"
         )
+        if process_id is not None:
+            statement = statement.filter(SystemRequest.process_id == process_id)
+        return statement.count()
 
 
 def set_request_status_in_session(
@@ -140,6 +142,7 @@ def set_request_status(
 
 
 def create_request(
+    user_id: int,
     setup_code: str,
     entry_point: str,
     kwargs: dict,
@@ -150,7 +153,7 @@ def create_request(
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
-
+    metadata["user_id"] = user_id
     with session_obj() as session:
         request = SystemRequest(
             request_uid=request_uid or str(uuid.uuid4()),
