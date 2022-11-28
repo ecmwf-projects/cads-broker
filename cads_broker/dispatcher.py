@@ -32,6 +32,7 @@ def get_tasks(client: distributed.Client) -> Any:
             "processing": "running",
             "erred": "failed",
             "finished": "successful",
+            "no-worker": "accepted",  # if the job is no-worker should be re-submitted
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
