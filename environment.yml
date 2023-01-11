@@ -11,9 +11,8 @@ dependencies:
 - pytest-cov
 - sphinx
 - sphinx-autoapi
-  # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+    # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - dask==2022.11.1
-- distributed
 - minio
 - pip
 - postgresql
@@ -29,4 +28,3 @@ dependencies:
 - pip:
   - pytest-postgresql
   - types-sqlalchemy-utils
-  - git+https://github.com/ecmwf-projects/cacholote
