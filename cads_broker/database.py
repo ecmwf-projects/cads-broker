@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from cads_broker import config
 
-BaseModel = cacholote.config.Base
+BaseModel = cacholote.database.Base
 
 
 status_enum = sa.Enum(
@@ -44,13 +44,16 @@ class SystemRequest(BaseModel):
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
             [cache_key, cache_expiration],
-            [cacholote.config.CacheEntry.key, cacholote.config.CacheEntry.expiration],
+            [
+                cacholote.database.CacheEntry.key,
+                cacholote.database.CacheEntry.expiration,
+            ],
             ondelete="set null",
         ),
         {},
     )
 
-    cache_entry = sa.orm.relationship(cacholote.config.CacheEntry)
+    cache_entry = sa.orm.relationship(cacholote.database.CacheEntry)
 
 
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
@@ -197,9 +200,9 @@ def get_request_result(
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
         request = get_request_in_session(request_uid, session)
-        statement = sa.select(cacholote.config.CacheEntry.result).where(
-            cacholote.config.CacheEntry.key == request.cache_key,
-            cacholote.config.CacheEntry.expiration == request.cache_expiration,
+        statement = sa.select(cacholote.database.CacheEntry.result).where(
+            cacholote.database.CacheEntry.key == request.cache_key,
+            cacholote.database.CacheEntry.expiration == request.cache_expiration,
         )
         return session.scalars(statement).one()
 
