@@ -38,7 +38,7 @@ def mock_system_request(
 
 
 def mock_cache_entry() -> db.SystemRequest:
-    cache_entry = cacholote.config.CacheEntry(
+    cache_entry = cacholote.database.CacheEntry(
         key=cacholote.utils.hexdigestify("test"),
         result={"href": "", "args": [1, 2]},
         expiration=datetime.datetime.today(),
