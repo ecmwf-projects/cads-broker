@@ -2,6 +2,13 @@
 
 CADS broker service
 
+## Quick Start
+
+```python
+>>> import cads_broker
+
+```
+
 ## Workflow for developers/contributors
 
 For best experience create a new conda environment (e.g. DEVELOP) with Python 3.10:
