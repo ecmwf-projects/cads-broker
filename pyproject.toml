@@ -17,6 +17,15 @@ classifiers = [
     "Topic :: Scientific/Engineering"
 ]
 dynamic = ["version"]
+dependencies = [
+  "attrs",
+  "cacholote",
+  "distributed",
+  "minio",
+  "sqlalchemy",
+  "sqlalchemy-utils",
+  "typer"
+]
 
 [project.scripts]
 broker = "cads_broker.entry_points:main"
