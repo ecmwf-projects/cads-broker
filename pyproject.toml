@@ -66,6 +66,9 @@ ignore = [
   "D417"
 ]
 
+[tool.setuptools]
+packages = ["cads_broker"]
+
 [tool.setuptools_scm]
 write_to = "cads_broker/version.py"
 write_to_template = '''
