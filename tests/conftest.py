@@ -10,7 +10,7 @@ from cads_broker import database
 
 @pytest.fixture()
 def session_obj(postgresql: Connection[str]) -> sessionmaker:
-    """Init the test database and return a connection object"""
+    """Init the test database and return a connection object."""
     connection_string = (
         f"postgresql+psycopg2://{postgresql.info.user}:"
         f"@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
@@ -22,7 +22,7 @@ def session_obj(postgresql: Connection[str]) -> sessionmaker:
 
 @pytest.fixture()
 def temp_environ() -> Any:
-    """Create a modifiable environment that affect only the test scope"""
+    """Create a modifiable environment that affect only the test scope."""
     old_environ = dict(os.environ)
 
     yield os.environ
