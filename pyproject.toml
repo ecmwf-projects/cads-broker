@@ -37,6 +37,10 @@ branch = true
 plugins = "sqlmypy"
 strict = true
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+postgresql_user = "broker"
+
 [tool.ruff]
 # Black line length is 88, but black does not format comments.
 line-length = 110
