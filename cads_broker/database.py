@@ -217,17 +217,33 @@ def get_request(
         return get_request_in_session(request_uid, session)
 
 
+def get_request_result_in_session(
+    request_uid: str, session: sa.orm.session.Session
+) -> SystemRequest:
+    request = get_request_in_session(request_uid, session)
+    statement = sa.select(cacholote.database.CacheEntry.result).where(
+        cacholote.database.CacheEntry.key == request.cache_key,
+        cacholote.database.CacheEntry.expiration == request.cache_expiration,
+    )
+    return session.scalars(statement).one()
+
+
 def get_request_result(
     request_uid: str, session_obj: sa.orm.sessionmaker | None = None
-) -> dict[str, Any]:
+) -> SystemRequest:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        request = get_request_in_session(request_uid, session)
-        statement = sa.select(cacholote.database.CacheEntry.result).where(
-            cacholote.database.CacheEntry.key == request.cache_key,
-            cacholote.database.CacheEntry.expiration == request.cache_expiration,
-        )
-        return session.scalars(statement).one()
+        get_request_result_in_session(request_uid, session)
+
+
+def delete_request_in_session(
+    request_uid: str, session: sa.orm.session.Session
+) -> SystemRequest:
+    set_request_status_in_session(request_uid, "dismissed", session=session)
+    request = get_request_in_session(request_uid, session)
+    session.delete(request)
+    session.commit()
+    return request
 
 
 def delete_request(
@@ -236,10 +252,7 @@ def delete_request(
 ) -> SystemRequest:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        set_request_status_in_session(request_uid, "dismissed", session=session)
-        request = get_request_in_session(request_uid, session)
-        session.delete(request)
-        session.commit()
+        request = delete_request_in_session(request_uid, session)
     return request
 
 
