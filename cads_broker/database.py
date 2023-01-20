@@ -144,38 +144,61 @@ def set_request_status(
         )
 
 
+def create_request_in_session(
+    session: sa.orm.Session,
+    user_id: int,
+    setup_code: str,
+    entry_point: str,
+    kwargs: dict[str, Any],
+    process_id: str,
+    metadata: dict[str, Any] = {},
+    request_uid: str | None = None,
+) -> dict[str, Any]:
+    """Temporary function to create a request."""
+    metadata["user_id"] = user_id
+    request = SystemRequest(
+        request_uid=request_uid or str(uuid.uuid4()),
+        process_id=process_id,
+        status="accepted",
+        request_body={
+            "setup_code": setup_code,
+            "entry_point": entry_point,
+            "kwargs": kwargs,
+        },
+        request_metadata=metadata,
+    )
+    session.add(request)
+    session.commit()
+    ret_value = {
+        column.key: getattr(request, column.key)
+        for column in sa.inspect(request).mapper.column_attrs
+    }
+    return ret_value
+
+
 def create_request(
     user_id: int,
     setup_code: str,
     entry_point: str,
-    kwargs: dict,
+    kwargs: dict[str, Any],
     process_id: str,
-    metadata: dict = {},
-    request_uid: str = None,
+    metadata: dict[str, Any] = {},
+    request_uid: str | None = None,
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
     session_obj = ensure_session_obj(session_obj)
-    metadata["user_id"] = user_id
     with session_obj() as session:
-        request = SystemRequest(
-            request_uid=request_uid or str(uuid.uuid4()),
-            process_id=process_id,
-            status="accepted",
-            request_body={
-                "setup_code": setup_code,
-                "entry_point": entry_point,
-                "kwargs": kwargs,
-            },
-            request_metadata=metadata,
+        return create_request_in_session(
+            session,
+            user_id,
+            setup_code,
+            entry_point,
+            kwargs,
+            process_id,
+            metadata,
+            request_uid,
         )
-        session.add(request)
-        session.commit()
-        ret_value = {
-            column.key: getattr(request, column.key)
-            for column in sa.inspect(request).mapper.column_attrs
-        }
-    return ret_value
 
 
 def get_request_in_session(
@@ -194,17 +217,33 @@ def get_request(
         return get_request_in_session(request_uid, session)
 
 
+def get_request_result_in_session(
+    request_uid: str, session: sa.orm.session.Session
+) -> SystemRequest:
+    request = get_request_in_session(request_uid, session)
+    statement = sa.select(cacholote.database.CacheEntry.result).where(
+        cacholote.database.CacheEntry.key == request.cache_key,
+        cacholote.database.CacheEntry.expiration == request.cache_expiration,
+    )
+    return session.scalars(statement).one()
+
+
 def get_request_result(
     request_uid: str, session_obj: sa.orm.sessionmaker | None = None
-) -> dict[str, Any]:
+) -> SystemRequest:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        request = get_request_in_session(request_uid, session)
-        statement = sa.select(cacholote.database.CacheEntry.result).where(
-            cacholote.database.CacheEntry.key == request.cache_key,
-            cacholote.database.CacheEntry.expiration == request.cache_expiration,
-        )
-        return session.scalars(statement).one()
+        return get_request_result_in_session(request_uid, session)
+
+
+def delete_request_in_session(
+    request_uid: str, session: sa.orm.session.Session
+) -> SystemRequest:
+    set_request_status_in_session(request_uid, "dismissed", session=session)
+    request = get_request_in_session(request_uid, session)
+    session.delete(request)
+    session.commit()
+    return request
 
 
 def delete_request(
@@ -213,10 +252,7 @@ def delete_request(
 ) -> SystemRequest:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        set_request_status_in_session(request_uid, "dismissed", session=session)
-        request = get_request_in_session(request_uid, session)
-        session.delete(request)
-        session.commit()
+        request = delete_request_in_session(request_uid, session)
     return request
 
 
