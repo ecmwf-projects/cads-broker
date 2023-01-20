@@ -233,7 +233,7 @@ def get_request_result(
 ) -> SystemRequest:
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        get_request_result_in_session(request_uid, session)
+        return get_request_result_in_session(request_uid, session)
 
 
 def delete_request_in_session(
