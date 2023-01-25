@@ -152,5 +152,5 @@ class Broker:
             if queue and available_slots > 0:
                 logging.info(f"queued: {queue}")
                 logging.info(f"available_slots: {available_slots}")
-                self.submit_request()
+                [self.submit_request() for _ in range(available_slots)]
             time.sleep(2)
