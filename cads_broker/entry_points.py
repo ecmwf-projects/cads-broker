@@ -65,7 +65,6 @@ def init_db(connection_string: str | None = None, force: bool = False) -> None:
 
 @app.command()
 def run(
-    max_running_requests: int = 4,
     address: str = "scheduler:8786",
 ) -> None:
     """Start the broker.
@@ -76,7 +75,7 @@ def run(
     scheduler_address: address of the scheduler
     """
     broker = dispatcher.Broker.from_address(
-        address=address, max_running_requests=max_running_requests
+        address=address
     )
     broker.run()
 
