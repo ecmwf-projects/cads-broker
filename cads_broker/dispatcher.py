@@ -57,13 +57,13 @@ class Broker:
         client = distributed.Client(address)
         return cls(client=client, max_running_requests=max_running_requests)
 
-    def choose_request(self) -> db.SystemRequest:
+    def choose_request(self) -> db.SystemRequest | None:
         queue = db.get_accepted_requests()
         candidates = sorted(
             queue,
             key=lambda r: self.priority(r),
         )
-        return candidates[0]
+        return candidates[0] if candidates else None
 
     def priority(self, request: db.SystemRequest) -> float:
         return request.created_at.timestamp()
@@ -118,7 +118,8 @@ class Broker:
 
     def submit_request(self) -> None:
         request = self.choose_request()
-
+        if not request:
+            return
         logging.info(
             f"Submitting {request.request_uid}",
         )
