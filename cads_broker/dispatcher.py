@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import traceback
 from typing import Any
@@ -53,7 +54,11 @@ class Broker:
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
 
     @classmethod
-    def from_address(cls, address="scheduler:8786", max_running_requests=1):
+    def from_address(
+        cls,
+        address="scheduler:8786",
+        max_running_requests=int(os.getenv("MAX_RUNNING_REQUESTS", 1)),
+    ):
         client = distributed.Client(address)
         return cls(client=client, max_running_requests=max_running_requests)
 
