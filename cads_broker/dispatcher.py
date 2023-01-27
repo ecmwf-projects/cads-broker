@@ -48,6 +48,7 @@ class Broker:
 
     client: distributed.Client
     max_running_requests: int
+    wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     queue: list[db.SystemRequest] = attrs.field(factory=list)
@@ -142,7 +143,9 @@ class Broker:
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
-        db.set_request_status_in_session(request_uid=request.request_uid, status="running", session=session)
+        db.set_request_status_in_session(
+            request_uid=request.request_uid, status="running", session=session
+        )
         self.futures[request.request_uid] = future
         logging.info(f"Submitted {request.request_uid}")
 
@@ -163,5 +166,8 @@ class Broker:
                 if queue and available_slots > 0:
                     logging.info(f"queued: {queue}")
                     logging.info(f"available_slots: {available_slots}")
-                    [self.submit_request(session=session) for _ in range(available_slots)]
-            time.sleep(2)
+                    [
+                        self.submit_request(session=session)
+                        for _ in range(available_slots)
+                    ]
+            time.sleep(self.wait_time)
