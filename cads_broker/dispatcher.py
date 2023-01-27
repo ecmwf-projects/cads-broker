@@ -53,7 +53,7 @@ class Broker:
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     queue: list[db.SystemRequest] = attrs.field(factory=list)
     running_requests: int = 0
-    _session_maker: sa.orm.sessionmaker | None = None
+    session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
 
     @classmethod
     def from_address(
@@ -63,11 +63,6 @@ class Broker:
     ):
         client = distributed.Client(address)
         return cls(client=client, max_running_requests=max_running_requests)
-
-    @property
-    def session_maker(self):
-        self._session_maker = db.ensure_session_obj(self._session_maker)
-        return self._session_maker
 
     def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
         queue = db.get_accepted_requests_in_session(session=session)
