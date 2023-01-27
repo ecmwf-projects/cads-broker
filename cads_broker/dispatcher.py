@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 import time
@@ -98,26 +99,29 @@ class Broker:
             request.status = self.fetch_dask_task_status(request.request_uid)
         session.commit()
 
-    def on_future_done(self, future: distributed.Future) -> None:
+    def on_future_done(self, future: distributed.Future, session: sa.orm.Session) -> None:
         logging.info(f"Future {future.key} is {future.status}")
         if future.status in "finished":
             result = future.result()
-            db.set_request_status(
+            db.set_request_status_in_session(
                 future.key,
                 DASK_STATUS_TO_STATUS[future.status],
                 cache_key=result["key"],
                 cache_expiration=result["expiration"],
+                session=session,
             )
         elif future.status in "error":
-            db.set_request_status(
+            db.set_request_status_in_session(
                 future.key,
                 DASK_STATUS_TO_STATUS[future.status],
                 traceback="".join(traceback.format_exception(future.exception())),
+                session=session,
             )
         else:
             logging.warning(f"Unknown future status {future.status}")
-            db.set_request_status(
-                future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown")
+            db.set_request_status_in_session(
+                future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown"),
+                session=session,
             )
         self.futures.pop(future.key)
 
@@ -137,7 +141,7 @@ class Broker:
             kwargs=request.request_body.get("kwargs", {}),
             metadata=request.request_metadata,
         )
-        future.add_done_callback(self.on_future_done)
+        future.add_done_callback(functools.partial(self.on_future_done, session=session))
         db.set_request_status_in_session(
             request_uid=request.request_uid, status="running", session=session
         )
