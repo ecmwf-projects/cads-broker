@@ -99,7 +99,7 @@ class Broker:
             request.status = self.fetch_dask_task_status(request.request_uid)
         session.commit()
 
-    def on_future_done(self, future: distributed.Future, session: sa.orm.Session) -> None:
+    def on_future_done(self, future: distributed.Future) -> None:
         logging.info(f"Future {future.key} is {future.status}")
         with self.session_maker() as session:
             if future.status in "finished":
