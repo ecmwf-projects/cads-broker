@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 import time
@@ -48,10 +49,12 @@ class Broker:
 
     client: distributed.Client
     max_running_requests: int
+    wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
+    futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     queue: list[db.SystemRequest] = attrs.field(factory=list)
     running_requests: int = 0
-    futures: dict[str, distributed.Future] = attrs.field(factory=dict)
+    session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
 
     @classmethod
     def from_address(
@@ -62,8 +65,8 @@ class Broker:
         client = distributed.Client(address)
         return cls(client=client, max_running_requests=max_running_requests)
 
-    def choose_request(self) -> db.SystemRequest | None:
-        queue = db.get_accepted_requests()
+    def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
+        queue = db.get_accepted_requests_in_session(session=session)
         candidates = sorted(
             queue,
             key=lambda r: self.priority(r),
@@ -84,45 +87,47 @@ class Broker:
         else:
             return "accepted"
 
-    def update_database(self, session_obj: sa.orm.sessionmaker | None = None) -> None:
+    def update_database(self, session: sa.orm.Session) -> None:
         """Update the database with the current status of the dask tasks.
 
         If the task is not in the dask scheduler, it is re-queued.
         """
-        session_obj = db.ensure_session_obj(session_obj)
-        with session_obj() as session:
-            statement = sa.select(db.SystemRequest).where(
-                db.SystemRequest.status == "running"
-            )
-            for request in session.scalars(statement):
-                request.status = self.fetch_dask_task_status(request.request_uid)
-            session.commit()
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.status == "running"
+        )
+        for request in session.scalars(statement):
+            request.status = self.fetch_dask_task_status(request.request_uid)
+        session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
         logging.info(f"Future {future.key} is {future.status}")
-        if future.status in "finished":
-            result = future.result()
-            db.set_request_status(
-                future.key,
-                DASK_STATUS_TO_STATUS[future.status],
-                cache_key=result["key"],
-                cache_expiration=result["expiration"],
-            )
-        elif future.status in "error":
-            db.set_request_status(
-                future.key,
-                DASK_STATUS_TO_STATUS[future.status],
-                traceback="".join(traceback.format_exception(future.exception())),
-            )
-        else:
-            logging.warning(f"Unknown future status {future.status}")
-            db.set_request_status(
-                future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown")
-            )
-        self.futures.pop(future.key)
+        with self.session_maker() as session:
+            if future.status in "finished":
+                result = future.result()
+                db.set_request_status_in_session(
+                    future.key,
+                    DASK_STATUS_TO_STATUS[future.status],
+                    cache_key=result["key"],
+                    cache_expiration=result["expiration"],
+                    session=session,
+                )
+            elif future.status in "error":
+                db.set_request_status_in_session(
+                    future.key,
+                    DASK_STATUS_TO_STATUS[future.status],
+                    traceback="".join(traceback.format_exception(future.exception())),
+                    session=session,
+                )
+            else:
+                logging.warning(f"Unknown future status {future.status}")
+                db.set_request_status_in_session(
+                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown"),
+                    session=session,
+                )
+            self.futures.pop(future.key)
 
-    def submit_request(self) -> None:
-        request = self.choose_request()
+    def submit_request(self, session: sa.orm.Session) -> None:
+        request = self.choose_request(session=session)
         if not request:
             return
         logging.info(
@@ -138,25 +143,31 @@ class Broker:
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
-        db.set_request_status(request.request_uid, "running")
+        db.set_request_status_in_session(
+            request_uid=request.request_uid, status="running", session=session
+        )
         self.futures[request.request_uid] = future
         logging.info(f"Submitted {request.request_uid}")
 
     def run(self) -> None:
         while True:
-            self.update_database()
-            self.running_requests = len(
-                [
-                    future
-                    for future in self.futures.values()
-                    if DASK_STATUS_TO_STATUS.get(future.status)
-                    not in ("successful", "failed")
-                ]
-            )
-            queue = db.get_accepted_requests()
-            available_slots = self.max_running_requests - self.running_requests
-            if queue and available_slots > 0:
-                logging.info(f"queued: {queue}")
-                logging.info(f"available_slots: {available_slots}")
-                [self.submit_request() for _ in range(available_slots)]
-            time.sleep(2)
+            with self.session_maker() as session:
+                self.update_database(session=session)
+                self.running_requests = len(
+                    [
+                        future
+                        for future in self.futures.values()
+                        if DASK_STATUS_TO_STATUS.get(future.status)
+                        not in ("successful", "failed")
+                    ]
+                )
+                queue = db.get_accepted_requests_in_session(session=session)
+                available_slots = self.max_running_requests - self.running_requests
+                if queue and available_slots > 0:
+                    logging.info(f"queued: {queue}")
+                    logging.info(f"available_slots: {available_slots}")
+                    [
+                        self.submit_request(session=session)
+                        for _ in range(available_slots)
+                    ]
+            time.sleep(self.wait_time)

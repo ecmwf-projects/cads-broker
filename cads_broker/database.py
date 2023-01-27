@@ -75,14 +75,21 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     return session_obj
 
 
+def get_accepted_requests_in_session(
+    session: sa.orm.Session = None,
+):
+    """Get all accepted requests."""
+    statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
+    return session.scalars(statement).all()
+
+
 def get_accepted_requests(
     session_obj: sa.orm.sessionmaker | None = None,
 ) -> list[SystemRequest]:
     """Get all accepted requests."""
     session_obj = ensure_session_obj(session_obj)
     with session_obj() as session:
-        statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
-        return session.scalars(statement).all()
+        return get_accepted_requests_in_session(session=session)
 
 
 def count_accepted_requests(
@@ -103,10 +110,10 @@ def count_accepted_requests(
 def set_request_status_in_session(
     request_uid: str,
     status: str,
+    session: sa.orm.Session,
     cache_key: str | None = None,
     cache_expiration: sa.DateTime | None = None,
     traceback: str | None = None,
-    session: sa.orm.sessionmaker | None = None,
 ) -> None:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -202,7 +209,8 @@ def create_request(
 
 
 def get_request_in_session(
-    request_uid: str, session: sa.orm.session.Session
+    request_uid: str,
+    session: sa.orm.Session,
 ) -> SystemRequest:
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     return session.scalars(statement).one()
@@ -218,7 +226,8 @@ def get_request(
 
 
 def get_request_result_in_session(
-    request_uid: str, session: sa.orm.session.Session
+    request_uid: str,
+    session: sa.orm.Session,
 ) -> SystemRequest:
     request = get_request_in_session(request_uid, session)
     statement = sa.select(cacholote.database.CacheEntry.result).where(
@@ -237,9 +246,12 @@ def get_request_result(
 
 
 def delete_request_in_session(
-    request_uid: str, session: sa.orm.session.Session
+    request_uid: str,
+    session: sa.orm.Session,
 ) -> SystemRequest:
-    set_request_status_in_session(request_uid, "dismissed", session=session)
+    set_request_status_in_session(
+        request_uid=request_uid, status="dismissed", session=session
+    )
     request = get_request_in_session(request_uid, session)
     session.delete(request)
     session.commit()

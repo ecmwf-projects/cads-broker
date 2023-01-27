@@ -61,9 +61,9 @@ def test_broker_update_database(
         new=mock_fetch_dask_task_status,
     )
 
-    broker.update_database(session_obj)
-
     with session_obj() as session:
+        broker.update_database(session=session)
+
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == successful_uid
         )
@@ -75,22 +75,25 @@ def test_broker_update_database(
         assert session.scalars(statement).first().status == "running"
 
 
-def test_broker_choose_request(mocker: pytest_mock.plugin.MockerFixture) -> None:
+def test_broker_choose_request(
+    mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
+) -> None:
     broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
     number_of_requests = 5
 
-    def get_accepted_requests() -> list[db.SystemRequest]:
+    def get_accepted_requests_in_session() -> list[db.SystemRequest]:
         return [
             mock_system_request(created_at=datetime.datetime(day=i, month=1, year=2020))
             for i in range(1, number_of_requests + 1)
         ]
 
     mocker.patch(
-        "cads_broker.database.get_accepted_requests",
-        return_value=get_accepted_requests(),
+        "cads_broker.database.get_accepted_requests_in_session",
+        return_value=get_accepted_requests_in_session(),
     )
-    request = broker.choose_request()
-    assert request.created_at.day == 1
+    with session_obj() as session:
+        request = broker.choose_request(session=session)
+        assert request.created_at.day == 1
 
 
 def test_broker_priority() -> None:
