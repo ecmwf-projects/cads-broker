@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import logging
 
 import pydantic
@@ -73,7 +72,6 @@ def ensure_settings(settings: SqlalchemySettings | None = None) -> SqlalchemySet
     return dbsettings
 
 
-@functools.lru_cache()
 def configure_logger() -> None:
     """
     Configure the logging module.
