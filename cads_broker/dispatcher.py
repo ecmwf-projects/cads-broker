@@ -1,5 +1,3 @@
-import functools
-import logging
 import os
 import time
 import traceback
@@ -8,6 +6,7 @@ from typing import Any
 import attrs
 import distributed
 import sqlalchemy as sa
+import structlog
 
 try:
     from cads_worker import worker
@@ -16,7 +15,7 @@ except ModuleNotFoundError:
 
 from cads_broker import database as db
 
-logging.getLogger().setLevel(logging.INFO)
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 DASK_STATUS_TO_STATUS = {
@@ -100,7 +99,7 @@ class Broker:
         session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
-        logging.info(f"Future {future.key} is {future.status}")
+        logger.info(f"Future {future.key} is {future.status}", job_id=future.key)
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
@@ -119,7 +118,7 @@ class Broker:
                     session=session,
                 )
             else:
-                logging.warning(f"Unknown future status {future.status}")
+                logger.warning(f"Unknown future status {future.status}", job_id=future.key)
                 db.set_request_status_in_session(
                     future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown"),
                     session=session,
@@ -130,8 +129,9 @@ class Broker:
         request = self.choose_request(session=session)
         if not request:
             return
-        logging.info(
+        logger.info(
             f"Submitting {request.request_uid}",
+            job_id=request.request_uid,
         )
 
         future = self.client.submit(
@@ -147,7 +147,7 @@ class Broker:
             request_uid=request.request_uid, status="running", session=session
         )
         self.futures[request.request_uid] = future
-        logging.info(f"Submitted {request.request_uid}")
+        logger.info(f"Submitted {request.request_uid}", job_id=future.key)
 
     def run(self) -> None:
         while True:
@@ -162,12 +162,12 @@ class Broker:
                     ]
                 )
                 queue = db.get_accepted_requests_in_session(session=session)
-                available_slots = self.max_running_requests - self.running_requests
-                if queue and available_slots > 0:
-                    logging.info(f"queued: {queue}")
-                    logging.info(f"available_slots: {available_slots}")
+                available_workers = self.max_running_requests - self.running_requests
+                if queue and available_workers > 0:
+                    logger.info(f"Queue length: {len(queue)}")
+                    logger.info(f"Available workers are: {available_workers}")
                     [
                         self.submit_request(session=session)
-                        for _ in range(available_slots)
+                        for _ in range(available_workers)
                     ]
             time.sleep(self.wait_time)
