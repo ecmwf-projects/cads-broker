@@ -38,7 +38,7 @@ def get_tasks(client: distributed.Client) -> Any:
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
-            tasks[task_id] = scheduler_state_to_status.get(task.state, "unknown")
+            tasks[task_id] = scheduler_state_to_status.get(task.state, "accepted")
         return tasks
 
     return client.run_on_scheduler(get_tasks_on_scheduler)
@@ -120,7 +120,7 @@ class Broker:
             else:
                 logging.warning(f"Unknown future status {future.status}")
                 db.set_request_status_in_session(
-                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown"),
+                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
                     session=session,
                 )
             self.futures.pop(future.key)
