@@ -162,11 +162,14 @@ class Broker:
                 )
                 number_accepted_requests = db.count_accepted_requests_in_session(session=session)
                 available_slots = self.max_running_requests - self.running_requests
-                if number_accepted_requests and available_slots > 0:
-                    logging.info(f"Queued jobs: {number_accepted_requests}")
-                    logging.info(f"Available workers: {available_slots}")
-                    [
-                        self.submit_request(session=session)
-                        for _ in range(available_slots)
-                    ]
+                if number_accepted_requests > 0:
+                    if available_slots > 0:
+                        logging.info(f"Queued jobs: {number_accepted_requests}")
+                        logging.info(f"Available workers: {available_slots}")
+                        [
+                            self.submit_request(session=session)
+                            for _ in range(available_slots)
+                        ]
+                    elif available_slots == 0:
+                        logging.info(f"Available workers: {available_slots}")
             time.sleep(self.wait_time)
