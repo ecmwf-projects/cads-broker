@@ -52,7 +52,6 @@ class Broker:
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
-    queue: list[db.SystemRequest] = attrs.field(factory=list)
     running_requests: int = 0
     session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
 
@@ -161,11 +160,11 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                queue = db.get_accepted_requests_in_session(session=session)
+                number_accepted_requests = db.count_accepted_requests_in_session(session=session)
                 available_slots = self.max_running_requests - self.running_requests
-                if queue and available_slots > 0:
-                    logging.info(f"queued: {queue}")
-                    logging.info(f"available_slots: {available_slots}")
+                if number_accepted_requests and available_slots > 0:
+                    logging.info(f"Queued jobs: {number_accepted_requests}")
+                    logging.info(f"Available workers: {available_slots}")
                     [
                         self.submit_request(session=session)
                         for _ in range(available_slots)
