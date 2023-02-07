@@ -1,5 +1,3 @@
-import functools
-import logging
 import os
 import time
 import traceback
@@ -8,6 +6,7 @@ from typing import Any
 import attrs
 import distributed
 import sqlalchemy as sa
+import structlog
 
 try:
     from cads_worker import worker
@@ -16,7 +15,7 @@ except ModuleNotFoundError:
 
 from cads_broker import database as db
 
-logging.getLogger().setLevel(logging.INFO)
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 DASK_STATUS_TO_STATUS = {
@@ -53,16 +52,24 @@ class Broker:
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     running_requests: int = 0
-    session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
+    session_maker: sa.orm.sessionmaker | None = None
+
+    def __attrs_post_init__(self):
+        self.session_maker = db.ensure_session_obj(self.session_maker)
 
     @classmethod
     def from_address(
         cls,
         address="scheduler:8786",
         max_running_requests=int(os.getenv("MAX_RUNNING_REQUESTS", 1)),
+        session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        return cls(client=client, max_running_requests=max_running_requests)
+        return cls(
+            client=client,
+            max_running_requests=max_running_requests,
+            session_maker=session_maker,
+        )
 
     def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
         queue = db.get_accepted_requests_in_session(session=session)
@@ -99,7 +106,7 @@ class Broker:
         session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
-        logging.info(f"Future {future.key} is {future.status}")
+        logger.info(f"Future {future.key} is {future.status}", job_id=future.key)
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
@@ -118,9 +125,12 @@ class Broker:
                     session=session,
                 )
             else:
-                logging.warning(f"Unknown future status {future.status}")
+                logger.warning(
+                    f"Unknown future status {future.status}", job_id=future.key
+                )
                 db.set_request_status_in_session(
-                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
+                    future.key,
+                    DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
                     session=session,
                 )
             self.futures.pop(future.key)
@@ -129,8 +139,9 @@ class Broker:
         request = self.choose_request(session=session)
         if not request:
             return
-        logging.info(
+        logger.info(
             f"Submitting {request.request_uid}",
+            job_id=request.request_uid,
         )
 
         future = self.client.submit(
@@ -146,7 +157,7 @@ class Broker:
             request_uid=request.request_uid, status="running", session=session
         )
         self.futures[request.request_uid] = future
-        logging.info(f"Submitted {request.request_uid}")
+        logger.info(f"Submitted {request.request_uid}", job_id=future.key)
 
     def run(self) -> None:
         while True:
@@ -160,16 +171,18 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_accepted_requests_in_session(session=session)
-                available_slots = self.max_running_requests - self.running_requests
+                number_accepted_requests = db.count_accepted_requests_in_session(
+                    session=session
+                )
+                available_workers = self.max_running_requests - self.running_requests
                 if number_accepted_requests > 0:
-                    if available_slots > 0:
-                        logging.info(f"Queued jobs: {number_accepted_requests}")
-                        logging.info(f"Available workers: {available_slots}")
+                    if available_workers > 0:
+                        logger.info(f"Queued jobs: {number_accepted_requests}")
+                        logger.info(f"Available workers: {available_workers}")
                         [
                             self.submit_request(session=session)
-                            for _ in range(available_slots)
+                            for _ in range(available_workers)
                         ]
-                    elif available_slots == 0:
-                        logging.info(f"Available workers: {available_slots}")
+                    elif available_workers == 0:
+                        logger.info(f"Available workers: {available_workers}")
             time.sleep(self.wait_time)

@@ -33,7 +33,9 @@ def test_broker_update_database(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
 
-    broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
+    broker = dispatcher.Broker(
+        client=CLIENT, max_running_requests=1, session_maker=session_obj
+    )
 
     successful_uid = str(uuid.uuid4())
     queued_in_dask_uid = str(uuid.uuid4())
@@ -78,7 +80,9 @@ def test_broker_update_database(
 def test_broker_choose_request(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
-    broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
+    broker = dispatcher.Broker(
+        client=CLIENT, max_running_requests=1, session_maker=session_obj
+    )
     number_of_requests = 5
 
     def get_accepted_requests_in_session() -> list[db.SystemRequest]:
@@ -96,8 +100,10 @@ def test_broker_choose_request(
         assert request.created_at.day == 1
 
 
-def test_broker_priority() -> None:
-    broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
+def test_broker_priority(session_obj: sa.orm.sessionmaker) -> None:
+    broker = dispatcher.Broker(
+        client=CLIENT, max_running_requests=1, session_maker=session_obj
+    )
 
     created_at = datetime.datetime(day=1, month=1, year=2022, hour=1)
     assert (
@@ -107,9 +113,11 @@ def test_broker_priority() -> None:
 
 
 def test_broker_fetch_dask_task_status(
-    mocker: pytest_mock.plugin.MockerFixture,
+    mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
-    broker = dispatcher.Broker(client=CLIENT, max_running_requests=1)
+    broker = dispatcher.Broker(
+        client=CLIENT, max_running_requests=1, session_maker=session_obj
+    )
 
     def mock_get_tasks() -> dict[str, str]:
         return {"dask-scheduler": "successful"}
