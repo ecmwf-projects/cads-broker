@@ -34,6 +34,7 @@ class SqlalchemySettings(pydantic.BaseSettings):
     compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
     compute_db_name: str = "broker"
+    pool_recycle: int = 60
 
     @pydantic.validator("compute_db_password")
     def password_must_be_set(cls: pydantic.BaseSettings, v: str | None) -> str | None:

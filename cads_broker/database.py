@@ -71,7 +71,9 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     if session_obj:
         return session_obj
     settings = config.ensure_settings(config.dbsettings)
-    session_obj = sa.orm.sessionmaker(sa.create_engine(settings.connection_string))
+    session_obj = sa.orm.sessionmaker(
+        sa.create_engine(settings.connection_string, pool_recycle=settings.pool_recycle)
+    )
     return session_obj
 
 

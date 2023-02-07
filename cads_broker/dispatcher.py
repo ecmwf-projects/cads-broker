@@ -37,7 +37,7 @@ def get_tasks(client: distributed.Client) -> Any:
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
-            tasks[task_id] = scheduler_state_to_status.get(task.state, "unknown")
+            tasks[task_id] = scheduler_state_to_status.get(task.state, "accepted")
         return tasks
 
     return client.run_on_scheduler(get_tasks_on_scheduler)
@@ -51,7 +51,6 @@ class Broker:
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
-    queue: list[db.SystemRequest] = attrs.field(factory=list)
     running_requests: int = 0
     session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
 
@@ -120,7 +119,7 @@ class Broker:
             else:
                 logger.warning(f"Unknown future status {future.status}", job_id=future.key)
                 db.set_request_status_in_session(
-                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "unknown"),
+                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
                     session=session,
                 )
             self.futures.pop(future.key)
@@ -161,13 +160,16 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                queue = db.get_accepted_requests_in_session(session=session)
+                number_accepted_requests = db.count_accepted_requests_in_session(session=session)
                 available_workers = self.max_running_requests - self.running_requests
-                if queue and available_workers > 0:
-                    logger.info(f"Queue length: {len(queue)}")
-                    logger.info(f"Available workers are: {available_workers}")
-                    [
-                        self.submit_request(session=session)
-                        for _ in range(available_workers)
-                    ]
+                if number_accepted_requests > 0:
+                    if available_workers > 0:
+                        logger.info(f"Queued jobs: {number_accepted_requests}")
+                        logger.info(f"Available workers: {available_workers}")
+                        [
+                            self.submit_request(session=session)
+                            for _ in range(available_workers)
+                        ]
+                    elif available_workers == 0:
+                        logger.info(f"Available workers: {available_workers}")
             time.sleep(self.wait_time)
