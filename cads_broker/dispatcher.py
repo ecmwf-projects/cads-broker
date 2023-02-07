@@ -52,16 +52,24 @@ class Broker:
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     running_requests: int = 0
-    session_maker: sa.orm.sessionmaker = db.ensure_session_obj(None)
+    session_maker: sa.orm.sessionmaker | None = None
+
+    def __attrs_post_init__(self):
+        self.session_maker = db.ensure_session_obj(self.session_maker)
 
     @classmethod
     def from_address(
         cls,
         address="scheduler:8786",
         max_running_requests=int(os.getenv("MAX_RUNNING_REQUESTS", 1)),
+        session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        return cls(client=client, max_running_requests=max_running_requests)
+        return cls(
+            client=client,
+            max_running_requests=max_running_requests,
+            session_maker=session_maker,
+        )
 
     def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
         queue = db.get_accepted_requests_in_session(session=session)
@@ -117,9 +125,12 @@ class Broker:
                     session=session,
                 )
             else:
-                logger.warning(f"Unknown future status {future.status}", job_id=future.key)
+                logger.warning(
+                    f"Unknown future status {future.status}", job_id=future.key
+                )
                 db.set_request_status_in_session(
-                    future.key, DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
+                    future.key,
+                    DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
                     session=session,
                 )
             self.futures.pop(future.key)
@@ -160,7 +171,9 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_accepted_requests_in_session(session=session)
+                number_accepted_requests = db.count_accepted_requests_in_session(
+                    session=session
+                )
                 available_workers = self.max_running_requests - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
