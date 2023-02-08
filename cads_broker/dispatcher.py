@@ -13,8 +13,10 @@ try:
 except ModuleNotFoundError:
     pass
 
+from cads_broker import config
 from cads_broker import database as db
 
+config.configure_logger()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 

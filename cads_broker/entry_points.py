@@ -74,7 +74,6 @@ def run(
     max_running_requests: maximum number of requests to run in parallel
     scheduler_address: address of the scheduler
     """
-    config.configure_logger()
     broker = dispatcher.Broker.from_address(address=address)
     broker.run()
 
