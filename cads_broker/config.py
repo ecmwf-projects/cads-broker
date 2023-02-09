@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import sys
 
 import pydantic
 import structlog
@@ -81,6 +82,8 @@ def configure_logger() -> None:
     """
     logging.basicConfig(
         level=logging.INFO,
+        format="%(message)s",
+        stream=sys.stdout,
     )
 
     structlog.configure(
