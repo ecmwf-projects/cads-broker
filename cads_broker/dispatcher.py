@@ -108,7 +108,7 @@ class Broker:
         session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
-        logger.info(f"Future {future.key} is {future.status}", job_id=future.key)
+        logger.info(f"Future {future.key} has status {future.status}", job_id=future.key)
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
@@ -142,7 +142,7 @@ class Broker:
         if not request:
             return
         logger.info(
-            f"Submitting {request.request_uid}",
+            f"Submitting job to the Scheduler.",
             job_id=request.request_uid,
         )
 
@@ -159,7 +159,7 @@ class Broker:
             request_uid=request.request_uid, status="running", session=session
         )
         self.futures[request.request_uid] = future
-        logger.info(f"Submitted {request.request_uid}", job_id=future.key)
+        logger.info(f"Submitted job to the scheduler", job_id=future.key)
 
     def run(self) -> None:
         while True:
