@@ -2,14 +2,17 @@
 import uuid
 from typing import Any
 
-import cacholote
 import sqlalchemy as sa
 import sqlalchemy_utils
+import structlog
+from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-from cads_broker import config
+import cacholote
 
 BaseModel = cacholote.database.Base
+
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 status_enum = sa.Enum(
@@ -112,7 +115,7 @@ def set_request_status_in_session(
     cache_key: str | None = None,
     cache_expiration: sa.DateTime | None = None,
     traceback: str | None = None,
-) -> None:
+) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
@@ -127,6 +130,7 @@ def set_request_status_in_session(
         request.started_at = sa.func.now()
     request.status = status
     session.commit()
+    return request
 
 
 def set_request_status(
@@ -174,6 +178,12 @@ def create_request_in_session(
     )
     session.add(request)
     session.commit()
+    logger.info(
+        "accepted job",
+        job_id=request.request_uid,
+        created_at=request.created_at,
+        updated_at=request.updated_at,
+    )
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
