@@ -109,6 +109,7 @@ class Broker:
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
+        logger_kwargs = {}
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
@@ -119,6 +120,7 @@ class Broker:
                     cache_expiration=result["expiration"],
                     session=session,
                 )
+                logger_kwargs["result"] = result
             elif future.status in "error":
                 request = db.set_request_status_in_session(
                     future.key,
@@ -126,6 +128,7 @@ class Broker:
                     traceback="".join(traceback.format_exception(future.exception())),
                     session=session,
                 )
+                logger_kwargs["traceback"] = request.traceback
             else:
                 request = db.set_request_status_in_session(
                     future.key,
@@ -147,6 +150,7 @@ class Broker:
                 started_at=request.started_at.strftime(config.timestamp_format),
                 finished_at=request.finished_at.strftime(config.timestamp_format),
                 updated_at=request.updated_at.strftime(config.timestamp_format),
+                **logger_kwargs
             )
 
     def submit_request(self, session: sa.orm.Session) -> None:
