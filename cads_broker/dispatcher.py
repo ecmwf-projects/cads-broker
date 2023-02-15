@@ -143,10 +143,10 @@ class Broker:
                 job_id=future.key,
                 job_status=DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
                 dask_status=future.status,
-                created_at=request.created_at,
-                started_at=request.started_at,
-                finished_at=request.finished_at,
-                updated_at=request.updated_at,
+                created_at=request.created_at.timestamp(),
+                started_at=request.started_at.timestamp(),
+                finished_at=request.finished_at.timestamp(),
+                updated_at=request.updated_at.timestamp(),
             )
 
     def submit_request(self, session: sa.orm.Session) -> None:
@@ -172,9 +172,9 @@ class Broker:
             job_id=future.key,
             job_status=request.status,
             user_uid=request.request_metadata.get("user_uid"),
-            created_at=request.created_at,
-            started_at=request.started_at,
-            updated_at=request.updated_at,
+            created_at=request.created_at.timestamp(),
+            started_at=request.started_at.timestamp(),
+            updated_at=request.updated_at.timestamp(),
         )
 
     def run(self) -> None:
