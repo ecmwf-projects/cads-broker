@@ -127,13 +127,15 @@ class Broker:
                     session=session,
                 )
             else:
-                logger.warning(
-                    f"Unknown future status {future.status}", job_id=future.key
-                )
                 request = db.set_request_status_in_session(
                     future.key,
                     job_status,
                     session=session,
+                )
+                logger.warning(
+                    "unknown dask status",
+                    job_status={future.status},
+                    job_id=request.request_uid,
                 )
             self.futures.pop(future.key)
             logger.info(
@@ -168,9 +170,12 @@ class Broker:
         logger.info(
             "submitted job to scheduler",
             job_id=future.key,
+            job_status=request.status,
+            user_uid=request.status,
             created_at=request.created_at,
             started_at=request.started_at,
             updated_at=request.updated_at,
+            user_uid=request.user_uid,
         )
 
     def run(self) -> None:
