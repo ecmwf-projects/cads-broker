@@ -128,7 +128,7 @@ class Broker:
                     traceback="".join(traceback.format_exception(future.exception())),
                     session=session,
                 )
-                logger_kwargs["traceback"] = request.traceback
+                logger_kwargs["traceback"] = request.response_traceback
             else:
                 request = db.set_request_status_in_session(
                     future.key,
