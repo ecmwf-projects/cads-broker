@@ -2,14 +2,14 @@
 import uuid
 from typing import Any
 
+import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-import cacholote
+from cads_broker import config
 
 BaseModel = cacholote.database.Base
 

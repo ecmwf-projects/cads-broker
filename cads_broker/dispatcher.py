@@ -150,7 +150,7 @@ class Broker:
                 started_at=request.started_at.strftime(config.timestamp_format),
                 finished_at=request.finished_at.strftime(config.timestamp_format),
                 updated_at=request.updated_at.strftime(config.timestamp_format),
-                **logger_kwargs
+                **logger_kwargs,
             )
 
     def submit_request(self, session: sa.orm.Session) -> None:
