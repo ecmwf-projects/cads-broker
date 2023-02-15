@@ -151,7 +151,7 @@ def set_request_status(
 
 def create_request_in_session(
     session: sa.orm.Session,
-    user_id: int,
+    user_uid: str,
     setup_code: str,
     entry_point: str,
     kwargs: dict[str, Any],
@@ -160,7 +160,7 @@ def create_request_in_session(
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
-    metadata["user_id"] = user_id
+    metadata["user_uid"] = user_uid
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
@@ -182,7 +182,7 @@ def create_request_in_session(
 
 
 def create_request(
-    user_id: int,
+    user_uid: str,
     setup_code: str,
     entry_point: str,
     kwargs: dict[str, Any],
@@ -196,7 +196,7 @@ def create_request(
     with session_obj() as session:
         return create_request_in_session(
             session,
-            user_id,
+            user_uid,
             setup_code,
             entry_point,
             kwargs,
