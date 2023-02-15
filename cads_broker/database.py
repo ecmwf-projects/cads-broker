@@ -230,7 +230,7 @@ def get_request_in_session(
             SystemRequest.request_uid == request_uid
         )
         return session.scalars(statement).one()
-    except (sa.orm.exc.NoResultFound):
+    except (sqlalchemy.orm.exc.NoResultFound):
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
