@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 import sqlalchemy as sa
+import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
 from cads_broker import config
@@ -18,6 +19,10 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", name="status"
 )
+
+
+class NoResultFound(Exception):
+    pass
 
 
 class SystemRequest(BaseModel):
@@ -220,8 +225,13 @@ def get_request_in_session(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    return session.scalars(statement).one()
+    try:
+        statement = sa.select(SystemRequest).where(
+            SystemRequest.request_uid == request_uid
+        )
+        return session.scalars(statement).one()
+    except (sa.orm.exc.NoResultFound):
+        raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
 def get_request(
