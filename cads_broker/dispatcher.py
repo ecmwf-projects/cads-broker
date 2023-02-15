@@ -171,11 +171,10 @@ class Broker:
             "submitted job to scheduler",
             job_id=future.key,
             job_status=request.status,
-            user_uid=request.status,
+            user_uid=request.user_uid,
             created_at=request.created_at,
             started_at=request.started_at,
             updated_at=request.updated_at,
-            user_uid=request.user_uid,
         )
 
     def run(self) -> None:
