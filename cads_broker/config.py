@@ -20,6 +20,7 @@ import pydantic
 import structlog
 
 dbsettings = None
+timestamp_format = "%Y-%m-%d %H:%M:%S"
 
 
 class SqlalchemySettings(pydantic.BaseSettings):
