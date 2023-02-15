@@ -186,8 +186,8 @@ def create_request_in_session(
     logger.info(
         "accepted job",
         job_id=request.request_uid,
-        created_at=request.created_at,
-        updated_at=request.updated_at,
+        created_at=request.created_at.strftime(config.timestamp_format),
+        updated_at=request.updated_at.strftime(config.timestamp_format),
     )
     ret_value = {
         column.key: getattr(request, column.key)
