@@ -6,7 +6,6 @@ from typing import Any
 import cacholote
 import pytest
 import sqlalchemy as sa
-import sqlalchemy.orm.exc
 from psycopg import Connection
 from sqlalchemy.orm import sessionmaker
 
@@ -54,7 +53,7 @@ def test_get_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) -> N
         session.add(successful_request)
         session.add(accepted_request)
         session.commit()
-        requests = db.get_accepted_requests_in_session(session=session)
+        requests = db.get_accepted_requests(session=session)
     assert len(requests) == 1
     assert requests[0].request_uid == accepted_request_uid
 
@@ -68,13 +67,13 @@ def test_count_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) ->
         session.add(request1)
         session.add(request2)
         session.commit()
-        assert 2 == db.count_accepted_requests_in_session(session=session)
-        assert 1 == db.count_accepted_requests_in_session(
+        assert 2 == db.count_accepted_requests(session=session)
+        assert 1 == db.count_accepted_requests(
             session=session, process_id=process_id
         )
 
 
-def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
+def test_set_request_status_in_session_in_session(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
 
@@ -83,11 +82,11 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request)
         session.commit()
 
-    db.set_request_status(
-        request_uid,
-        status="running",
-        session_obj=session_obj,
-    )
+        db.set_request_status(
+            request_uid,
+            status="running",
+            session=session,
+        )
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_uid
@@ -103,12 +102,12 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         session.add(cache_entry)
         session.commit()
 
-    db.set_request_status(
-        request_uid,
-        status="successful",
-        cache_key=cache_key,
-        session_obj=session_obj,
-    )
+        db.set_request_status(
+            request_uid,
+            status="successful",
+            cache_key=cache_key,
+            session=session,
+        )
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_uid
@@ -128,13 +127,13 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request)
         session.commit()
 
-    traceback = "traceback"
-    db.set_request_status(
-        request_uid,
-        status="failed",
-        traceback=traceback,
-        session_obj=session_obj,
-    )
+        traceback = "traceback"
+        db.set_request_status(
+            request_uid,
+            status="failed",
+            traceback=traceback,
+            session=session,
+        )
     with session_obj() as session:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_uid
@@ -147,17 +146,17 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     assert failed_request.finished_at is not None
 
 
-def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
-    request_dict = db.create_request(
-        user_uid="abc123",
-        setup_code="",
-        entry_point="sum",
-        kwargs={},
-        metadata={},
-        process_id="submit-workflow",
-        session_obj=session_obj,
-    )
+def test_create_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
     with session_obj() as session:
+        request_dict = db.create_request(
+            user_uid="abc123",
+            setup_code="",
+            entry_point="sum",
+            kwargs={},
+            metadata={},
+            process_id="submit-workflow",
+            session=session,
+        )
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_dict["request_uid"]
         )
@@ -176,23 +175,23 @@ def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request)
         session.commit()
     with session_obj() as session:
-        request = db.get_request_in_session(request_uid, session)
+        request = db.get_request(request_uid, session)
     with pytest.raises(db.NoResultFound):
-        request = db.get_request_in_session(str(uuid.uuid4()), session)
+        request = db.get_request(str(uuid.uuid4()), session)
     assert request.request_uid == request_uid
 
 
-def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
     with session_obj() as session:
         session.add(request)
         session.commit()
-    request = db.get_request(request_uid, session_obj)
+        request = db.get_request(request_uid, session=session)
     assert request.request_uid == request_uid
 
 
-def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_request_result_in_session(session_obj: sa.orm.sessionmaker) -> None:
     cache_entry = mock_cache_entry()
     request = mock_system_request(
         status="successful",
@@ -204,21 +203,22 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
         session.add(cache_entry)
         session.add(request)
         session.commit()
-    result = db.get_request_result(request_uid, session_obj)
+        result = db.get_request_result(request_uid, session=session)
     assert len(result) == 2
 
 
-def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
+def test_delete_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
     with session_obj() as session:
         session.add(request)
         session.commit()
-    request = db.delete_request(request_uid, session_obj)
+        request = db.delete_request(request_uid, session=session)
     assert request.request_uid == request_uid
     assert request.status == "dismissed"
     with pytest.raises(db.NoResultFound):
-        request = db.get_request(request_uid, session_obj)
+        with session_obj() as session:
+            request = db.get_request(request_uid, session=session)
 
 
 def test_init_database(postgresql: Connection[str]) -> None:
@@ -246,12 +246,14 @@ def test_init_database(postgresql: Connection[str]) -> None:
 
     db.init_database(connection_string)
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
-    requests = db.get_accepted_requests(session_obj=session_obj)
+    with session_obj() as session:
+        requests = db.get_accepted_requests(session=session)
     assert len(requests) == 1
 
     db.init_database(connection_string, force=True)
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
-    requests = db.get_accepted_requests(session_obj=session_obj)
+    with session_obj() as session:
+        requests = db.get_accepted_requests(session=session)
     assert len(requests) == 0
 
 
