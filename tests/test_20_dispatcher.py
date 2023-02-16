@@ -85,15 +85,15 @@ def test_broker_choose_request(
     )
     number_of_requests = 5
 
-    def get_accepted_requests_in_session() -> list[db.SystemRequest]:
+    def get_accepted_requests() -> list[db.SystemRequest]:
         return [
             mock_system_request(created_at=datetime.datetime(day=i, month=1, year=2020))
             for i in range(1, number_of_requests + 1)
         ]
 
     mocker.patch(
-        "cads_broker.database.get_accepted_requests_in_session",
-        return_value=get_accepted_requests_in_session(),
+        "cads_broker.database.get_accepted_requests",
+        return_value=get_accepted_requests(),
     )
     with session_obj() as session:
         request = broker.choose_request(session=session)

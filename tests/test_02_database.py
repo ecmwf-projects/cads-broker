@@ -45,7 +45,7 @@ def mock_cache_entry() -> db.SystemRequest:
     return cache_entry
 
 
-def test_get_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     successful_request = mock_system_request(status="running")
     accepted_request = mock_system_request(status="accepted")
     accepted_request_uid = accepted_request.request_uid
@@ -58,7 +58,7 @@ def test_get_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) -> N
     assert requests[0].request_uid == accepted_request_uid
 
 
-def test_count_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     process_id = "reanalysis-era5-pressure-levels"
     request1 = mock_system_request(status="accepted", process_id=process_id)
     request2 = mock_system_request(status="accepted")
@@ -73,7 +73,7 @@ def test_count_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) ->
         )
 
 
-def test_set_request_status_in_session_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
 
@@ -146,7 +146,7 @@ def test_set_request_status_in_session_in_session(session_obj: sa.orm.sessionmak
     assert failed_request.finished_at is not None
 
 
-def test_create_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
     with session_obj() as session:
         request_dict = db.create_request(
             user_uid="abc123",
@@ -168,7 +168,7 @@ def test_create_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
     )
 
 
-def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
     with session_obj() as session:
@@ -178,10 +178,12 @@ def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
         request = db.get_request(request_uid, session)
     with pytest.raises(db.NoResultFound):
         request = db.get_request(str(uuid.uuid4()), session)
+    with pytest.raises(db.NoResultFound):
+        request = db.get_request("123", session)
     assert request.request_uid == request_uid
 
 
-def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
     with session_obj() as session:
@@ -191,7 +193,7 @@ def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
     assert request.request_uid == request_uid
 
 
-def test_get_request_result_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
     cache_entry = mock_cache_entry()
     request = mock_system_request(
         status="successful",
@@ -207,7 +209,7 @@ def test_get_request_result_in_session(session_obj: sa.orm.sessionmaker) -> None
     assert len(result) == 2
 
 
-def test_delete_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
+def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
     with session_obj() as session:
