@@ -46,7 +46,7 @@ def mock_cache_entry() -> db.SystemRequest:
     return cache_entry
 
 
-def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_accepted_requests_in_session(session_obj: sa.orm.sessionmaker) -> None:
     successful_request = mock_system_request(status="running")
     accepted_request = mock_system_request(status="accepted")
     accepted_request_uid = accepted_request.request_uid
@@ -54,7 +54,7 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.add(successful_request)
         session.add(accepted_request)
         session.commit()
-    requests = db.get_accepted_requests(session_obj)
+        requests = db.get_accepted_requests_in_session(session=session)
     assert len(requests) == 1
     assert requests[0].request_uid == accepted_request_uid
 
@@ -177,6 +177,8 @@ def test_get_request_in_session(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
     with session_obj() as session:
         request = db.get_request_in_session(request_uid, session)
+    with pytest.raises(db.NoResultFound):
+        request = db.get_request_in_session(str(uuid.uuid4()), session)
     assert request.request_uid == request_uid
 
 
@@ -215,7 +217,7 @@ def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
     request = db.delete_request(request_uid, session_obj)
     assert request.request_uid == request_uid
     assert request.status == "dismissed"
-    with pytest.raises(sqlalchemy.orm.exc.NoResultFound):
+    with pytest.raises(db.NoResultFound):
         request = db.get_request(request_uid, session_obj)
 
 

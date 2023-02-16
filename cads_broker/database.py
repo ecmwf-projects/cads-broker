@@ -4,17 +4,25 @@ from typing import Any
 
 import cacholote
 import sqlalchemy as sa
+import sqlalchemy.orm.exc
 import sqlalchemy_utils
+import structlog
 from sqlalchemy.dialects.postgresql import JSONB
 
 from cads_broker import config
 
 BaseModel = cacholote.database.Base
 
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
+
 
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", name="status"
 )
+
+
+class NoResultFound(Exception):
+    pass
 
 
 class SystemRequest(BaseModel):
@@ -112,7 +120,7 @@ def set_request_status_in_session(
     cache_key: str | None = None,
     cache_expiration: sa.DateTime | None = None,
     traceback: str | None = None,
-) -> None:
+) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
@@ -127,6 +135,7 @@ def set_request_status_in_session(
         request.started_at = sa.func.now()
     request.status = status
     session.commit()
+    return request
 
 
 def set_request_status(
@@ -174,6 +183,12 @@ def create_request_in_session(
     )
     session.add(request)
     session.commit()
+    logger.info(
+        "accepted job",
+        job_id=request.request_uid,
+        created_at=request.created_at.strftime(config.timestamp_format),
+        updated_at=request.updated_at.strftime(config.timestamp_format),
+    )
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
@@ -210,8 +225,13 @@ def get_request_in_session(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    return session.scalars(statement).one()
+    try:
+        statement = sa.select(SystemRequest).where(
+            SystemRequest.request_uid == request_uid
+        )
+        return session.scalars(statement).one()
+    except (sqlalchemy.orm.exc.NoResultFound):
+        raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
 def get_request(

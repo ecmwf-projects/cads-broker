@@ -108,45 +108,55 @@ class Broker:
         session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
-        logger.info(
-            f"Future {future.key} has status {future.status}", job_id=future.key
-        )
+        job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
+        logger_kwargs = {}
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
-                db.set_request_status_in_session(
+                request = db.set_request_status_in_session(
                     future.key,
-                    DASK_STATUS_TO_STATUS[future.status],
+                    job_status,
                     cache_key=result["key"],
                     cache_expiration=result["expiration"],
                     session=session,
                 )
+                logger_kwargs["result"] = result
             elif future.status in "error":
-                db.set_request_status_in_session(
+                request = db.set_request_status_in_session(
                     future.key,
-                    DASK_STATUS_TO_STATUS[future.status],
+                    job_status,
                     traceback="".join(traceback.format_exception(future.exception())),
                     session=session,
                 )
+                logger_kwargs["traceback"] = request.response_traceback
             else:
-                logger.warning(
-                    f"Unknown future status {future.status}", job_id=future.key
-                )
-                db.set_request_status_in_session(
+                request = db.set_request_status_in_session(
                     future.key,
-                    DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
+                    job_status,
                     session=session,
                 )
+                logger.warning(
+                    "unknown dask status",
+                    job_status={future.status},
+                    job_id=request.request_uid,
+                )
             self.futures.pop(future.key)
+            logger.info(
+                "job has finished",
+                job_id=future.key,
+                job_status=DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
+                dask_status=future.status,
+                created_at=request.created_at.strftime(config.timestamp_format),
+                started_at=request.started_at.strftime(config.timestamp_format),
+                finished_at=request.finished_at.strftime(config.timestamp_format),
+                updated_at=request.updated_at.strftime(config.timestamp_format),
+                **logger_kwargs,
+            )
 
     def submit_request(self, session: sa.orm.Session) -> None:
         request = self.choose_request(session=session)
         if not request:
             return
-        logger.info(
-            "Submitting job to the Scheduler.",
-            job_id=request.request_uid,
-        )
 
         future = self.client.submit(
             worker.submit_workflow,
@@ -157,11 +167,19 @@ class Broker:
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
-        db.set_request_status_in_session(
+        request = db.set_request_status_in_session(
             request_uid=request.request_uid, status="running", session=session
         )
         self.futures[request.request_uid] = future
-        logger.info("Submitted job to the scheduler", job_id=future.key)
+        logger.info(
+            "submitted job to scheduler",
+            job_id=future.key,
+            job_status=request.status,
+            user_uid=request.request_metadata.get("user_uid"),
+            created_at=request.created_at.strftime(config.timestamp_format),
+            started_at=request.started_at.strftime(config.timestamp_format),
+            updated_at=request.updated_at.strftime(config.timestamp_format),
+        )
 
     def run(self) -> None:
         while True:
