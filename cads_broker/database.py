@@ -176,7 +176,7 @@ def get_request(
             SystemRequest.request_uid == request_uid
         )
         return session.scalars(statement).one()
-    except (sqlalchemy.orm.exc.NoResultFound):
+    except (sqlalchemy.orm.exc.NoResultFound, sqlalchemy.exc.StatementError):
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
