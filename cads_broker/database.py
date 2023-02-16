@@ -196,9 +196,7 @@ def delete_request(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    set_request_status(
-        request_uid=request_uid, status="dismissed", session=session
-    )
+    set_request_status(request_uid=request_uid, status="dismissed", session=session)
     request = get_request(request_uid, session)
     session.delete(request)
     session.commit()

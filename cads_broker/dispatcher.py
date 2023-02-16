@@ -193,9 +193,7 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_accepted_requests(
-                    session=session
-                )
+                number_accepted_requests = db.count_accepted_requests(session=session)
                 available_workers = self.max_running_requests - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
