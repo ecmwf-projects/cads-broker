@@ -78,42 +78,6 @@ def run(
     broker.run()
 
 
-@app.command()
-def add_system_request(
-    file_path: pathlib.Path = typer.Option(
-        None,
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        writable=False,
-        readable=True,
-        # resolve_path=True,
-        help="Path to the file containing the JSON request to the Broker",
-    ),
-    connection_string: str = typer.Option(
-        None, help="Connection string to the broker database"
-    ),
-) -> None:
-    """Add a system request to the database.
-
-    Parameters
-    ----------
-    seconds: number of seconds to sleep
-    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    """
-    if connection_string is None:
-        dbsettings = config.ensure_settings(config.dbsettings)
-        connection_string = dbsettings.connection_string
-    engine = sa.create_engine(connection_string)
-    session_obj = sa.orm.sessionmaker(engine)
-    print(file_path)
-    database.create_request(
-        process_id="submit-workflow",
-        session_obj=session_obj,
-        **json.loads(file_path.read_text())
-    )
-
-
 def main() -> None:
     """Run main broker entry points."""
     app()
