@@ -74,7 +74,7 @@ class Broker:
         )
 
     def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
-        queue = db.get_accepted_requests_in_session(session=session)
+        queue = db.get_accepted_requests(session=session)
         candidates = sorted(
             queue,
             key=lambda r: self.priority(r),
@@ -113,7 +113,7 @@ class Broker:
         with self.session_maker() as session:
             if future.status in "finished":
                 result = future.result()
-                request = db.set_request_status_in_session(
+                request = db.set_request_status(
                     future.key,
                     job_status,
                     cache_key=result["key"],
@@ -122,7 +122,7 @@ class Broker:
                 )
                 logger_kwargs["result"] = result
             elif future.status in "error":
-                request = db.set_request_status_in_session(
+                request = db.set_request_status(
                     future.key,
                     job_status,
                     traceback="".join(traceback.format_exception(future.exception())),
@@ -130,7 +130,7 @@ class Broker:
                 )
                 logger_kwargs["traceback"] = request.response_traceback
             else:
-                request = db.set_request_status_in_session(
+                request = db.set_request_status(
                     future.key,
                     job_status,
                     session=session,
@@ -167,7 +167,7 @@ class Broker:
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
-        request = db.set_request_status_in_session(
+        request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
         self.futures[request.request_uid] = future
@@ -193,7 +193,7 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_accepted_requests_in_session(
+                number_accepted_requests = db.count_accepted_requests(
                     session=session
                 )
                 available_workers = self.max_running_requests - self.running_requests
