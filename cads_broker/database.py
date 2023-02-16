@@ -159,6 +159,7 @@ def create_request(
         job_id=request.request_uid,
         created_at=request.created_at.strftime(config.timestamp_format),
         updated_at=request.updated_at.strftime(config.timestamp_format),
+        request=kwargs,
     )
     ret_value = {
         column.key: getattr(request, column.key)
