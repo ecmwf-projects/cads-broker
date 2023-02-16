@@ -160,6 +160,7 @@ def create_request(
         created_at=request.created_at.strftime(config.timestamp_format),
         updated_at=request.updated_at.strftime(config.timestamp_format),
         request=kwargs.get("request", {}),
+        process_id=process_id,
     )
     ret_value = {
         column.key: getattr(request, column.key)
