@@ -190,7 +190,6 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request)
         session.commit()
         result = db.get_request_result(request_uid, session=session)
-        print("RESULT", result)
     assert len(result) == 2
 
 
