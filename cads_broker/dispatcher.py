@@ -144,7 +144,7 @@ class Broker:
             logger.info(
                 "job has finished",
                 job_id=future.key,
-                job_status=DASK_STATUS_TO_STATUS.get(future.status, "accepted"),
+                job_status=job_status,
                 dask_status=future.status,
                 created_at=request.created_at.strftime(config.timestamp_format),
                 started_at=request.started_at.strftime(config.timestamp_format),
