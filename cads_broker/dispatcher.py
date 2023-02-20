@@ -116,8 +116,7 @@ class Broker:
                 request = db.set_request_status(
                     future.key,
                     job_status,
-                    cache_key=result["key"],
-                    cache_expiration=result["expiration"],
+                    cache_id=result,
                     session=session,
                 )
                 logger_kwargs["result"] = result
