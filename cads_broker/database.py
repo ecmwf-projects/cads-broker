@@ -38,8 +38,7 @@ class SystemRequest(BaseModel):
     )
     process_id = sa.Column(sa.VARCHAR(1024))
     status = sa.Column(status_enum)
-    cache_key = sa.Column(sa.String(56))
-    cache_expiration = sa.Column(sa.DateTime)
+    cache_id = sa.Column(sa.ForeignKey(cacholote.database.CacheEntry))
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
     response_traceback = sa.Column(JSONB)
@@ -48,18 +47,6 @@ class SystemRequest(BaseModel):
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
-
-    __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
-        sa.ForeignKeyConstraint(
-            [cache_key, cache_expiration],
-            [
-                cacholote.database.CacheEntry.key,
-                cacholote.database.CacheEntry.expiration,
-            ],
-            ondelete="set null",
-        ),
-        {},
-    )
 
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry)
 
@@ -108,8 +95,7 @@ def set_request_status(
     request_uid: str,
     status: str,
     session: sa.orm.Session,
-    cache_key: str | None = None,
-    cache_expiration: sa.DateTime | None = None,
+    cache_id: int | None = None,
     traceback: str | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
@@ -117,8 +103,7 @@ def set_request_status(
     request = session.scalars(statement).one()
     if status == "successful":
         request.finished_at = sa.func.now()
-        request.cache_key = cache_key
-        request.cache_expiration = cache_expiration
+        request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
         request.response_traceback = traceback
@@ -187,11 +172,7 @@ def get_request_result(
     session: sa.orm.Session,
 ) -> SystemRequest:
     request = get_request(request_uid, session)
-    statement = sa.select(cacholote.database.CacheEntry.result).where(
-        cacholote.database.CacheEntry.key == request.cache_key,
-        cacholote.database.CacheEntry.expiration == request.cache_expiration,
-    )
-    return session.scalars(statement).one()
+    return request.cache_entry
 
 
 def delete_request(
