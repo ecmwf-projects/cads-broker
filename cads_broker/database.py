@@ -179,7 +179,7 @@ def get_request_result(
     session: sa.orm.Session,
 ) -> SystemRequest:
     request = get_request(request_uid, session)
-    return request.cache_entry
+    return request.cache_entry.result
 
 
 def delete_request(
