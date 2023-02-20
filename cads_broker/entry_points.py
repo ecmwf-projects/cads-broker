@@ -1,7 +1,5 @@
 """Module for entry points."""
-import json
 import os
-import pathlib
 from typing import Any
 
 import sqlalchemy as sa

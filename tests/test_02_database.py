@@ -65,9 +65,7 @@ def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request2)
         session.commit()
         assert 2 == db.count_accepted_requests(session=session)
-        assert 1 == db.count_accepted_requests(
-            session=session, process_id=process_id
-        )
+        assert 1 == db.count_accepted_requests(session=session, process_id=process_id)
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
@@ -177,16 +175,6 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         request = db.get_request(str(uuid.uuid4()), session)
     with pytest.raises(db.NoResultFound):
         request = db.get_request("123", session)
-    assert request.request_uid == request_uid
-
-
-def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
-    request = mock_system_request(status="accepted")
-    request_uid = request.request_uid
-    with session_obj() as session:
-        session.add(request)
-        session.commit()
-        request = db.get_request(request_uid, session=session)
     assert request.request_uid == request_uid
 
 
