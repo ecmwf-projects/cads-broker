@@ -111,7 +111,7 @@ class Broker:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
         logger_kwargs = {}
         with self.session_maker() as session:
-            if future.status in "finished":
+            if future.status == "finished":
                 result = future.result()
                 request = db.set_request_status(
                     future.key,
@@ -120,7 +120,7 @@ class Broker:
                     session=session,
                 )
                 logger_kwargs["result"] = result
-            elif future.status in "error":
+            elif future.status == "error":
                 request = db.set_request_status(
                     future.key,
                     job_status,
