@@ -119,7 +119,7 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                logger_kwargs["result"] = result
+                logger_kwargs["result"] = request.cache_entry.result
             elif future.status == "error":
                 request = db.set_request_status(
                     future.key,
