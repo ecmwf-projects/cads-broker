@@ -97,9 +97,6 @@ def configure_logger() -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
-            structlog.processors.KeyValueRenderer(
-                key_order=["event"], sort_keys=True, drop_missing=True
-            ),
         ],
         wrapper_class=structlog.stdlib.BoundLogger,
         logger_factory=structlog.stdlib.LoggerFactory(),
