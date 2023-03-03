@@ -121,6 +121,26 @@ def set_request_status(
     return request
 
 
+def logger_kwargs(request: SystemRequest) -> dict[str, str]:
+    kwargs = {
+        "event_type": "DATASET_REQUEST",
+        "job_id": request.request_uid,
+        "user_uid": request.request_metadata.get("user_uid"),
+        "created_at": request.created_at.isoformat(),
+        "updated_at": request.updated_at.isoformat(),
+        "started_at": request.started_at.isoformat()
+        if request.started_at is not None
+        else None,
+        "finished_at": request.finished_at.isoformat()
+        if request.finished_at is not None
+        else None,
+        "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
+        "user_request": True,
+        "process_id": request.process_id,
+    }
+    return kwargs
+
+
 def create_request(
     session: sa.orm.Session,
     user_uid: str,
@@ -146,14 +166,7 @@ def create_request(
     )
     session.add(request)
     session.commit()
-    logger.info(
-        "accepted job",
-        job_id=request.request_uid,
-        created_at=request.created_at.strftime(config.timestamp_format),
-        updated_at=request.updated_at.strftime(config.timestamp_format),
-        request=kwargs.get("request", {}),
-        process_id=process_id,
-    )
+    logger.info("accepted job", **logger_kwargs(request=request))
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
