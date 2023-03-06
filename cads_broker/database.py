@@ -149,10 +149,12 @@ def create_request(
     kwargs: dict[str, Any],
     process_id: str,
     metadata: dict[str, Any] = {},
+    resources: dict[str, Any] = {},
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
     metadata["user_uid"] = user_uid
+    metadata["resources"] = resources
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
