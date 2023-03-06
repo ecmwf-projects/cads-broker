@@ -119,7 +119,7 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                logger_kwargs["result"] = result
+                logger_kwargs["result"] = request.cache_entry.result
             elif future.status == "error":
                 request = db.set_request_status(
                     future.key,
@@ -142,13 +142,8 @@ class Broker:
             self.futures.pop(future.key)
             logger.info(
                 "job has finished",
-                job_id=future.key,
-                job_status=job_status,
                 dask_status=future.status,
-                created_at=request.created_at.strftime(config.timestamp_format),
-                started_at=request.started_at.strftime(config.timestamp_format),
-                finished_at=request.finished_at.strftime(config.timestamp_format),
-                updated_at=request.updated_at.strftime(config.timestamp_format),
+                **db.logger_kwargs(request=request),
                 **logger_kwargs,
             )
 
@@ -172,12 +167,7 @@ class Broker:
         self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",
-            job_id=future.key,
-            job_status=request.status,
-            user_uid=request.request_metadata.get("user_uid"),
-            created_at=request.created_at.strftime(config.timestamp_format),
-            started_at=request.started_at.strftime(config.timestamp_format),
-            updated_at=request.updated_at.strftime(config.timestamp_format),
+            **db.logger_kwargs(request=request),
         )
 
     def run(self) -> None:
@@ -196,12 +186,12 @@ class Broker:
                 available_workers = self.max_running_requests - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
-                        logger.info(f"Queued jobs: {number_accepted_requests}")
-                        logger.info(f"Available workers: {available_workers}")
+                        logger.info("broker info", queued_jobs=number_accepted_requests)
+                        logger.info("broker info", available_workers=available_workers)
                         [
                             self.submit_request(session=session)
                             for _ in range(available_workers)
                         ]
                     elif available_workers == 0:
-                        logger.info(f"Available workers: {available_workers}")
+                        logger.info("broker info", available_workers=available_workers)
             time.sleep(self.wait_time)
