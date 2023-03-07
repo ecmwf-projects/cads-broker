@@ -32,7 +32,6 @@ def mock_system_request(
 def test_broker_update_database(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
-
     broker = dispatcher.Broker(
         client=CLIENT, max_running_requests=1, session_maker=session_obj
     )

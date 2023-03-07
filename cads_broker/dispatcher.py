@@ -47,7 +47,6 @@ def get_tasks(client: distributed.Client) -> Any:
 
 @attrs.define
 class Broker:
-
     client: distributed.Client
     max_running_requests: int
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))

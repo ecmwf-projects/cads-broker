@@ -12,11 +12,6 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Topic :: Scientific/Engineering"
 ]
-description = "CADS broker service"
-dynamic = ["version"]
-license = {file = "LICENSE"}
-name = "cads-broker"
-readme = "README.md"
 dependencies = [
   "attrs",
   "cacholote",
@@ -26,6 +21,11 @@ dependencies = [
   "sqlalchemy-utils",
   "typer"
 ]
+description = "CADS broker service"
+dynamic = ["version"]
+license = {file = "LICENSE"}
+name = "cads-broker"
+readme = "README.md"
 
 [project.scripts]
 broker = "cads_broker.entry_points:main"
