@@ -158,6 +158,7 @@ class Broker:
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.request_body.get("entry_point", ""),
             kwargs=request.request_body.get("kwargs", {}),
+            resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
