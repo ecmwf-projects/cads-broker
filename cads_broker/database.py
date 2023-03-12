@@ -177,11 +177,11 @@ def create_request(
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
-    metadata["user_uid"] = user_uid
     metadata["resources"] = resources
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
+        user_uid=user_uid,
         status="accepted",
         request_body={
             "setup_code": setup_code,
