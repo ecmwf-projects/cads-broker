@@ -7,7 +7,7 @@
 # nor does it submit to any jurisdiction.
 #
 
-from queueos.expressions import functions
+from . import functions
 
 FUNCTIONS = {}
 

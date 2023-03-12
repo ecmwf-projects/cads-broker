@@ -7,9 +7,9 @@
 # nor does it submit to any jurisdiction.
 #
 
-from queueos.expressions.FunctionFactory import FunctionFactory
-from queueos.expressions.NumberExpression import NumberExpression
-from queueos.expressions.StringExpression import StringExpression
+from .FunctionFactory import FunctionFactory
+from .NumberExpression import NumberExpression
+from .StringExpression import StringExpression
 
 from .Parser import Parser, ParserError
 

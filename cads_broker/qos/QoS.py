@@ -10,9 +10,11 @@
 import threading
 from functools import wraps
 
-from queueos.expressions.RulesParser import RulesParser
-from queueos.qos.Properties import Properties
-from queueos.qos.Rule import Context, RuleSet
+from .. import database
+
+from ..expressions.RulesParser import RulesParser
+from .Properties import Properties
+from .Rule import Context, RuleSet
 
 
 def locked(method):
@@ -30,7 +32,6 @@ class QoS:
 
         self.environment = environment
         # The list of active requests
-        self.running_requests = set()
 
         # Cache associating Request and their Properties
         self.requests_properties_cache = dict()
@@ -64,15 +65,15 @@ class QoS:
         self.rules.dump()
 
     @locked
-    def reload_rules(self):
+    def reload_rules(self, session):
         """This methods allow a 'hot' reloading of the rules. For example, a thread
         could be monitoring the time stamp of the rules file and call this method
         """
         self.read_rules()
-        self.reconfigure()
+        self.reconfigure(session=session)
 
     @locked
-    def reconfigure(self):
+    def reconfigure(self, session):
         """Reset the status of the QoS. This method must be called if the rule_set is
         changed.
         """
@@ -84,24 +85,24 @@ class QoS:
         self.requests_properties_cache.clear()
 
         # Re-register the active tasks
-        for request in self.running_requests:
+        for request in database.get_running_requests(session=session):
             # Recompute the limits
-            for limit in self.limits_for(request):
+            for limit in self.limits_for(request, session):
                 limit.increment()
 
     @locked
-    def can_run(self, request):
+    def can_run(self, request, session):
         """Checks if a request can run"""
-        return not any(limit.full(request) for limit in self.limits_for(request))
+        return not any(limit.full(request) for limit in self.limits_for(request, session))
 
     @locked
-    def _properties(self, request):
+    def _properties(self, request, session):
         """Returns the Properties object associated with a request. If it does not
         exists it is created. The property object caches the rules matching the
         request. The method also checks permission and establish starting
         priority.
         """
-        properties = self.requests_properties_cache.get(request)
+        properties = self.requests_properties_cache.get(request.request_uid)
         if properties is not None:
             return properties
 
@@ -112,8 +113,12 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
-                    request.canceled = rule.info.evaluate(
-                        Context(request, self.environment)
+                    database.set_request_status(
+                        status="failed",
+                        session=session,
+                        traceback=rule.info.evaluate(
+                            Context(request, self.environment)
+                        ),
                     )
                     break
 
@@ -138,41 +143,41 @@ class QoS:
         properties.starting_priority = priority
 
         # Store in cache
-        self.requests_properties_cache[request] = properties
+        self.requests_properties_cache[request.request_uid] = properties
 
         return properties
 
     @locked
-    def priority(self, request):
+    def priority(self, request, session):
         """Computes the priority of a request"""
         # The priority of a request increases with time
-        return self._properties(request).starting_priority + request.age
+        return self._properties(request, session).starting_priority + request.age
 
     def dump(self, out=print):
         self.rules.dump(out)
 
     @locked
-    def status(self, requests, out=print):
+    def status(self, requests, session, out=print):
         out()
         out("===================================================================")
         out("REQUESTS")
         out("===================================================================")
 
         for request in requests:
-            self._status(request, out)
+            self._status(request, session, out)
 
         out()
         out("===================================================================")
 
-    def _status(self, request, out):
+    def _status(self, request, session, out):
 
         out()
         out("===================================================================")
         out("QoS info for:")
         out(request, request.status)
-        out("Priority: {}".format(self.priority(request)))
+        out("Priority: {}".format(self.priority(request, session)))
         out("Limits rules:")
-        for limit in self.limits_for(request):
+        for limit in self.limits_for(request, session):
             out(
                 "    {} ({}/{}) {}".format(
                     limit,
@@ -183,35 +188,35 @@ class QoS:
             )
 
         out("Priorities rules:")
-        for priority in self.priorities_for(request):
+        for priority in self.priorities_for(request, session):
             out("    {}".format(priority))
 
         out("Permissions rules:")
-        for permission in self.permissions_for(request):
+        for permission in self.permissions_for(request, session):
             out("    {}".format(permission))
 
     @locked
-    def limits_for(self, request):
+    def limits_for(self, request, session):
         """Returns the limit rules that applies to a request. Ensure that the
         properties cache is created if needed."""
-        return self._properties(request).limits
+        return self._properties(request, session).limits
 
     @locked
-    def permissions_for(self, request):
+    def permissions_for(self, request, session):
         """Returns the permission rules that applies to a request. Ensure that the
         properties cache is created if needed."""
-        return self._properties(request).permissions
+        return self._properties(request, session).permissions
 
     @locked
-    def priorities_for(self, request):
+    def priorities_for(self, request, session):
         """Returns the priority rules that applies to a request. Ensure that the
         properties cache is created if needed."""
-        return self._properties(request).priorities
+        return self._properties(request, session).priorities
 
     @locked
     def user_limit(self, request):
         """Returns the per-user limit for the user associated with the request"""
-        user = request.user
+        user = request.user_uid
 
         limit = self.per_user_limits.get(user)
         if limit is not None:
@@ -231,15 +236,10 @@ class QoS:
         # raise Exception(f"Not rules matching user '{user}'")
 
     @locked
-    def pick(self, queue):
-
-        for request in queue:
-            if request.canceled:
-                queue.remove(request)
-                return request
+    def pick(self, queue, session):
 
         # Create the list of requests than can run
-        candidates = [r for r in queue if self.can_run(r)]
+        candidates = [r for r in queue if self.can_run(r, session)]
 
         # If no request can run, return 'None'
         if len(candidates) == 0:
@@ -248,40 +248,33 @@ class QoS:
         # Sort according to priorities, highest first
         candidates = sorted(
             candidates,
-            key=lambda r: self.priority(r),
+            key=lambda r: self.priority(r, session),
             reverse=True,
         )
 
         # Select the request with the highest priority
         request = candidates[0]
 
-        # Remove it from the queue
-        queue.remove(request)
-
-        # print(f"QoS: choice is {request}, priority={self.priority(request)}")
-
         return request
 
     @locked
-    def notify_start_of_request(self, request):
+    def notify_start_of_request(self, request, session):
         """Increments the limits matching that request so that other request
         sharing the same limits may be kept in the queue if a limit reaches
         its capacity
         """
-        for limit in self.limits_for(request):
+        for limit in self.limits_for(request, session):
             limit.increment()
 
         # Keep track of the running request. This is needed by reconfigure(self)
-        self.running_requests.add(request)
 
     @locked
-    def notify_end_of_request(self, request):
+    def notify_end_of_request(self, request, session):
         """Decrements the limits matching that request so that other request
         sharing the same limits can run
         """
-        for limit in self.limits_for(request):
+        for limit in self.limits_for(request, session):
             limit.decrement()
 
         # Remove requests all collections
-        self.running_requests.remove(request)
-        self.requests_properties_cache.pop(request)
+        self.requests_properties_cache.pop(request.request_uid)

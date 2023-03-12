@@ -14,13 +14,17 @@
 # limitations under the License.
 
 import logging
+import os
 import sys
 
 import pydantic
 import structlog
 
 dbsettings = None
-timestamp_format = "%Y-%m-%d %H:%M:%S"
+
+
+class QoSRules(pydantic.BaseSettings):
+    qos_rules: str = os.path.join(os.path.abspath(os.path.dirname(__file__)), "qos.rules")
 
 
 class SqlalchemySettings(pydantic.BaseSettings):

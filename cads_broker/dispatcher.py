@@ -15,6 +15,8 @@ except ModuleNotFoundError:
 
 from cads_broker import config
 from cads_broker import database as db
+from cads_broker.qos import QoS
+from cads_broker import Environment
 
 config.configure_logger()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -50,6 +52,8 @@ class Broker:
 
     client: distributed.Client
     max_running_requests: int
+    environment: Environment.Environment
+    qos: QoS.QoS
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
@@ -67,22 +71,14 @@ class Broker:
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
+        environment = Environment.Environment(max_running_requests)
         return cls(
             client=client,
             max_running_requests=max_running_requests,
             session_maker=session_maker,
+            environment=environment,
+            qos=QoS.QoS(config.QoSRules().qos_rules, environment)
         )
-
-    def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
-        queue = db.get_accepted_requests(session=session)
-        candidates = sorted(
-            queue,
-            key=lambda r: self.priority(r),
-        )
-        return candidates[0] if candidates else None
-
-    def priority(self, request: db.SystemRequest) -> float:
-        return request.created_at.timestamp()
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
@@ -140,6 +136,7 @@ class Broker:
                     job_id=request.request_uid,
                 )
             self.futures.pop(future.key)
+            self.qos.notify_end_of_request(request, session)
             logger.info(
                 "job has finished",
                 dask_status=future.status,
@@ -148,7 +145,8 @@ class Broker:
             )
 
     def submit_request(self, session: sa.orm.Session) -> None:
-        request = self.choose_request(session=session)
+        queue = db.get_accepted_requests(session=session)
+        request = self.qos.pick(queue, session=session)
         if not request:
             return
 
@@ -165,6 +163,7 @@ class Broker:
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
+        self.qos.notify_start_of_request(request, session)
         self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",

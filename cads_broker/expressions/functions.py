@@ -181,12 +181,12 @@ class FunctionInfinity(FunctionExpression):
 
 class FunctionNumberOfWorkers(FunctionExpression):
     def execute(self, context):
-        return context.request.dispatcher.number_of_workers
+        return context.environment.number_of_workers
 
 
 class FunctionUser(FunctionExpression):
     def execute(self, context):
-        return context.request.user
+        return context.request.user_uid
 
 
 # class FunctionAdaptor(FunctionExpression):
