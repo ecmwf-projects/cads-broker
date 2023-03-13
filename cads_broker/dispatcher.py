@@ -13,10 +13,9 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import config
+from cads_broker import Environment, config
 from cads_broker import database as db
 from cads_broker.qos import QoS
-from cads_broker import Environment
 
 config.configure_logger()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -72,12 +71,14 @@ class Broker:
     ):
         client = distributed.Client(address)
         environment = Environment.Environment(max_running_requests)
+        qos_config = config.QoSRules()
+        qos_config.register_functions()
         return cls(
             client=client,
             max_running_requests=max_running_requests,
             session_maker=session_maker,
             environment=environment,
-            qos=QoS.QoS(config.QoSRules().qos_rules, environment)
+            qos=QoS.QoS(qos_config.qos_rules, environment),
         )
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
