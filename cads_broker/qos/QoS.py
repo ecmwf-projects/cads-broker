@@ -26,11 +26,14 @@ def locked(method):
     return wrapped
 
 
-def mul(data):
+def and_func(data: list):
+    """It applies the and operator on a list of values.
+    In case the list is empty it returns True
+    """
     result = 1
     for i in data:
         result *= i
-    return result
+    return bool(result)
 
 
 class QoS:
@@ -102,7 +105,7 @@ class QoS:
         """Checks if a request can run"""
         properties = self._properties(request=request, session=session)
         limits_constraint = not any(limit.full(request) for limit in properties.limits)
-        permissions_contraint = mul([
+        permissions_contraint = and_func([
             permission.evaluate(request) for permission in properties.permissions
         ])
         return limits_constraint and permissions_contraint
