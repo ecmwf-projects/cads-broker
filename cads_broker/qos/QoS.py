@@ -26,6 +26,13 @@ def locked(method):
     return wrapped
 
 
+def mul(data):
+    result = 1
+    for i in data:
+        result *= i
+    return result
+
+
 class QoS:
     def __init__(self, rules, environment):
         self.lock = threading.RLock()
@@ -93,7 +100,12 @@ class QoS:
     @locked
     def can_run(self, request, session):
         """Checks if a request can run"""
-        return not any(limit.full(request) for limit in self.limits_for(request, session))
+        properties = self._properties(request=request, session=session)
+        limits_constraint = not any(limit.full(request) for limit in properties.limits)
+        permissions_contraint = mul([
+            permission.evaluate(request) for permission in properties.permissions
+        ])
+        return limits_constraint and permissions_contraint
 
     @locked
     def _properties(self, request, session):
@@ -114,6 +126,7 @@ class QoS:
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
                     database.set_request_status(
+                        request_uid=request.request_uid,
                         status="failed",
                         session=session,
                         traceback=rule.info.evaluate(
