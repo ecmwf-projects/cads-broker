@@ -3,14 +3,14 @@ import datetime
 import uuid
 from typing import Any
 
+import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-import cacholote
+from cads_broker import config
 
 BaseModel = cacholote.database.Base
 
@@ -63,7 +63,8 @@ class SystemRequest(BaseModel):
     def age(self):
         """Returns the age of the request in seconds".
 
-        Returns:
+        Returns
+        -------
             float: Age in seconds.
         """
         return (datetime.datetime.now() - self.created_at).seconds
@@ -95,7 +96,7 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
 
 
 def get_running_requests(
-    session: sa.orm.Session = None,
+    session: sa.orm.Session,
 ):
     """Get all running requests."""
     statement = sa.select(SystemRequest).where(SystemRequest.status == "running")
@@ -103,7 +104,7 @@ def get_running_requests(
 
 
 def get_accepted_requests(
-    session: sa.orm.Session = None,
+    session: sa.orm.Session,
 ):
     """Get all accepted requests."""
     statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
