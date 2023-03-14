@@ -36,6 +36,7 @@ class SqlalchemySettings(pydantic.BaseSettings):
     compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
     compute_db_name: str = "broker"
+    pool_timeout: float = 1.0
     pool_recycle: int = 60
 
     @pydantic.validator("compute_db_password")
