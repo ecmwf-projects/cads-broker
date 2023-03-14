@@ -14,13 +14,30 @@
 # limitations under the License.
 
 import logging
+import os
 import sys
 
 import pydantic
 import structlog
 
+from cads_broker import expressions
+
 dbsettings = None
-timestamp_format = "%Y-%m-%d %H:%M:%S"
+
+
+class QoSRules(pydantic.BaseSettings):
+    qos_rules: str = os.path.join(os.path.abspath(os.path.dirname(__file__)), "qos.rules")
+
+    def register_functions(self):
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "dataset",
+            lambda context, *args: context.request.process_id,
+        )
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "adaptor",
+            lambda context, *args: context.request.request_body.get("entry_point", ""),
+        )
+
 
 
 class SqlalchemySettings(pydantic.BaseSettings):
