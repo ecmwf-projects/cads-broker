@@ -4,6 +4,7 @@ import traceback
 from typing import Any
 
 import attrs
+import cachetools
 import distributed
 import sqlalchemy as sa
 import structlog
@@ -29,6 +30,20 @@ DASK_STATUS_TO_STATUS = {
 }
 
 
+@cachetools.cached(  # type: ignore
+    cache=cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("NWORKERS_CACHE_TIME", 10))
+    ),
+    info=True,
+)
+def get_number_of_workers(client: distributed.Client) -> int:
+    workers = client.scheduler_info()["workers"]
+    number_of_workers = len(
+        [w for w in workers.values() if w.get("status", None) == "running"]
+    )
+    return number_of_workers
+
+
 def get_tasks(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
         scheduler_state_to_status = {
@@ -49,7 +64,6 @@ def get_tasks(client: distributed.Client) -> Any:
 @attrs.define
 class Broker:
     client: distributed.Client
-    max_running_requests: int
     environment: Environment.Environment
     qos: QoS.QoS
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
@@ -58,27 +72,29 @@ class Broker:
     running_requests: int = 0
     session_maker: sa.orm.sessionmaker | None = None
 
-    def __attrs_post_init__(self):
-        self.session_maker = db.ensure_session_obj(self.session_maker)
-
     @classmethod
     def from_address(
         cls,
         address="scheduler:8786",
-        max_running_requests=int(os.getenv("MAX_RUNNING_REQUESTS", 1)),
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        environment = Environment.Environment(max_running_requests)
+        environment = Environment.Environment()
         qos_config = config.QoSRules()
         qos_config.register_functions()
+        session_maker = db.ensure_session_obj(session_maker)
         return cls(
             client=client,
-            max_running_requests=max_running_requests,
             session_maker=session_maker,
             environment=environment,
             qos=QoS.QoS(qos_config.qos_rules, environment),
         )
+
+    @property
+    def number_of_workers(self):
+        number_of_workers = get_number_of_workers(client=self.client)
+        self.environment.number_of_workers = number_of_workers
+        return number_of_workers
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
@@ -183,7 +199,7 @@ class Broker:
                     ]
                 )
                 number_accepted_requests = db.count_accepted_requests(session=session)
-                available_workers = self.max_running_requests - self.running_requests
+                available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
