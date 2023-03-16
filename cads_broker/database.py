@@ -149,7 +149,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     kwargs = {
         "event_type": "DATASET_REQUEST",
         "job_id": request.request_uid,
-        "user_uid": request.request_metadata.get("user_uid"),
+        "user_uid": request.user_uid,
         "status": request.status,
         "created_at": request.created_at.isoformat(),
         "updated_at": request.updated_at.isoformat(),
