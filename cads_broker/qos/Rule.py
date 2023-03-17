@@ -16,8 +16,10 @@ class Context:
 
 class QoSRule:
     """
-    This class represents an  QoS rule. Rules have two parts: the
-    'condition' and the 'conclusion', which are both Expressions. The
+    It represents an QoS rule.
+
+    Rules have two parts:
+    the 'condition' and the 'conclusion', which are both Expressions. The
     'condition' is used to match request, while the 'conclusion' is used
     to perform an action with the matching request. For example, in the
     case of a 'Limit', the conclusion represents the maximum value
@@ -51,8 +53,10 @@ class QoSRule:
 
 class Priority(QoSRule):
     """
-    This class represents a priority rule. The 'conclusion' part must
-    evaluate as a number, which is then used to compute the starting
+    It represents a priority rule.
+
+    The 'conclusion' part must evaluate as a number,
+    which is then used to compute the starting
     priority of a request. All rules matching a request contributes to
     the starting priority of the request. The priority is a number that
     represents a number of seconds. For example, a request with a
@@ -76,8 +80,10 @@ class Priority(QoSRule):
 
 class Permission(QoSRule):
     """
-    This class implements the permission rule. Its 'conclusion' must
-    evaluate to a . If the evaluation returns True, the matching
+    It implements the permission rule.
+
+    Its 'conclusion' must evaluate to a .
+    If the evaluation returns True, the matching
     requests are granted execution, otherwise they are denied execution
     and are immediately set to aborted.
     """
@@ -87,10 +93,11 @@ class Permission(QoSRule):
 
 class Limit(QoSRule):
     """
-    This class implements a limit in the QoS system. Its 'conclusion'
-    must evaluate to a positive integer, which represent the 'capacity'
-    of the limit, i.e. the number of requests that this rule will allow
-    to execute simultaneously.
+    It implements a limit in the QoS system.
+
+    Its 'conclusion' must evaluate to a positive integer,
+    which represent the 'capacity' of the limit, i.e. the number
+    of requests that this rule will allow to execute simultaneously.
 
     A limit holds a counter that is incremented each time a request
     matching the 'condition' part of the rule is started, and decremented
@@ -120,15 +127,15 @@ class Limit(QoSRule):
 
 class GlobalLimit(Limit):
     """
-    This is a subclass of 'Limit' and exists for the sake of strong
-    typing. Global limits are shared by all users.
+    It is a subclass of 'Limit' and exists for the sake of strong typing.
+
+    Global limits are shared by all users.
     """
 
     name = "limit"
 
 
 class UserLimit(Limit):
-
     name = "user"
 
     def clone(self):
@@ -141,10 +148,7 @@ class UserLimit(Limit):
 
 
 class RuleSet:
-    """
-    This utility class is used to store all rules in a single neat an
-    tidy location.
-    """
+    """It is used to store all rules in a single neat an tidy location."""
 
     def __init__(self):
         self.priorities = []

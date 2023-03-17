@@ -16,7 +16,6 @@ FunctionFactory.FunctionFactory.register_function(
 
 
 class TestRequest:
-
     user_uid = "david"
     dataset = "dataset-1"
     adaptor = "adaptor1"
@@ -26,7 +25,7 @@ class TestRequest:
 request = TestRequest()
 
 
-environment = Environment.Environment(number_of_workers=1)
+environment = Environment.Environment()
 environment.disable_resource("adaptor2")
 
 
@@ -40,7 +39,6 @@ def evaluate(text):
 
 
 def test_expression():
-
     assert evaluate("1 + 2") == 3.0
     assert evaluate("1 - 2") == -1.0
     assert evaluate("1 / 2") == 0.5
@@ -88,7 +86,6 @@ def test_expression():
 
 
 def test_functions():
-
     assert evaluate("second(1)") == 1
     assert evaluate("minute(1)") == 60
     assert evaluate("hour(1)") == 3600

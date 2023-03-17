@@ -9,7 +9,7 @@
 
 
 class StringExpression:
-    """This class represents a string constant expression, e.g. 'Hello, world!'"""
+    """It represents a string constant expression, e.g. 'Hello, world!'."""
 
     def __init__(self, value, quote):
         self.value = value

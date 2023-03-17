@@ -9,7 +9,7 @@
 
 
 class Properties:
-    """This class is a placeholder to hold all rules that matches a given request."""
+    """It is a placeholder to hold all rules that matches a given request."""
 
     def __init__(self):
         self.starting_priority = 0

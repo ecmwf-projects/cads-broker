@@ -19,15 +19,15 @@ class UserFunction(functions.FunctionExpression):
 
 
 class FunctionFactory:
-    """This class instantiates objects that are sub-classes of the
-    FunctionExpression. Objects are created by name, by capitalising the
+    """It instantiates objects that are sub-classes of the FunctionExpression.
+
+    Objects are created by name, by capitalising the
     first letter. So if the function name is 'foo', the class
     queueos.expressions.functions.Foo is instantiated.
     """
 
     @classmethod
     def create(cls, name, *args):
-
         # if '.' in name:
         #     assert len(args) ==0
         #     names = name.split('.')

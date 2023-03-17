@@ -11,7 +11,6 @@ import threading
 from functools import wraps
 
 from .. import database
-
 from ..expressions.RulesParser import RulesParser
 from .Properties import Properties
 from .Rule import Context, RuleSet
@@ -27,8 +26,9 @@ def locked(method):
 
 
 def and_func(data: list):
-    """It applies the and operator on a list of values.
-    In case the list is empty it returns True
+    """Apply the "and" operator on a list of values.
+
+    In case the list is empty it returns True.
     """
     result = 1
     for i in data:
@@ -60,8 +60,7 @@ class QoS:
 
     @locked
     def read_rules(self):
-        """Reads the rule files and populate the rule_set"""
-
+        """Read the rule files and populate the rule_set."""
         # Create a parser to parse the rules file
         parser = RulesParser(self.path)
 
@@ -76,18 +75,20 @@ class QoS:
 
     @locked
     def reload_rules(self, session):
-        """This methods allow a 'hot' reloading of the rules. For example, a thread
-        could be monitoring the time stamp of the rules file and call this method
+        """Allow a 'hot' reloading of the rules.
+
+        For example, a thread could be monitoring the time stamp of the rules
+        file and call this method.
         """
         self.read_rules()
         self.reconfigure(session=session)
 
     @locked
     def reconfigure(self, session):
-        """Reset the status of the QoS. This method must be called if the rule_set is
-        changed.
-        """
+        """Reset the status of the QoS.
 
+        This method must be called if the rule_set is changed.
+        """
         # Reset per-user limits
         self.per_user_limits.clear()
 
@@ -102,20 +103,21 @@ class QoS:
 
     @locked
     def can_run(self, request, session):
-        """Checks if a request can run"""
+        """Check if a request can run."""
         properties = self._properties(request=request, session=session)
         limits_constraint = not any(limit.full(request) for limit in properties.limits)
-        permissions_contraint = and_func([
-            permission.evaluate(request) for permission in properties.permissions
-        ])
+        permissions_contraint = and_func(
+            [permission.evaluate(request) for permission in properties.permissions]
+        )
         return limits_constraint and permissions_contraint
 
     @locked
     def _properties(self, request, session):
-        """Returns the Properties object associated with a request. If it does not
-        exists it is created. The property object caches the rules matching the
-        request. The method also checks permission and establish starting
-        priority.
+        """Return the Properties object associated with a request.
+
+        If it does not exists it is created.
+        The property object caches the rules matching the request.
+        The method also checks permission and establish starting priority.
         """
         properties = self.requests_properties_cache.get(request.request_uid)
         if properties is not None:
@@ -165,7 +167,7 @@ class QoS:
 
     @locked
     def priority(self, request, session):
-        """Computes the priority of a request"""
+        """Compute the priority of a request."""
         # The priority of a request increases with time
         return self._properties(request, session).starting_priority + request.age
 
@@ -186,7 +188,6 @@ class QoS:
         out("===================================================================")
 
     def _status(self, request, session, out):
-
         out()
         out("===================================================================")
         out("QoS info for:")
@@ -213,25 +214,31 @@ class QoS:
 
     @locked
     def limits_for(self, request, session):
-        """Returns the limit rules that applies to a request. Ensure that the
-        properties cache is created if needed."""
+        """Return the limit rules that applies to a request.
+
+        Ensure that the properties cache is created if needed.
+        """
         return self._properties(request, session).limits
 
     @locked
     def permissions_for(self, request, session):
-        """Returns the permission rules that applies to a request. Ensure that the
-        properties cache is created if needed."""
+        """Return the permission rules that applies to a request.
+
+        Ensure that the properties cache is created if needed.
+        """
         return self._properties(request, session).permissions
 
     @locked
     def priorities_for(self, request, session):
-        """Returns the priority rules that applies to a request. Ensure that the
-        properties cache is created if needed."""
+        """Return the priority rules that applies to a request.
+
+        Ensure that the properties cache is created if needed.
+        """
         return self._properties(request, session).priorities
 
     @locked
     def user_limit(self, request):
-        """Returns the per-user limit for the user associated with the request"""
+        """Return the per-user limit for the user associated with the request."""
         user = request.user_uid
 
         limit = self.per_user_limits.get(user)
@@ -253,7 +260,6 @@ class QoS:
 
     @locked
     def pick(self, queue, session):
-
         # Create the list of requests than can run
         candidates = [r for r in queue if self.can_run(r, session)]
 
@@ -275,9 +281,11 @@ class QoS:
 
     @locked
     def notify_start_of_request(self, request, session):
-        """Increments the limits matching that request so that other request
+        """Notify the start of a request.
+
+        Increment the limits matching that request so that other request
         sharing the same limits may be kept in the queue if a limit reaches
-        its capacity
+        its capacity.
         """
         for limit in self.limits_for(request, session):
             limit.increment()
@@ -286,8 +294,10 @@ class QoS:
 
     @locked
     def notify_end_of_request(self, request, session):
-        """Decrements the limits matching that request so that other request
-        sharing the same limits can run
+        """Notify the end of a request.
+
+        Decrement the limits matching that request so that other request
+        sharing the same limits can run.
         """
         for limit in self.limits_for(request, session):
             limit.decrement()
