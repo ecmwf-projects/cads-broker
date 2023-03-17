@@ -25,7 +25,7 @@ class TestRequest:
 request = TestRequest()
 
 
-environment = Environment.Environment(number_of_workers=1)
+environment = Environment.Environment()
 environment.disable_resource("adaptor2")
 
 
