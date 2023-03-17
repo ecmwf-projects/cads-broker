@@ -9,9 +9,8 @@
 
 from .FunctionFactory import FunctionFactory
 from .NumberExpression import NumberExpression
-from .StringExpression import StringExpression
-
 from .Parser import Parser, ParserError
+from .StringExpression import StringExpression
 
 OPERATORS = {
     "+": "add",
@@ -32,9 +31,12 @@ OPERATORS = {
 
 
 class RulesParser(Parser):
-    """This class implements a simple recursive descent parser to crack a
+    """It parses the QoS rules.
+
+    It implements a simple recursive descent parser to crack a
     text file containing rules (broker.rules file) and fills the
-    RuleSet that is provided as argument."""
+    RuleSet that is provided as argument.
+    """
 
     def parse_ident(self):
         s = ""
@@ -110,7 +112,6 @@ class RulesParser(Parser):
         return StringExpression(s, quote)
 
     def parse_atom(self):
-
         c = self.peek()
         if c == "(":
             self.consume("(")
@@ -149,7 +150,6 @@ class RulesParser(Parser):
             )
 
     def parse_power(self):
-
         result = self.parse_atom()
         c = self.peek()
         while c == "^":
@@ -177,7 +177,6 @@ class RulesParser(Parser):
         return result
 
     def parse_factor(self):
-
         result = self.parse_power()
         c = self.peek()
         while c in ("*", "/"):
@@ -192,7 +191,6 @@ class RulesParser(Parser):
         return result
 
     def parse_term(self):
-
         result = self.parse_factor()
         c = self.peek()
         while c in ("+", "-"):
@@ -207,11 +205,9 @@ class RulesParser(Parser):
         return result
 
     def parse_test(self):
-
         result = self.parse_term()
         c = self.peek()
         while c in ("<", ">", "=", "!", "~"):
-
             self.consume(c)
 
             name = "" + c
@@ -231,11 +227,9 @@ class RulesParser(Parser):
         return result
 
     def parse_conjunction(self):
-
         result = self.parse_test()
         c = self.peek()
         while c == "&":
-
             self.consume(c)
             self.consume(c)
 
@@ -249,11 +243,9 @@ class RulesParser(Parser):
         return result
 
     def parse_disjunction(self):
-
         result = self.parse_conjunction()
         c = self.peek()
         while c == "|":
-
             self.consume(c)
             self.consume(c)
 
@@ -283,7 +275,6 @@ class RulesParser(Parser):
         rules.add_priority(environment, info, condition, conclusion)
 
     def parse_global_limit(self, rules, environment):
-
         info = self.parse_string()
         condition = self.parse_expression()
         self.consume(":")
@@ -292,7 +283,6 @@ class RulesParser(Parser):
         rules.add_global_limit(environment, info, condition, conclusion)
 
     def parse_user_limit(self, rules, environment):
-
         info = self.parse_string()
         condition = self.parse_expression()
         self.consume(":")
@@ -304,8 +294,11 @@ class RulesParser(Parser):
         return self.parse_disjunction()
 
     def parse(self):
-        """Parse the text provided in the constructor, which should represent a
-        single expression. This method is used for unit testing."""
+        """Parse the text provided in the constructor.
+
+        It which should represent a single expression.
+        This method is used for unit testing.
+        """
         result = self.parse_expression()
         c = self.peek()
         if c != "":
@@ -317,18 +310,18 @@ class RulesParser(Parser):
         return result
 
     def parse_rules(self, rules, environment):
-        """Parse the text provided in the constructor
+        """Parse the text provided in the constructor.
 
         Args:
+        ----
             rules ([type]): the rules that will be updated with the rules
             environment ([type]): the environment in which the rules will be evaluated
 
         Raises:
+        ------
             ParserError: [description]
         """
-
         while self.peek():
-
             ident = self.parse_ident()
 
             if ident == "limit":

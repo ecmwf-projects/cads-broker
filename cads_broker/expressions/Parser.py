@@ -34,10 +34,12 @@ class Reader:
 
 
 class Parser:
-    """This class is a simple tokeniser used to parse text files or strings.
+    """It is a simple tokeniser used to parse text files or strings.
+
     The class returns the next non-space characters, and allow one
     character look-ahead. Comments are marked with '#' and are ignored.
-    This class must be sub-classed."""
+    This class must be sub-classed.
+    """
 
     def __init__(self, path, comments=True):
         if isinstance(path, str):
@@ -49,7 +51,6 @@ class Parser:
         self.line = 0
 
     def read(self):
-
         if self.eof:
             return ""
 
@@ -61,7 +62,6 @@ class Parser:
 
     def peek(self, spaces=False):
         while True:
-
             c = self.reader.peek()
 
             if self.comments and c == "#":
@@ -83,7 +83,6 @@ class Parser:
                     self.line += 1
 
     def next(self, spaces=False):
-
         while True:
             c = self.read()
             if c == "":
@@ -107,9 +106,7 @@ class Parser:
                 return c
 
     def consume(self, s):
-
         for c in s:
-
             n = self.next()
             if c != n:
                 raise ParserError(

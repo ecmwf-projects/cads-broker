@@ -26,7 +26,9 @@ dbsettings = None
 
 
 class QoSRules(pydantic.BaseSettings):
-    qos_rules: str = os.path.join(os.path.abspath(os.path.dirname(__file__)), "qos.rules")
+    qos_rules: str = os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), "qos.rules"
+    )
 
     def register_functions(self):
         expressions.FunctionFactory.FunctionFactory.register_function(
@@ -37,7 +39,6 @@ class QoSRules(pydantic.BaseSettings):
             "adaptor",
             lambda context, *args: context.request.request_body.get("entry_point", ""),
         )
-
 
 
 class SqlalchemySettings(pydantic.BaseSettings):

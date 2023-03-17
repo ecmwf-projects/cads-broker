@@ -16,7 +16,6 @@ FunctionFactory.FunctionFactory.register_function(
 
 
 class TestRequest:
-
     user_uid = "david"
     dataset = "dataset-1"
     adaptor = "adaptor1"
