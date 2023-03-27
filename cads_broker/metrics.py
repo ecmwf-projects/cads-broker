@@ -27,3 +27,8 @@ def push_to_prometheus():
             logger.warning("Connection to Prometheus host refused.")
         except Exception:
             logger.error("Unexpected error")
+
+
+def increase_bytes_counter(file_size):
+    GENERATED_BYTES_COUNTER.inc(file_size)
+    push_to_prometheus()
