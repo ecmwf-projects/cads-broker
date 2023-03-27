@@ -8,7 +8,7 @@ import distributed
 import sqlalchemy as sa
 import structlog
 
-from cads_broker.metrics import GENERATED_BYTES_COUNTER
+from cads_broker.metrics import GENERATED_BYTES_COUNTER, push_to_prometheus
 
 try:
     from cads_worker import worker
@@ -125,6 +125,7 @@ class Broker:
                 GENERATED_BYTES_COUNTER.inc(
                     request.cache_entry.result["args"][0]["file:size"]
                 )
+                push_to_prometheus()
             elif future.status == "error":
                 request = db.set_request_status(
                     future.key,
