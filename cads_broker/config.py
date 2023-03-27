@@ -14,13 +14,31 @@
 # limitations under the License.
 
 import logging
+import os
 import sys
 
 import pydantic
 import structlog
 
+from cads_broker import expressions
+
 dbsettings = None
-timestamp_format = "%Y-%m-%d %H:%M:%S"
+
+
+class QoSRules(pydantic.BaseSettings):
+    qos_rules: str = os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), "qos.rules"
+    )
+
+    def register_functions(self):
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "dataset",
+            lambda context, *args: context.request.process_id,
+        )
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "adaptor",
+            lambda context, *args: context.request.request_body.get("entry_point", ""),
+        )
 
 
 class SqlalchemySettings(pydantic.BaseSettings):
@@ -36,6 +54,7 @@ class SqlalchemySettings(pydantic.BaseSettings):
     compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
     compute_db_name: str = "broker"
+    pool_timeout: float = 1.0
     pool_recycle: int = 60
 
     @pydantic.validator("compute_db_password")

@@ -6,8 +6,9 @@ import distributed
 import pytest_mock
 import sqlalchemy as sa
 
+from cads_broker import Environment, dispatcher
 from cads_broker import database as db
-from cads_broker import dispatcher
+from cads_broker.qos import QoS, Rule
 
 # create client object and connect to local cluster
 CLIENT = distributed.Client(distributed.LocalCluster())
@@ -32,9 +33,13 @@ def mock_system_request(
 def test_broker_update_database(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
-
+    environment = Environment.Environment()
+    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment)
     broker = dispatcher.Broker(
-        client=CLIENT, max_running_requests=1, session_maker=session_obj
+        client=CLIENT,
+        environment=environment,
+        qos=qos,
+        session_maker=session_obj,
     )
 
     successful_uid = str(uuid.uuid4())
@@ -77,46 +82,13 @@ def test_broker_update_database(
         assert session.scalars(statement).first().status == "running"
 
 
-def test_broker_choose_request(
-    mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
-) -> None:
-    broker = dispatcher.Broker(
-        client=CLIENT, max_running_requests=1, session_maker=session_obj
-    )
-    number_of_requests = 5
-
-    def get_accepted_requests() -> list[db.SystemRequest]:
-        return [
-            mock_system_request(created_at=datetime.datetime(day=i, month=1, year=2020))
-            for i in range(1, number_of_requests + 1)
-        ]
-
-    mocker.patch(
-        "cads_broker.database.get_accepted_requests",
-        return_value=get_accepted_requests(),
-    )
-    with session_obj() as session:
-        request = broker.choose_request(session=session)
-        assert request.created_at.day == 1
-
-
-def test_broker_priority(session_obj: sa.orm.sessionmaker) -> None:
-    broker = dispatcher.Broker(
-        client=CLIENT, max_running_requests=1, session_maker=session_obj
-    )
-
-    created_at = datetime.datetime(day=1, month=1, year=2022, hour=1)
-    assert (
-        broker.priority(mock_system_request(created_at=created_at))
-        == created_at.timestamp()
-    )
-
-
 def test_broker_fetch_dask_task_status(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
+    environment = Environment.Environment()
+    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment)
     broker = dispatcher.Broker(
-        client=CLIENT, max_running_requests=1, session_maker=session_obj
+        client=CLIENT, environment=environment, qos=qos, session_maker=session_obj
     )
 
     def mock_get_tasks() -> dict[str, str]:

@@ -4,6 +4,7 @@ import traceback
 from typing import Any
 
 import attrs
+import cachetools
 import distributed
 import sqlalchemy as sa
 import structlog
@@ -15,8 +16,9 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import config
+from cads_broker import Environment, config
 from cads_broker import database as db
+from cads_broker.qos import QoS
 
 config.configure_logger()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -28,6 +30,20 @@ DASK_STATUS_TO_STATUS = {
     "error": "failed",
     "finished": "successful",
 }
+
+
+@cachetools.cached(  # type: ignore
+    cache=cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("NWORKERS_CACHE_TIME", 10))
+    ),
+    info=True,
+)
+def get_number_of_workers(client: distributed.Client) -> int:
+    workers = client.scheduler_info()["workers"]
+    number_of_workers = len(
+        [w for w in workers.values() if w.get("status", None) == "running"]
+    )
+    return number_of_workers
 
 
 def get_tasks(client: distributed.Client) -> Any:
@@ -49,42 +65,38 @@ def get_tasks(client: distributed.Client) -> Any:
 
 @attrs.define
 class Broker:
-
     client: distributed.Client
-    max_running_requests: int
+    environment: Environment.Environment
+    qos: QoS.QoS
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(factory=dict)
     running_requests: int = 0
     session_maker: sa.orm.sessionmaker | None = None
 
-    def __attrs_post_init__(self):
-        self.session_maker = db.ensure_session_obj(self.session_maker)
-
     @classmethod
     def from_address(
         cls,
         address="scheduler:8786",
-        max_running_requests=int(os.getenv("MAX_RUNNING_REQUESTS", 1)),
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
+        environment = Environment.Environment()
+        qos_config = config.QoSRules()
+        qos_config.register_functions()
+        session_maker = db.ensure_session_obj(session_maker)
         return cls(
             client=client,
-            max_running_requests=max_running_requests,
             session_maker=session_maker,
+            environment=environment,
+            qos=QoS.QoS(qos_config.qos_rules, environment),
         )
 
-    def choose_request(self, session: sa.orm.Session) -> db.SystemRequest | None:
-        queue = db.get_accepted_requests(session=session)
-        candidates = sorted(
-            queue,
-            key=lambda r: self.priority(r),
-        )
-        return candidates[0] if candidates else None
-
-    def priority(self, request: db.SystemRequest) -> float:
-        return request.created_at.timestamp()
+    @property
+    def number_of_workers(self):
+        number_of_workers = get_number_of_workers(client=self.client)
+        self.environment.number_of_workers = number_of_workers
+        return number_of_workers
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
@@ -121,7 +133,7 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                logger_kwargs["result"] = result
+                logger_kwargs["result"] = request.cache_entry.result
                 GENERATED_BYTES_COUNTER.inc(
                     request.cache_entry.result["args"][0]["file:size"]
                 )
@@ -146,20 +158,17 @@ class Broker:
                     job_id=request.request_uid,
                 )
             self.futures.pop(future.key)
+            self.qos.notify_end_of_request(request, session)
             logger.info(
                 "job has finished",
-                job_id=future.key,
-                job_status=job_status,
                 dask_status=future.status,
-                created_at=request.created_at.strftime(config.timestamp_format),
-                started_at=request.started_at.strftime(config.timestamp_format),
-                finished_at=request.finished_at.strftime(config.timestamp_format),
-                updated_at=request.updated_at.strftime(config.timestamp_format),
+                **db.logger_kwargs(request=request),
                 **logger_kwargs,
             )
 
     def submit_request(self, session: sa.orm.Session) -> None:
-        request = self.choose_request(session=session)
+        queue = db.get_accepted_requests(session=session)
+        request = self.qos.pick(queue, session=session)
         if not request:
             return
 
@@ -169,21 +178,18 @@ class Broker:
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.request_body.get("entry_point", ""),
             kwargs=request.request_body.get("kwargs", {}),
+            resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
         future.add_done_callback(self.on_future_done)
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
+        self.qos.notify_start_of_request(request, session)
         self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",
-            job_id=future.key,
-            job_status=request.status,
-            user_uid=request.request_metadata.get("user_uid"),
-            created_at=request.created_at.strftime(config.timestamp_format),
-            started_at=request.started_at.strftime(config.timestamp_format),
-            updated_at=request.updated_at.strftime(config.timestamp_format),
+            **db.logger_kwargs(request=request),
         )
 
     def run(self) -> None:
@@ -199,15 +205,15 @@ class Broker:
                     ]
                 )
                 number_accepted_requests = db.count_accepted_requests(session=session)
-                available_workers = self.max_running_requests - self.running_requests
+                available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
-                        logger.info(f"Queued jobs: {number_accepted_requests}")
-                        logger.info(f"Available workers: {available_workers}")
+                        logger.info("broker info", queued_jobs=number_accepted_requests)
+                        logger.info("broker info", available_workers=available_workers)
                         [
                             self.submit_request(session=session)
                             for _ in range(available_workers)
                         ]
                     elif available_workers == 0:
-                        logger.info(f"Available workers: {available_workers}")
+                        logger.info("broker info", available_workers=available_workers)
             time.sleep(self.wait_time)

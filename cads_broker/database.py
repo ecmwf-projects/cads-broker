@@ -1,4 +1,5 @@
 """SQLAlchemy ORM model."""
+import datetime
 import uuid
 from typing import Any
 
@@ -36,7 +37,8 @@ class SystemRequest(BaseModel):
         index=True,
         unique=True,
     )
-    process_id = sa.Column(sa.VARCHAR(1024))
+    process_id = sa.Column(sa.Text)
+    user_uid = sa.Column(sa.Text)
     status = sa.Column(status_enum)
     cache_id = sa.Column(sa.Integer)
     request_body = sa.Column(JSONB, nullable=False)
@@ -56,6 +58,20 @@ class SystemRequest(BaseModel):
     )
 
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry)
+
+    @property
+    def age(self):
+        """Returns the age of the request in seconds".
+
+        Returns
+        -------
+            float: Age in seconds.
+        """
+        return (datetime.datetime.now() - self.created_at).seconds
+
+    @property
+    def cost(self):
+        return (0, 0)
 
 
 def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessionmaker:
@@ -79,8 +95,16 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     return session_obj
 
 
+def get_running_requests(
+    session: sa.orm.Session,
+):
+    """Get all running requests."""
+    statement = sa.select(SystemRequest).where(SystemRequest.status == "running")
+    return session.scalars(statement).all()
+
+
 def get_accepted_requests(
-    session: sa.orm.Session = None,
+    session: sa.orm.Session,
 ):
     """Get all accepted requests."""
     statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
@@ -121,6 +145,27 @@ def set_request_status(
     return request
 
 
+def logger_kwargs(request: SystemRequest) -> dict[str, str]:
+    kwargs = {
+        "event_type": "DATASET_REQUEST",
+        "job_id": request.request_uid,
+        "user_uid": request.user_uid,
+        "status": request.status,
+        "created_at": request.created_at.isoformat(),
+        "updated_at": request.updated_at.isoformat(),
+        "started_at": request.started_at.isoformat()
+        if request.started_at is not None
+        else None,
+        "finished_at": request.finished_at.isoformat()
+        if request.finished_at is not None
+        else None,
+        "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
+        "user_request": True,
+        "process_id": request.process_id,
+    }
+    return kwargs
+
+
 def create_request(
     session: sa.orm.Session,
     user_uid: str,
@@ -129,13 +174,15 @@ def create_request(
     kwargs: dict[str, Any],
     process_id: str,
     metadata: dict[str, Any] = {},
+    resources: dict[str, Any] = {},
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
-    metadata["user_uid"] = user_uid
+    metadata["resources"] = resources
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
+        user_uid=user_uid,
         status="accepted",
         request_body={
             "setup_code": setup_code,
@@ -146,14 +193,7 @@ def create_request(
     )
     session.add(request)
     session.commit()
-    logger.info(
-        "accepted job",
-        job_id=request.request_uid,
-        created_at=request.created_at.strftime(config.timestamp_format),
-        updated_at=request.updated_at.strftime(config.timestamp_format),
-        request=kwargs.get("request", {}),
-        process_id=process_id,
-    )
+    logger.info("accepted job", **logger_kwargs(request=request))
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
@@ -171,6 +211,7 @@ def get_request(
         )
         return session.scalars(statement).one()
     except (sqlalchemy.orm.exc.NoResultFound, sqlalchemy.exc.StatementError):
+        logger.exception("get_request failed")
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
