@@ -1,4 +1,5 @@
 # user "Limit for anonymous"       (user == "anonymous") : numberOfWorkers
+# user "Default per-user limit"   (user ~ ".*")        : 6
 
 # limit "Limit for dummy-dataset"    (dataset == "dummy-dataset")      : numberOfWorkers
 # limit "Limit for cads_adaptors:DummyAdaptor" (adaptor == "cads_adaptors:DummyAdaptor")   : numberOfWorkers - 6
