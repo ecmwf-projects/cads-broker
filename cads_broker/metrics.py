@@ -14,15 +14,20 @@ GENERATED_BYTES_COUNTER = Counter(
     "generated_bytes_counter", "Total bytes generated in successful requests"
 )
 
+exporter_host = os.environ.get("EXPORTER_HOST")
+
 
 def push_to_prometheus():
     exporter_host = os.environ.get("EXPORTER_HOST")
     if exporter_host is not None:
-        push_to_gateway(
-            exporter_host, job="cads-broker-metrics-job", registry=REGISTRY
-        )
-    else:
-        print("asd")
+        try:
+            push_to_gateway(
+                exporter_host, job="cads-broker-metrics-job", registry=REGISTRY
+            )
+        except URLError:
+            logger.warning("Connection to Prometheus host refused.")
+        except Exception:
+            logger.error("Unexpected error")
 
 
 def increase_bytes_counter(file_size):
