@@ -1,3 +1,4 @@
+import hashlib
 import os
 import time
 import traceback
@@ -44,6 +45,18 @@ def get_number_of_workers(client: distributed.Client) -> int:
     return number_of_workers
 
 
+@cachetools.cached(  # type: ignore
+    cache=cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("QOS_RULES_CACHE_TIME", 10))
+    ),
+    info=True,
+)
+def get_rules_hash(rules_path: str):
+    with open(rules_path) as f:
+        rules = f.read()
+    return hashlib.md5(rules.encode()).hexdigest()
+
+
 def get_tasks(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
         scheduler_state_to_status = {
@@ -83,12 +96,18 @@ class Broker:
         qos_config = config.QoSRules()
         qos_config.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
-        return cls(
+        rules_hash = get_rules_hash(qos_config.qos_rules)
+        self = cls(
             client=client,
             session_maker=session_maker,
             environment=environment,
-            qos=QoS.QoS(qos_config.qos_rules, environment),
+            qos=QoS.QoS(
+                qos_config.qos_rules,
+                environment,
+                rules_hash=rules_hash,
+            ),
         )
+        return self
 
     @property
     def number_of_workers(self):
@@ -189,6 +208,10 @@ class Broker:
     def run(self) -> None:
         while True:
             with self.session_maker() as session:
+                if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
+                    logger.info("reloading qos rules")
+                    self.qos.reload_rules(session=session)
+                    self.qos.rules_hash = rules_hash
                 self.update_database(session=session)
                 self.running_requests = len(
                     [

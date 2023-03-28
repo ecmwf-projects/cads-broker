@@ -37,8 +37,10 @@ def and_func(data: list):
 
 
 class QoS:
-    def __init__(self, rules, environment):
+    def __init__(self, rules, environment, rules_hash):
         self.lock = threading.RLock()
+
+        self.rules_hash = rules_hash
 
         self.environment = environment
         # The list of active requests
