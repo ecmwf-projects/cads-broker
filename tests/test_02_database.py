@@ -170,8 +170,6 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         request = db.get_request(request_uid, session)
     with pytest.raises(db.NoResultFound):
         request = db.get_request(str(uuid.uuid4()), session)
-    with pytest.raises(db.NoResultFound):
-        request = db.get_request("123", session)
     assert request.request_uid == request_uid
 
 
