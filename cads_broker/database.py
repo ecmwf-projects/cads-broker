@@ -57,7 +57,8 @@ class SystemRequest(BaseModel):
         {},
     )
 
-    cache_entry = sa.orm.relationship(cacholote.database.CacheEntry)
+    # joined is temporary
+    cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
 
     @property
     def age(self):
