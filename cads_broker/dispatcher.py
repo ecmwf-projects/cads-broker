@@ -81,7 +81,10 @@ class Broker:
     qos: QoS.QoS
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
-    futures: dict[str, distributed.Future] = attrs.field(factory=dict)
+    futures: dict[str, distributed.Future] = attrs.field(
+        factory=dict,
+        repr=lambda futures: " ".join(futures.keys()),
+    )
     running_requests: int = 0
     session_maker: sa.orm.sessionmaker | None = None
 
