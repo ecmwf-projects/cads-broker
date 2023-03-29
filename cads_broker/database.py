@@ -148,7 +148,6 @@ def set_request_status(
 
 def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     kwargs = {
-        "event_type": "DATASET_REQUEST",
         "job_id": request.request_uid,
         "user_uid": request.user_uid,
         "status": request.status,
@@ -194,7 +193,9 @@ def create_request(
     )
     session.add(request)
     session.commit()
-    logger.info("accepted job", **logger_kwargs(request=request))
+    logger.info(
+        "accepted job", event_type="DATASET_REQUEST", **logger_kwargs(request=request)
+    )
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
@@ -221,6 +222,7 @@ def get_request_result(
     session: sa.orm.Session,
 ) -> SystemRequest:
     request = get_request(request_uid, session)
+    logger.info("result accessed", **logger_kwargs(request))
     return request.cache_entry.result
 
 
