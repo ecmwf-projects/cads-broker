@@ -6,5 +6,5 @@
 
 # permission "anonymous cannot access dummy-dataset"  (dataset == "dummy-dataset"): user != 'anonymous'
 
-priority "Priority for user mysecretpat"    (user == "00000000-0000-4000-a000-000000000000")  :  hour(1)
-priority "Priority for user anewsecretpat"    (user == "00000000-0000-3000-abcd-000000000001")  :  -hour(1)
+priority "Priority for test user 1"    (user == "00000000-0000-4000-a000-000000000000")  :  hour(1)
+priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-000000000001")  :  -hour(1)
