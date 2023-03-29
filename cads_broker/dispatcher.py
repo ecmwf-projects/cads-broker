@@ -138,7 +138,9 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            request.status = self.fetch_dask_task_status(request.request_uid)
+            status = self.fetch_dask_task_status(request.request_uid)
+            if status in ("successful", "failed"):
+                request.status = "running"
         session.commit()
 
     def on_future_done(self, future: distributed.Future) -> None:
