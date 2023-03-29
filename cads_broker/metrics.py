@@ -30,6 +30,7 @@ def push_to_prometheus():
             logger.error("Unexpected error")
 
 
-def increase_bytes_counter(file_size):
+def increase_bytes_counter(result):
+    file_size = result["args"][0]["file:size"]
     GENERATED_BYTES_COUNTER.inc(file_size)
     push_to_prometheus()
