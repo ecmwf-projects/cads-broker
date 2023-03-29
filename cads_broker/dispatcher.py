@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config
+from cads_broker import Environment, config, metrics
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -132,6 +132,7 @@ class Broker:
                     session=session,
                 )
                 logger_kwargs["result"] = request.cache_entry.result
+                metrics.increase_bytes_counter(result=request.cache_entry.result)
             elif future.status == "error":
                 request = db.set_request_status(
                     future.key,
