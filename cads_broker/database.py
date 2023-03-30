@@ -221,6 +221,13 @@ def get_request_result(
     session: sa.orm.Session,
 ) -> SystemRequest:
     request = get_request(request_uid, session)
+    logger.info(
+        "result accessed",
+        user_uid=request.user_uid,
+        job_id=request.request_uid,
+        process_id=request.process_id,
+        status=request.status,
+    )
     return request.cache_entry.result
 
 
