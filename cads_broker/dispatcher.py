@@ -234,11 +234,19 @@ class Broker:
                 if number_accepted_requests > 0:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
-                        logger.info("broker info", available_workers=available_workers)
+                        logger.info(
+                            "broker info",
+                            available_workers=available_workers,
+                            number_of_workers=self.number_of_workers,
+                        )
                         [
                             self.submit_request(session=session)
                             for _ in range(available_workers)
                         ]
                     elif available_workers == 0:
-                        logger.info("broker info", available_workers=available_workers)
+                        logger.info(
+                            "broker info",
+                            available_workers=available_workers,
+                            number_of_workers=self.number_of_workers,
+                        )
             time.sleep(self.wait_time)
