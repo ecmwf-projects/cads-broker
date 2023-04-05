@@ -1,10 +1,10 @@
 # user "Limit for anonymous"       (user == "anonymous") : numberOfWorkers
 # user "Default per-user limit"   (user ~ ".*")        : 6
 
-# limit "Limit for dummy-dataset"    (dataset == "dummy-dataset")      : numberOfWorkers
+# limit "Limit for dummy-dataset"    (dataset == "test-dummy-adaptor")      : numberOfWorkers
 # limit "Limit for cads_adaptors:DummyAdaptor" (adaptor == "cads_adaptors:DummyAdaptor")   : numberOfWorkers - 6
 
-# permission "anonymous cannot access dummy-dataset"  (dataset == "dummy-dataset"): user != 'anonymous'
+# permission "anonymous cannot access dummy-dataset"  (dataset == "test-dummy-adaptor"): user != 'anonymous'
 
 priority "Priority for test user 1"    (user == "00000000-0000-4000-a000-000000000000")  :  hour(1)
 priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-000000000001")  :  -hour(1)
