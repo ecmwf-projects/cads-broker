@@ -123,8 +123,8 @@ class Broker:
         if request_uid in self.futures:
             return DASK_STATUS_TO_STATUS[self.futures[request_uid].status]
         # check if the task is in the scheduler
-        elif request_uid in get_tasks(self.client):
-            return get_tasks(self.client).get(request_uid, "unknown")
+        elif request_uid in (tasks := get_tasks(self.client)):
+            return tasks.get(request_uid)
         # if request is not in the dask scheduler, re-queue it
         else:
             return "accepted"
