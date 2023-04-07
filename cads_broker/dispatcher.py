@@ -33,7 +33,7 @@ DASK_STATUS_TO_STATUS = {
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("NWORKERS_CACHE_TIME", 10))
+        maxsize=1024, ttl=int(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
     ),
     info=True,
 )
@@ -57,6 +57,12 @@ def get_rules_hash(rules_path: str):
     return hashlib.md5(rules.encode()).hexdigest()
 
 
+@cachetools.cached(  # type: ignore
+    cache=cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("GET_TASKS_FROM_SCHEDULER_CACHE_TIME", 1))
+    ),
+    info=True,
+)
 def get_tasks(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
         scheduler_state_to_status = {
