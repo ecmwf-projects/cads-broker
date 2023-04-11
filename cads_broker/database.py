@@ -146,6 +146,30 @@ def set_request_status(
     return request
 
 
+async def set_request_status_async(
+    request_uid: str,
+    status: str,
+    session: sa.orm.Session,
+    cache_id: int | None = None,
+    traceback: str | None = None,
+) -> SystemRequest:
+    """Set the status of a request."""
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    result = await session.execute(statement)
+    request = result.scalars().one()
+    if status == "successful":
+        request.finished_at = sa.func.now()
+        request.cache_id = cache_id
+    elif status == "failed":
+        request.finished_at = sa.func.now()
+        request.response_traceback = traceback
+    elif status == "running":
+        request.started_at = sa.func.now()
+    request.status = status
+    await session.commit()
+    return request
+
+
 def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     kwargs = {
         "event_type": "DATASET_REQUEST",
@@ -306,6 +330,20 @@ def delete_request(
     request = get_request(request_uid, session)
     session.delete(request)
     session.commit()
+    return request
+
+
+async def delete_request_async(
+    request_uid: str,
+    session: sa.orm.Session,
+) -> SystemRequest:
+    await set_request_status_async(
+        request_uid=request_uid, status="dismissed", session=session
+    )
+    request = await get_request_async(request_uid, session)
+    session.delete(request)
+    await session.commit()
+    await session.refresh(request)
     return request
 
 
