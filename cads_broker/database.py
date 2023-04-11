@@ -341,9 +341,8 @@ async def delete_request_async(
         request_uid=request_uid, status="dismissed", session=session
     )
     request = await get_request_async(request_uid, session)
-    session.delete(request)
+    await session.delete(request)
     await session.commit()
-    await session.refresh(request)
     return request
 
 
