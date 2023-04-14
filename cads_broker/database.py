@@ -112,6 +112,21 @@ def get_accepted_requests(
     return session.scalars(statement).all()
 
 
+def count_finished_requests_per_user(
+    session: sa.orm.Session, user_uid: str, last_hours: int | None = None
+) -> int:
+    """Count running requests for user_uid."""
+    statement = (
+        session.query(SystemRequest)
+        .where(SystemRequest.user_uid == user_uid)
+        .where(SystemRequest.status.in_(("successful", "failed")))
+    )
+    if last_hours is not None:
+        finished_at = datetime.datetime.now() - datetime.timedelta(hours=last_hours)
+        statement = statement.where(SystemRequest.finished_at >= finished_at)
+    return statement.count()
+
+
 def count_accepted_requests(
     session: sa.orm.Session,
     process_id: str | None = None,

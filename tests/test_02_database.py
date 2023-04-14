@@ -55,6 +55,20 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     assert requests[0].request_uid == accepted_request_uid
 
 
+def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> None:
+    request1 = mock_system_request(status="successful")
+    request1.finished_at = datetime.datetime.now()
+    request2 = mock_system_request(status="failed")
+    request2.finished_at = datetime.datetime.now()
+
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+        assert 2 == db.count_finished_requests_per_user(session=session, user_uid=request1.user_uid, last_hours=1)
+        # assert 1 == db.count_accepted_requests(session=session, process_id=process_id)
+
+
 def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     process_id = "reanalysis-era5-pressure-levels"
     request1 = mock_system_request(status="accepted", process_id=process_id)

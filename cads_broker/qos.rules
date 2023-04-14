@@ -1,5 +1,6 @@
 # user "Limit for anonymous"       (user == "anonymous") : numberOfWorkers
 # user "Default per-user limit"   (user ~ ".*")        : 6
+# user "Limit for users: 15 finished requests in the last 24 hours" (user ~ ".*")   : 15 - finished_requests
 
 # limit "Limit for dummy-dataset"    (dataset == "test-dummy-adaptor")      : numberOfWorkers
 # limit "Limit for cads_adaptors:DummyAdaptor" (adaptor == "cads_adaptors:DummyAdaptor")   : numberOfWorkers - 6
