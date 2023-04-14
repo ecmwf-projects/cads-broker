@@ -254,7 +254,7 @@ async def create_request_async(
     session.add(request)
     await session.commit()
     await session.refresh(request)
-    logger.info("accepted job", **logger_kwargs(request=request))
+    # logger.info("accepted job", **logger_kwargs(request=request))
     ret_value = {
         column.key: getattr(request, column.key)
         for column in sa.inspect(request).mapper.column_attrs
@@ -288,7 +288,7 @@ async def get_request_async(
         request = result.scalars().one()
         return request
     except sqlalchemy.orm.exc.NoResultFound:
-        logger.exception("get_request failed")
+        # logger.exception("get_request failed")
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
@@ -312,13 +312,13 @@ async def get_request_result_async(
     session: sa.orm.Session,
 ) -> SystemRequest:
     request = await get_request_async(request_uid, session)
-    logger.info(
-        "result accessed",
-        user_uid=request.user_uid,
-        job_id=request.request_uid,
-        process_id=request.process_id,
-        status=request.status,
-    )
+    # logger.info(
+    #     "result accessed",
+    #     user_uid=request.user_uid,
+    #     job_id=request.request_uid,
+    #     process_id=request.process_id,
+    #     status=request.status,
+    # )
     return request.cache_entry.result
 
 
