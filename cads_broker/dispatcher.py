@@ -80,15 +80,6 @@ def get_tasks(client: distributed.Client) -> Any:
     return client.run_on_scheduler(get_tasks_on_scheduler)
 
 
-def test(context, *args):
-    finished_requests = db.count_finished_requests_per_user(
-        user_uid=context.request.user_uid,
-        last_hours=24,
-        session=context.session,
-    )
-    return finished_requests
-
-
 class QoSRules:
     def __init__(self) -> None:
         self.qos_rules: str = os.path.join(
@@ -105,7 +96,12 @@ class QoSRules:
             lambda context, *args: context.request.request_body.get("entry_point", ""),
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
-            "finished_requests", test
+            "finished_requests",
+            lambda context, *args: db.count_finished_requests_per_user(
+                user_uid=context.request.user_uid,
+                last_hours=args[0],
+                session=context.session,
+            ),
         )
 
 
