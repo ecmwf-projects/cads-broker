@@ -15,6 +15,7 @@ classifiers = [
 dependencies = [
   "attrs",
   "cacholote",
+  "cads-common",
   "distributed",
   "minio",
   "sqlalchemy",
