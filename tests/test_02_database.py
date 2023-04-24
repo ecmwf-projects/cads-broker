@@ -69,14 +69,27 @@ def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_count_requests_per_dataset_status(session_obj: sa.orm.sessionmaker) -> None:
-    process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
+    process_id_era5 = "reanalysis-era5-pressure-levels"
+    process_id_dummy = "dummy-dataset"
+    request1 = mock_system_request(status="accepted", process_id=process_id_era5)
+    request2 = mock_system_request(status="accepted", process_id=process_id_era5)
+    request3 = mock_system_request(status="accepted", process_id=process_id_dummy)
     with session_obj() as session:
         session.add(request1)
+        session.add(request2)
+        session.add(request3)
         session.commit()
         response = db.count_requests_per_dataset_status(session=session)
-        assert 1 == len(response)
-        assert 1 == response[0][2]
+        print(response)
+        assert 2 == len(response)
+        if response[0][0] == process_id_era5:
+            assert response[0][2] == 2
+        elif response[0][0] == process_id_dummy:
+            assert response[0][2] == 1
+        if response[1][0] == process_id_era5:
+            assert response[1][2] == 2
+        elif response[1][0] == process_id_dummy:
+            assert response[1][2] == 1
 
 
 def test_total_request_time_per_dataset_status(
