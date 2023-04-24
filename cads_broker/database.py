@@ -8,7 +8,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from sqlalchemy import distinct, func
+from sqlalchemy import all_, any_, distinct, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import aliased
 
@@ -200,21 +200,21 @@ def count_waiting_users_queued_behind_themselves(session: sa.orm.Session) -> lis
 
 def count_waiting_users_queued(session: sa.orm.Session):
     """Users that only have accepted requests (not running requests), per dataset."""
-    sr1 = aliased(SystemRequest)
-    sr2 = aliased(SystemRequest)
-
-    subq = (
-        session.query(sr1.process_id, sr1.user_uid)
-        .join(sr2, (sr1.user_uid == sr2.user_uid) & (sr1.process_id == sr2.process_id))
-        .filter(sr1.status == "accepted", sr2.status != "running")
-        .group_by(sr1.process_id, sr1.user_uid)
+    subquery = (
+        session.query(
+            SystemRequest.process_id,
+            SystemRequest.user_uid,
+            func.array_agg(distinct(SystemRequest.status)).label("in_status"),
+        )
+        .group_by(SystemRequest.process_id, SystemRequest.user_uid)
         .subquery()
     )
 
-    # count the number of user_uid values from the subquery and per dataset
     return (
-        session.query(subq.c.process_id, func.count(subq.c.user_uid))
-        .group_by(subq.c.process_id)
+        session.query(subquery.c.process_id, func.count().label("count"))
+        .where(all_(subquery.c.in_status) != "running")
+        .where(any_(subquery.c.in_status) == "accepted")
+        .group_by(subquery.c.process_id)
         .all()
     )
 
