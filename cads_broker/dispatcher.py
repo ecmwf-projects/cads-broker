@@ -218,11 +218,17 @@ class Broker:
                 **logger_kwargs,
             )
 
-    def submit_request(self, session: sa.orm.Session) -> None:
+    def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
         queue = db.get_accepted_requests(session=session)
-        request = self.qos.pick(queue, session=session)
-        if not request:
-            return
+        for _ in range(number_of_requests):
+            request = self.qos.pick(queue, session=session)
+            if not request:
+                return
+            self.submit_request(request, session=session)
+
+    def submit_request(
+        self, request: db.SystemRequest, session: sa.orm.Session
+    ) -> None:
 
         future = self.client.submit(
             worker.submit_workflow,
@@ -270,10 +276,9 @@ class Broker:
                             available_workers=available_workers,
                             number_of_workers=self.number_of_workers,
                         )
-                        [
-                            self.submit_request(session=session)
-                            for _ in range(available_workers)
-                        ]
+                        self.submit_requests(
+                            session=session, number_of_requests=available_workers
+                        )
                     elif available_workers == 0:
                         logger.info(
                             "broker info",
