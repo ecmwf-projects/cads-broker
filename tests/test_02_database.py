@@ -68,6 +68,103 @@ def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
         assert 1 == db.count_accepted_requests(session=session, process_id=process_id)
 
 
+def test_count_requests_per_dataset_status(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    with session_obj() as session:
+        session.add(request1)
+        session.commit()
+        response = db.count_requests_per_dataset_status(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][2]
+
+
+def test_total_request_time_per_dataset_status(
+    session_obj: sa.orm.sessionmaker,
+) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="successful", process_id=process_id)
+    request1.started_at = datetime.datetime(2023, 1, 1)
+    request1.finished_at = datetime.datetime(2023, 1, 2)
+    with session_obj() as session:
+        session.add(request1)
+        session.commit()
+        response = db.total_request_time_per_dataset_status(session=session)
+        assert 1 == len(response)
+        assert datetime.timedelta(days=1) == response[0][2]
+
+
+def test_count_active_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="running", process_id=process_id)
+    request2.user_uid = "bbb"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+        response = db.count_active_users(session=session)
+        assert 1 == len(response)
+        assert 2 == response[0][1]
+
+
+def test_count_queued_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    with session_obj() as session:
+        session.add(request1)
+        session.commit()
+        response = db.count_active_users(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][1]
+
+
+def test_count_waiting_users_behind_themselves(
+    session_obj: sa.orm.sessionmaker,
+) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="running", process_id=process_id)
+    request2.user_uid = "aaa"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+        response = db.count_waiting_users_queued_behind_themselves(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][1]
+
+
+def test_count_waiting_users_queued(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="successful", process_id=process_id)
+    request2.user_uid = "aaa"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+        response = db.count_waiting_users_queued(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][1]
+
+
+def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="running", process_id=process_id)
+    request1.user_uid = "aaa"
+    with session_obj() as session:
+        session.add(request1)
+        session.commit()
+        response = db.count_running_users(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][1]
+
+
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(status="accepted")
     request_uid = request.request_uid
