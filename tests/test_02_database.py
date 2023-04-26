@@ -209,7 +209,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     )
     engine = sa.create_engine(connection_string)
     conn = engine.connect()
-    query = (
+    query = sa.text(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
     expected_tables_at_beginning: set[str] = set()

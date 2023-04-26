@@ -33,7 +33,7 @@ class SystemRequest(BaseModel):
 
     request_id = sa.Column(sa.Integer, primary_key=True)
     request_uid = sa.Column(
-        sa.dialects.postgresql.UUID(),
+        sa.dialects.postgresql.UUID(False),
         index=True,
         unique=True,
     )
@@ -117,10 +117,10 @@ def count_accepted_requests(
     process_id: str | None = None,
 ) -> int:
     """Count all accepted requests."""
-    statement = session.query(SystemRequest).filter(SystemRequest.status == "accepted")
+    statement = sa.select(sa.func.count()).select_from(SystemRequest).filter(SystemRequest.status == "accepted")
     if process_id is not None:
         statement = statement.filter(SystemRequest.process_id == process_id)
-    return statement.count()
+    return session.scalar(statement)
 
 
 def set_request_status(
@@ -255,7 +255,8 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         structure_exists = False
     else:
         conn = engine.connect()
-        query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        query = sa.text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+
         if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
             structure_exists = False
     if not structure_exists or force:
