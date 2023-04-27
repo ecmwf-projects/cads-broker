@@ -128,9 +128,24 @@ def count_accepted_requests(
 def count_requests_per_dataset_status(
     session: sa.orm.Session,
 ) -> list:
-    """Count request by dataset and status."""
+    """Count request by dataset and status (status that change over time)."""
     return (
         session.query(SystemRequest.process_id, SystemRequest.status, func.count())
+        .where(SystemRequest.status.in_(("accepted", "running")))
+        .group_by(SystemRequest.status, SystemRequest.process_id)
+        .all()
+    )
+
+
+def count_last_day_requests_per_dataset_status(session: sa.orm.Session) -> list:
+    """Count last day requests by dataset and status (permanent status)."""
+    return (
+        session.query(SystemRequest.process_id, SystemRequest.status, func.count())
+        .where(
+            SystemRequest.created_at
+            > (datetime.datetime.now() - datetime.timedelta(days=1))
+        )
+        .where(SystemRequest.status.in_(("failed", "successful", "dismissed")))
         .group_by(SystemRequest.status, SystemRequest.process_id)
         .all()
     )
@@ -146,7 +161,10 @@ def total_request_time_per_dataset_status(
             func.sum(SystemRequest.finished_at - SystemRequest.started_at),
         )
         .filter(
-            SystemRequest.started_at.isnot(None), SystemRequest.finished_at.isnot(None)
+            SystemRequest.created_at
+            > (datetime.datetime.now() - datetime.timedelta(days=1)),
+            SystemRequest.started_at.isnot(None),
+            SystemRequest.finished_at.isnot(None),
         )
         .group_by(SystemRequest.process_id, SystemRequest.status)
         .all()
