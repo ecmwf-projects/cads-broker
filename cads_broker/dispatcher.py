@@ -170,6 +170,7 @@ class Broker:
         for request in session.scalars(statement):
             status = self.fetch_dask_task_status(request.request_uid)
             if status in ("successful", "failed"):
+                # status successful or failed must be set by on_future_done method
                 request.status = "running"
             else:
                 request.status = status
