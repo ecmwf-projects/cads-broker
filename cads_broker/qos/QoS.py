@@ -282,6 +282,7 @@ class QoS:
         n, request = candidates[0]
 
         # remove request from the queue
+        # FIXME: this is slow ~ n ** 2
         queue.pop(n)
 
         return request
