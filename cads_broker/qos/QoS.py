@@ -265,7 +265,7 @@ class QoS:
     @locked
     def pick(self, queue, session):
         # Create the list of requests than can run
-        candidates = [r for r in queue if self.can_run(r, session)]
+        candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r, session)]
 
         # If no request can run, return 'None'
         if len(candidates) == 0:
@@ -274,12 +274,16 @@ class QoS:
         # Sort according to priorities, highest first
         candidates = sorted(
             candidates,
-            key=lambda r: self.priority(r, session),
+            key=lambda candidate: self.priority(candidate[1], session),
             reverse=True,
         )
 
         # Select the request with the highest priority
-        request = candidates[0]
+        n, request = candidates[0]
+
+        # remove request from the queue
+        # FIXME: this is slow ~ n ** 2
+        queue.pop(n)
 
         return request
 
