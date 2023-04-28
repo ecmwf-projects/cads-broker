@@ -112,21 +112,35 @@ def get_accepted_requests(
     return session.scalars(statement).all()
 
 
-def count_finished_requests_per_user(
-    user_uid: str, last_hours: int | None = None
+def count_finished_requests_per_user_in_session(
+    user_uid: str,
+    session: sa.orm.Session,
+    last_hours: int | None = None,
 ) -> int:
     """Count running requests for user_uid."""
-    session_maker = ensure_session_obj(None)
+    statement = (
+        session.query(SystemRequest)
+        .where(SystemRequest.user_uid == user_uid)
+        .where(SystemRequest.status.in_(("successful", "failed")))
+    )
+    if last_hours is not None:
+        finished_at = datetime.datetime.now() - datetime.timedelta(hours=last_hours)
+        statement = statement.where(SystemRequest.finished_at >= finished_at)
+    return statement.count()
+
+
+def count_finished_requests_per_user(
+    user_uid: str,
+    last_hours: int | None = None,
+    session_maker: sa.orm.Session = None,
+) -> int:
+    """Count running requests for user_uid."""
+    session_maker = ensure_session_obj(session_maker)
     with session_maker() as session:
-        statement = (
-            session.query(SystemRequest)
-            .where(SystemRequest.user_uid == user_uid)
-            .where(SystemRequest.status.in_(("successful", "failed")))
+        ret_value = count_finished_requests_per_user_in_session(
+            user_uid=user_uid, last_hours=last_hours, session=session
         )
-        if last_hours is not None:
-            finished_at = datetime.datetime.now() - datetime.timedelta(hours=last_hours)
-            statement = statement.where(SystemRequest.finished_at >= finished_at)
-        return statement.count()
+        return ret_value
 
 
 def count_accepted_requests(

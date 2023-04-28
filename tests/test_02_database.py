@@ -65,8 +65,9 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
         session.add(request1)
         session.add(request2)
         session.commit()
-        assert 2 == db.count_finished_requests_per_user(session=session, user_uid=request1.user_uid, last_hours=1)
-        # assert 1 == db.count_accepted_requests(session=session, process_id=process_id)
+        assert 2 == db.count_finished_requests_per_user_in_session(
+            user_uid=request1.user_uid, last_hours=1, session=session
+        )
 
 
 def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
