@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, metrics
+from cads_broker import Environment, expressions, config, metrics
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -80,6 +80,30 @@ def get_tasks(client: distributed.Client) -> Any:
     return client.run_on_scheduler(get_tasks_on_scheduler)
 
 
+class QoSRules:
+    def __init__(self) -> None:
+        self.qos_rules: str = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)), "qos.rules"
+        )
+
+    def register_functions(self):
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "dataset",
+            lambda context, *args: context.request.process_id,
+        )
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "adaptor",
+            lambda context, *args: context.request.request_body.get("entry_point", ""),
+        )
+        expressions.FunctionFactory.FunctionFactory.register_function(
+            "finished_requests",
+            lambda context, *args: db.count_finished_requests_per_user(
+                user_uid=context.request.user_uid,
+                last_hours=args[0],
+            ),
+        )
+
+
 @attrs.define
 class Broker:
     client: distributed.Client
@@ -102,7 +126,7 @@ class Broker:
     ):
         client = distributed.Client(address)
         environment = Environment.Environment()
-        qos_config = config.QoSRules()
+        qos_config = QoSRules()
         qos_config.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
         rules_hash = get_rules_hash(qos_config.qos_rules)
@@ -146,6 +170,7 @@ class Broker:
         for request in session.scalars(statement):
             status = self.fetch_dask_task_status(request.request_uid)
             if status in ("successful", "failed"):
+                # status successful or failed must be set by on_future_done method
                 request.status = "running"
             else:
                 request.status = status
@@ -193,11 +218,17 @@ class Broker:
                 **logger_kwargs,
             )
 
-    def submit_request(self, session: sa.orm.Session) -> None:
+    def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
         queue = db.get_accepted_requests(session=session)
-        request = self.qos.pick(queue, session=session)
-        if not request:
-            return
+        for _ in range(number_of_requests):
+            request = self.qos.pick(queue, session=session)
+            if not request:
+                return
+            self.submit_request(request, session=session)
+
+    def submit_request(
+        self, request: db.SystemRequest, session: sa.orm.Session
+    ) -> None:
 
         future = self.client.submit(
             worker.submit_workflow,
@@ -245,10 +276,9 @@ class Broker:
                             available_workers=available_workers,
                             number_of_workers=self.number_of_workers,
                         )
-                        [
-                            self.submit_request(session=session)
-                            for _ in range(available_workers)
-                        ]
+                        self.submit_requests(
+                            session=session, number_of_requests=available_workers
+                        )
                     elif available_workers == 0:
                         logger.info(
                             "broker info",

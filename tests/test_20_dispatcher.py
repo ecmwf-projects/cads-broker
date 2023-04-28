@@ -34,7 +34,7 @@ def test_broker_update_database(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
     environment = Environment.Environment()
-    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment)
+    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment, rules_hash="")
     broker = dispatcher.Broker(
         client=CLIENT,
         environment=environment,
@@ -74,7 +74,7 @@ def test_broker_update_database(
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == successful_uid
         )
-        assert session.scalars(statement).first().status == "successful"
+        assert session.scalars(statement).first().status == "running"
 
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == queued_in_dask_uid
@@ -86,7 +86,7 @@ def test_broker_fetch_dask_task_status(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
     environment = Environment.Environment()
-    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment)
+    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment, rules_hash="")
     broker = dispatcher.Broker(
         client=CLIENT, environment=environment, qos=qos, session_maker=session_obj
     )
