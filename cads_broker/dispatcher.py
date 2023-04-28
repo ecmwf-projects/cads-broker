@@ -100,7 +100,6 @@ class QoSRules:
             lambda context, *args: db.count_finished_requests_per_user(
                 user_uid=context.request.user_uid,
                 last_hours=args[0],
-                session=context.session,
             ),
         )
 

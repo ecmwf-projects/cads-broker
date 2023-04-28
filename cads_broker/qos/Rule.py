@@ -9,10 +9,9 @@
 
 
 class Context:
-    def __init__(self, request, environment, session=None):
+    def __init__(self, request, environment):
         self.request = request
         self.environment = environment
-        self.session = session
 
 
 class QoSRule:
@@ -39,11 +38,11 @@ class QoSRule:
         self.condition = condition
         self.conclusion = conclusion
 
-    def evaluate(self, request, session=None):
-        return self.conclusion.evaluate(Context(request, self.environment, session=session))
+    def evaluate(self, request):
+        return self.conclusion.evaluate(Context(request, self.environment))
 
-    def match(self, request, session=None):
-        return self.condition.evaluate(Context(request, self.environment, session=session))
+    def match(self, request):
+        return self.condition.evaluate(Context(request, self.environment))
 
     def dump(self, out):
         out(self)
@@ -117,13 +116,13 @@ class Limit(QoSRule):
         if self.value > 0:
             self.value -= 1
 
-    def capacity(self, request, session):
-        return self.evaluate(request, session=session)
+    def capacity(self, request):
+        return self.evaluate(request)
 
-    def full(self, request, session):
+    def full(self, request):
         # NOTE: the self.value can be greater than the limit capacity after a
         # reconfiguration of the QoS
-        return self.value >= self.capacity(request, session=session)
+        return self.value >= self.capacity(request)
 
 
 class GlobalLimit(Limit):

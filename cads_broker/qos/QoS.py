@@ -107,9 +107,7 @@ class QoS:
     def can_run(self, request, session):
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
-        limits_constraint = not any(
-            limit.full(request, session=session) for limit in properties.limits
-        )
+        limits_constraint = not any(limit.full(request) for limit in properties.limits)
         permissions_contraint = and_func(
             [permission.evaluate(request) for permission in properties.permissions]
         )
@@ -131,7 +129,7 @@ class QoS:
 
         # First check permissions
         for rule in self.rules.permissions:
-            if rule.match(request, session=session):
+            if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
                     database.set_request_status(
@@ -146,7 +144,7 @@ class QoS:
 
         # Add general limits
         for rule in self.rules.global_limits:
-            if rule.match(request, session=session):
+            if rule.match(request):
                 properties.limits.append(rule)
 
         # Add per-user limits
@@ -157,7 +155,7 @@ class QoS:
         # Add priorities and compute starting priority
         priority = 0
         for rule in self.rules.priorities:
-            if rule.match(request, session=session):
+            if rule.match(request):
                 properties.priorities.append(rule)
                 priority += rule.evaluate(request)
 
@@ -203,8 +201,8 @@ class QoS:
                 "    {} ({}/{}) {}".format(
                     limit,
                     limit.value,
-                    limit.capacity(request, session=session),
-                    "** FULL **" if limit.full(request, session=session) else "-",
+                    limit.capacity(request),
+                    "** FULL **" if limit.full(request) else "-",
                 )
             )
 
