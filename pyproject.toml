@@ -17,7 +17,7 @@ dependencies = [
   "cacholote",
   "distributed",
   "minio",
-  "sqlalchemy",
+  "sqlalchemy>=2.0.9",
   "sqlalchemy-utils",
   "typer"
 ]
@@ -34,7 +34,7 @@ broker = "cads_broker.entry_points:main"
 branch = true
 
 [tool.mypy]
-plugins = "sqlmypy"
+plugins = "sqlalchemy.ext.mypy.plugin"
 strict = true
 
 [tool.pytest.ini_options]

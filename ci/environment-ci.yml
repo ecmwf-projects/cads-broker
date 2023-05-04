@@ -15,8 +15,8 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - pip
 - pytest-mock
-- sqlalchemy-stubs
 - pip:
   - git+https://github.com/ecmwf-projects/cacholote.git
   - pytest-postgresql
+  - sqlalchemy[mypy]
   - types-sqlalchemy-utils

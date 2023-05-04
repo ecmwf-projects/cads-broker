@@ -17,7 +17,7 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     )
     engine = sa.create_engine(connection_string)
     conn = engine.connect()
-    query = (
+    query = sa.text(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
     object_storage_url = "http://myobject-storage:myport/"
