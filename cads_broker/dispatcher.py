@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, expressions, config, metrics
+from cads_broker import Environment, config, expressions, metrics
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -229,7 +229,6 @@ class Broker:
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
     ) -> None:
-
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -266,7 +265,9 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_accepted_requests(session=session)
+                number_accepted_requests = db.count_requests(
+                    session=session, status="accepted"
+                )
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:

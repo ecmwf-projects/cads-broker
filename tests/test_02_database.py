@@ -14,10 +14,11 @@ from cads_broker import database as db
 
 
 def mock_system_request(
-    status: str = "accepted",
+    status: str | None = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
     process_id: str | None = None,
+    user_uid: str | None = None,
     cache_id: int | None = None,
     request_body: dict | None = None,
 ) -> db.SystemRequest:
@@ -26,6 +27,7 @@ def mock_system_request(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
         status=status,
+        user_uid=user_uid,
         created_at=created_at,
         started_at=None,
         cache_id=cache_id,
@@ -70,17 +72,29 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
         )
 
 
-def test_count_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
-    process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
-    request2 = mock_system_request(status="accepted")
+def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
+    process_id1 = "reanalysis-era5-pressure-levels"
+    process_id2 = "reanalysis-era5-single-levels"
+    user_uid1 = str(uuid.uuid4())
+    user_uid2 = str(uuid.uuid4())
+    request1 = mock_system_request(process_id=process_id1, user_uid=user_uid1)
+    request2 = mock_system_request(process_id=process_id2, user_uid=user_uid2)
+    request3 = mock_system_request(
+        status="running", process_id=process_id2, user_uid=user_uid2
+    )
 
     with session_obj() as session:
         session.add(request1)
         session.add(request2)
+        session.add(request3)
         session.commit()
-        assert 2 == db.count_accepted_requests(session=session)
-        assert 1 == db.count_accepted_requests(session=session, process_id=process_id)
+        assert 3 == db.count_requests(session=session)
+        assert 1 == db.count_requests(session=session, process_id=process_id1)
+        assert 2 == db.count_requests(session=session, status="accepted")
+        assert 2 == db.count_requests(session=session, user_uid=user_uid2)
+        assert 1 == db.count_requests(
+            session=session, status="accepted", user_uid=user_uid2
+        )
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
