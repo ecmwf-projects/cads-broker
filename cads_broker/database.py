@@ -143,15 +143,21 @@ def count_finished_requests_per_user(
         return ret_value
 
 
-def count_accepted_requests(
+def count_requests(
     session: sa.orm.Session,
+    status: str | None = None,
     process_id: str | None = None,
+    user_uid: str | None = None,
 ) -> int:
-    """Count all accepted requests."""
-    statement = sa.select(sa.func.count()).select_from(SystemRequest).filter(SystemRequest.status == "accepted")
+    """Count requests."""
+    statement = session.query(SystemRequest)
+    if status is not None:
+        statement = statement.filter(SystemRequest.status == status)
     if process_id is not None:
         statement = statement.filter(SystemRequest.process_id == process_id)
-    return session.scalar(statement)
+    if user_uid is not None:
+        statement = statement.filter(SystemRequest.user_uid == user_uid)
+    return statement.count()
 
 
 def set_request_status(
@@ -286,7 +292,9 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         structure_exists = False
     else:
         conn = engine.connect()
-        query = sa.text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+        query = sa.text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        )
 
         if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
             structure_exists = False
