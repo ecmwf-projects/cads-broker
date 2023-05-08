@@ -191,13 +191,15 @@ class Broker:
                 logger_kwargs["result"] = request.cache_entry.result
                 metrics.increase_bytes_counter(result=request.cache_entry.result)
             elif future.status == "error":
+                exception = future.exception()
                 request = db.set_request_status(
                     future.key,
                     job_status,
-                    traceback="".join(traceback.format_exception(future.exception())),
+                    traceback="".join(traceback.format_exception(exception)),
                     session=session,
                 )
-                logger_kwargs["traceback"] = request.response_traceback
+                logger_kwargs["error_message"] = request.response_traceback
+                logger_kwargs["error_reason"] = traceback.format_exception_only(exception)[0]
             else:
                 request = db.set_request_status(
                     future.key,
