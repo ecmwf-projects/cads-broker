@@ -43,7 +43,8 @@ class SystemRequest(BaseModel):
     cache_id = sa.Column(sa.Integer)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
-    response_traceback = sa.Column(JSONB)
+    response_error_message = sa.Column(JSONB)
+    response_error_reason = sa.Column(JSONB)
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
     started_at = sa.Column(sa.TIMESTAMP)
@@ -282,7 +283,7 @@ def set_request_status(
     status: str,
     session: sa.orm.Session,
     cache_id: int | None = None,
-    traceback: str | None = None,
+    error_message: str | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -292,7 +293,7 @@ def set_request_status(
         request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
-        request.response_traceback = traceback
+        request.response_error_message = error_message
     elif status == "running":
         request.started_at = sa.func.now()
     request.status = status

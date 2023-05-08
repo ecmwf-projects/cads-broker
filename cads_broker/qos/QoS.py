@@ -136,7 +136,7 @@ class QoS:
                         request_uid=request.request_uid,
                         status="failed",
                         session=session,
-                        traceback=rule.info.evaluate(
+                        error_message=rule.info.evaluate(
                             Context(request, self.environment)
                         ),
                     )
