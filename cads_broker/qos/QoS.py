@@ -139,6 +139,7 @@ class QoS:
                         error_message=rule.info.evaluate(
                             Context(request, self.environment)
                         ),
+                        error_reason="Permission error."
                     )
                     break
 

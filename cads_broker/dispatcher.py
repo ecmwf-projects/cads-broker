@@ -196,10 +196,10 @@ class Broker:
                     future.key,
                     job_status,
                     error_message="".join(traceback.format_exception(exception)),
+                    error_reason=traceback.format_exception_only(exception)[0],
                     session=session,
                 )
-                logger_kwargs["error_message"] = request.response_error_message
-                logger_kwargs["error_reason"] = traceback.format_exception_only(exception)[0]
+                logger_kwargs.update(**dict(request.response_error))
             else:
                 request = db.set_request_status(
                     future.key,
