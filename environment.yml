@@ -17,7 +17,7 @@ dependencies:
 - psycopg
 - psycopg2
 - pydantic
-- sqlalchemy==1.4*
+- sqlalchemy>=2.0.9
 - sqlalchemy-utils
 - structlog
 - tornado==6.1

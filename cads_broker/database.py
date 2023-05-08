@@ -33,7 +33,7 @@ class SystemRequest(BaseModel):
 
     request_id = sa.Column(sa.Integer, primary_key=True)
     request_uid = sa.Column(
-        sa.dialects.postgresql.UUID(),
+        sa.dialects.postgresql.UUID(False),
         index=True,
         unique=True,
     )
@@ -112,14 +112,51 @@ def get_accepted_requests(
     return session.scalars(statement).all()
 
 
-def count_accepted_requests(
+def count_finished_requests_per_user_in_session(
+    user_uid: str,
     session: sa.orm.Session,
-    process_id: str | None = None,
+    last_hours: int | None = None,
 ) -> int:
-    """Count all accepted requests."""
-    statement = session.query(SystemRequest).filter(SystemRequest.status == "accepted")
+    """Count running requests for user_uid."""
+    statement = (
+        session.query(SystemRequest)
+        .where(SystemRequest.user_uid == user_uid)
+        .where(SystemRequest.status.in_(("successful", "failed")))
+    )
+    if last_hours is not None:
+        finished_at = datetime.datetime.now() - datetime.timedelta(hours=last_hours)
+        statement = statement.where(SystemRequest.finished_at >= finished_at)
+    return statement.count()
+
+
+def count_finished_requests_per_user(
+    user_uid: str,
+    last_hours: int | None = None,
+    session_maker: sa.orm.Session = None,
+) -> int:
+    """Count running requests for user_uid."""
+    session_maker = ensure_session_obj(session_maker)
+    with session_maker() as session:
+        ret_value = count_finished_requests_per_user_in_session(
+            user_uid=user_uid, last_hours=last_hours, session=session
+        )
+        return ret_value
+
+
+def count_requests(
+    session: sa.orm.Session,
+    status: str | None = None,
+    process_id: str | None = None,
+    user_uid: str | None = None,
+) -> int:
+    """Count requests."""
+    statement = session.query(SystemRequest)
+    if status is not None:
+        statement = statement.filter(SystemRequest.status == status)
     if process_id is not None:
         statement = statement.filter(SystemRequest.process_id == process_id)
+    if user_uid is not None:
+        statement = statement.filter(SystemRequest.user_uid == user_uid)
     return statement.count()
 
 
@@ -372,7 +409,10 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         structure_exists = False
     else:
         conn = engine.connect()
-        query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        query = sa.text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        )
+
         if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
             structure_exists = False
     if not structure_exists or force:
