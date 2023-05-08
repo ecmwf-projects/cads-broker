@@ -150,14 +150,16 @@ class Broker:
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
+        requeue_counter = 0
         if request_uid in self.futures:
-            return DASK_STATUS_TO_STATUS[self.futures[request_uid].status]
+            return requeue_counter, DASK_STATUS_TO_STATUS[self.futures[request_uid].status]
         # check if the task is in the scheduler
         elif request_uid in (tasks := get_tasks(self.client)):
-            return tasks.get(request_uid)
+            return requeue_counter, tasks.get(request_uid)
         # if request is not in the dask scheduler, re-queue it
         else:
-            return "accepted"
+            requeue_counter = 1
+            return requeue_counter, "accepted"
 
     def update_database(self, session: sa.orm.Session) -> None:
         """Update the database with the current status of the dask tasks.
@@ -168,7 +170,8 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            status = self.fetch_dask_task_status(request.request_uid)
+            requeue_counter, status = self.fetch_dask_task_status(request.request_uid)
+            request.requeue_counter += requeue_counter
             if status in ("successful", "failed"):
                 # status successful or failed must be set by on_future_done method
                 request.status = "running"
@@ -188,7 +191,6 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                logger_kwargs["result"] = request.cache_entry.result
                 metrics.increase_bytes_counter(result=request.cache_entry.result)
             elif future.status == "error":
                 exception = future.exception()
@@ -199,7 +201,6 @@ class Broker:
                     error_reason=traceback.format_exception_only(exception)[0],
                     session=session,
                 )
-                logger_kwargs.update(**dict(request.response_error))
             else:
                 request = db.set_request_status(
                     future.key,

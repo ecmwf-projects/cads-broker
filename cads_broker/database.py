@@ -43,12 +43,13 @@ class SystemRequest(BaseModel):
     cache_id = sa.Column(sa.Integer)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
-    response_error = sa.Column(JSONB)
+    response_error = sa.Column(JSONB, default={})
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
+    requeue_counter = sa.Column(sa.Integer, default=0)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -307,6 +308,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "job_id": request.request_uid,
         "user_uid": request.user_uid,
         "status": request.status,
+        "result": request.cache_entry.get("result", None),
         "created_at": request.created_at.isoformat(),
         "updated_at": request.updated_at.isoformat(),
         "started_at": request.started_at.isoformat()
@@ -318,6 +320,8 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
+        "requeue_counter": request.requeue_counter,
+        **request.error,
     }
     return kwargs
 
