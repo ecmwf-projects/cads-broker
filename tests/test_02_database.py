@@ -1,6 +1,7 @@
 import datetime
 import random
 import uuid
+from collections import defaultdict
 from typing import Any
 
 import cacholote
@@ -42,6 +43,13 @@ def mock_cache_entry() -> db.SystemRequest:
         result={"href": "", "args": [1, 2]},
     )
     return cache_entry
+
+
+def response_as_dict(response: list[tuple]) -> dict:
+    result = defaultdict(dict)
+    for process_id, status, count in response:
+        result[process_id][status] = count
+    return result
 
 
 def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
@@ -95,6 +103,189 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         assert 1 == db.count_requests(
             session=session, status="accepted", user_uid=user_uid2
         )
+
+
+def test_count_requests_per_dataset_status(session_obj: sa.orm.sessionmaker) -> None:
+    process_id_era5 = "reanalysis-era5-pressure-levels"
+    process_id_dummy = "dummy-dataset"
+    request1 = mock_system_request(status="accepted", process_id=process_id_era5)
+    request2 = mock_system_request(status="accepted", process_id=process_id_era5)
+    request3 = mock_system_request(status="accepted", process_id=process_id_dummy)
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.commit()
+        response = db.count_requests_per_dataset_status(session=session)
+        assert 2 == len(response)
+        if response[0][0] == process_id_era5:
+            assert response[0][2] == 2
+        elif response[0][0] == process_id_dummy:
+            assert response[0][2] == 1
+        if response[1][0] == process_id_era5:
+            assert response[1][2] == 2
+        elif response[1][0] == process_id_dummy:
+            assert response[1][2] == 1
+
+
+def test_count_last_day_requests_per_dataset_status(
+    session_obj: sa.orm.sessionmaker,
+) -> None:
+    process_id_era5 = "reanalysis-era5-pressure-levels"
+    process_id_dummy = "dummy-dataset"
+    request1 = mock_system_request(status="failed", process_id=process_id_era5)
+    request2 = mock_system_request(status="failed", process_id=process_id_era5)
+    request3 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request4 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request4.created_at = datetime.datetime(2020, 1, 1)
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.add(request4)
+        session.commit()
+        response = db.count_last_day_requests_per_dataset_status(session=session)
+    assert 2 == len(response)
+    result = response_as_dict(response)
+    assert result[process_id_era5]["failed"] == 2
+    assert result[process_id_dummy]["successful"] == 1
+
+
+def test_total_request_time_per_dataset_status(
+    session_obj: sa.orm.sessionmaker,
+) -> None:
+    process_id_era5 = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="successful", process_id=process_id_era5)
+    # entry not counted (created before yesterday)
+    request1.created_at = datetime.datetime(2020, 1, 1)
+    request1.started_at = datetime.datetime(2023, 1, 1)
+    request1.finished_at = datetime.datetime(2023, 1, 2)
+    request2 = mock_system_request(status="successful", process_id=process_id_era5)
+    request2.started_at = datetime.datetime(2023, 1, 1)
+    request2.finished_at = datetime.datetime(2023, 1, 2)
+
+    process_id_dummy = "dummy-dataset"
+    request3 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request3.started_at = datetime.datetime(2023, 1, 1)
+    request3.finished_at = datetime.datetime(2023, 1, 2)
+    request4 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request4.started_at = datetime.datetime(2023, 2, 1)
+    request4.finished_at = datetime.datetime(2023, 2, 2)
+    request5 = mock_system_request(status="failed", process_id=process_id_dummy)
+    request5.started_at = datetime.datetime(2023, 1, 1)
+    request5.finished_at = datetime.datetime(2023, 1, 2)
+
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.add(request4)
+        session.add(request5)
+        session.commit()
+        response = db.total_request_time_per_dataset_status(session=session)
+    assert 3 == len(response)
+    result = response_as_dict(response)
+    assert result[process_id_era5]["successful"] == datetime.timedelta(days=1)
+    assert result[process_id_dummy]["successful"] == datetime.timedelta(days=2)
+    assert result[process_id_dummy]["failed"] == datetime.timedelta(days=1)
+
+
+def test_count_active_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="successful", process_id=process_id)
+    request2.user_uid = "aaa"
+    request3 = mock_system_request(status="running", process_id=process_id)
+    request3.user_uid = "bbb"
+    request4 = mock_system_request(status="failed", process_id=process_id)
+    # third user is inactive
+    request4.user_uid = "ccc"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.add(request4)
+        session.commit()
+        response = db.count_active_users(session=session)
+    assert 1 == len(response)
+    assert 2 == response[0][1]
+
+
+def test_count_queued_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="running", process_id=process_id)
+    request2.user_uid = "bbb"
+    request3 = mock_system_request(status="accepted", process_id=process_id)
+    request3.user_uid = "ccc"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.commit()
+        response = db.count_queued_users(session=session)
+        assert 1 == len(response)
+        assert 2 == response[0][1]
+
+
+def test_count_waiting_users_behind_themselves(
+    session_obj: sa.orm.sessionmaker,
+) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    process_id_dummy = "process_id_dummy"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="running", process_id=process_id)
+    request2.user_uid = "aaa"
+    request3 = mock_system_request(status="accepted", process_id=process_id)
+    request3.user_uid = "bbb"
+    request4 = mock_system_request(status="accepted", process_id=process_id_dummy)
+    request4.user_uid = "bbb"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.add(request4)
+        session.commit()
+        response = db.count_waiting_users_queued_behind_themselves(session=session)
+        assert 1 == len(response)
+        # user bbb is not queued behind himself
+        assert 1 == response[0][1]
+
+
+def test_count_waiting_users_queued(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="successful", process_id=process_id)
+    request2.user_uid = "aaa"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.commit()
+        response = db.count_waiting_users_queued(session=session)
+        assert 1 == len(response)
+        assert 1 == response[0][1]
+
+
+def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
+    process_id = "reanalysis-era5-pressure-levels"
+    request1 = mock_system_request(status="running", process_id=process_id)
+    request1.user_uid = "aaa"
+    request2 = mock_system_request(status="running", process_id=process_id)
+    request2.user_uid = "bbb"
+    request3 = mock_system_request(status="accepted", process_id=process_id)
+    request3.user_uid = "ccc"
+    with session_obj() as session:
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.commit()
+        response = db.count_running_users(session=session)
+        assert 1 == len(response)
+        assert 2 == response[0][1]
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
@@ -197,8 +388,8 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
     with session_obj() as session:
         request = db.get_request(request_uid, session)
-    with pytest.raises(db.NoResultFound):
-        request = db.get_request(str(uuid.uuid4()), session)
+        with pytest.raises(db.NoResultFound):
+            request = db.get_request(str(uuid.uuid4()), session)
     assert request.request_uid == request_uid
 
 
@@ -265,6 +456,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     with session_obj() as session:
         requests = db.get_accepted_requests(session=session)
     assert len(requests) == 0
+    conn.close()
 
 
 def test_ensure_session_obj(

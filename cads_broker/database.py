@@ -160,6 +160,123 @@ def count_requests(
     return statement.count()
 
 
+def count_requests_per_dataset_status(
+    session: sa.orm.Session,
+) -> list:
+    """Count request by dataset and status (status that change over time)."""
+    return session.execute(
+        sa.select(SystemRequest.process_id, SystemRequest.status, sa.func.count())
+        .where(SystemRequest.status.in_(("accepted", "running")))
+        .group_by(SystemRequest.status, SystemRequest.process_id)
+    ).all()
+
+
+def count_last_day_requests_per_dataset_status(session: sa.orm.Session) -> list:
+    """Count last day requests by dataset and status (permanent status)."""
+    return session.execute(
+        sa.select(SystemRequest.process_id, SystemRequest.status, sa.func.count())
+        .where(
+            SystemRequest.created_at
+            > (datetime.datetime.now() - datetime.timedelta(days=1))
+        )
+        .where(SystemRequest.status.in_(("failed", "successful", "dismissed")))
+        .group_by(SystemRequest.status, SystemRequest.process_id)
+    ).all()
+
+
+def total_request_time_per_dataset_status(
+    session: sa.orm.Session,
+) -> list:
+    return session.execute(
+        sa.select(
+            SystemRequest.process_id,
+            SystemRequest.status,
+            sa.func.sum(SystemRequest.finished_at - SystemRequest.started_at),
+        )
+        .filter(
+            SystemRequest.created_at
+            > (datetime.datetime.now() - datetime.timedelta(days=1)),
+            SystemRequest.started_at.isnot(None),
+            SystemRequest.finished_at.isnot(None),
+        )
+        .group_by(SystemRequest.process_id, SystemRequest.status)
+    ).all()
+
+
+def count_active_users(session: sa.orm.Session) -> list:
+    """Users which have requests with status running or accepted, per dataset."""
+    return session.execute(
+        sa.select(
+            SystemRequest.process_id, sa.func.count(sa.distinct(SystemRequest.user_uid))
+        )
+        .filter(SystemRequest.status.in_(("running", "accepted")))
+        .group_by(SystemRequest.process_id)
+    ).all()
+
+
+def count_queued_users(session: sa.orm.Session) -> list:
+    """Users that have requests with status accepted, per dataset."""
+    return session.execute(
+        sa.select(
+            SystemRequest.process_id, sa.func.count(sa.distinct(SystemRequest.user_uid))
+        )
+        .filter(SystemRequest.status == "accepted")
+        .group_by(SystemRequest.process_id)
+    ).all()
+
+
+def count_waiting_users_queued_behind_themselves(session: sa.orm.Session) -> list:
+    """Users that have at least an accepted and a running request, per dataset."""
+    sr1 = sa.orm.aliased(SystemRequest)
+    sr2 = sa.orm.aliased(SystemRequest)
+
+    subq = (
+        sa.select(sr1.process_id, sr1.user_uid)
+        .join(sr2, (sr1.user_uid == sr2.user_uid) & (sr1.process_id == sr2.process_id))
+        .filter(sr1.status == "accepted", sr2.status == "running")
+        .group_by(sr1.process_id, sr1.user_uid)
+        .subquery()
+    )
+
+    # count the number of user_uid values from the subquery and per dataset
+    return session.execute(
+        sa.select(subq.c.process_id, sa.func.count(subq.c.user_uid)).group_by(
+            subq.c.process_id
+        )
+    ).all()
+
+
+def count_waiting_users_queued(session: sa.orm.Session):
+    """Users that only have accepted requests (not running requests), per dataset."""
+    subquery = (
+        sa.select(
+            SystemRequest.process_id,
+            SystemRequest.user_uid,
+            sa.func.array_agg(sa.distinct(SystemRequest.status)).label("in_status"),
+        )
+        .group_by(SystemRequest.process_id, SystemRequest.user_uid)
+        .subquery()
+    )
+
+    return session.execute(
+        sa.select(subquery.c.process_id, sa.func.count().label("count"))
+        .where(sa.all_(subquery.c.in_status) != "running")
+        .where(sa.any_(subquery.c.in_status) == "accepted")
+        .group_by(subquery.c.process_id)
+    ).all()
+
+
+def count_running_users(session: sa.orm.Session) -> list:
+    """Users that have running requests, per dataset."""
+    return session.execute(
+        sa.select(
+            SystemRequest.process_id, sa.func.count(sa.distinct(SystemRequest.user_uid))
+        )
+        .filter(SystemRequest.status == "running")
+        .group_by(SystemRequest.process_id)
+    ).all()
+
+
 def set_request_status(
     request_uid: str,
     status: str,
@@ -302,4 +419,5 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
+    conn.close()
     return engine
