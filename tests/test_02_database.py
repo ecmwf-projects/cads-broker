@@ -388,8 +388,8 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
     with session_obj() as session:
         request = db.get_request(request_uid, session)
-    with pytest.raises(db.NoResultFound):
-        request = db.get_request(str(uuid.uuid4()), session)
+        with pytest.raises(db.NoResultFound):
+            request = db.get_request(str(uuid.uuid4()), session)
     assert request.request_uid == request_uid
 
 
@@ -456,6 +456,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     with session_obj() as session:
         requests = db.get_accepted_requests(session=session)
     assert len(requests) == 0
+    conn.close()
 
 
 def test_ensure_session_obj(

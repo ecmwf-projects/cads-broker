@@ -419,4 +419,5 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
+    conn.close()
     return engine
