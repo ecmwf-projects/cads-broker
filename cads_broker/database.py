@@ -308,7 +308,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "job_id": request.request_uid,
         "user_uid": request.user_uid,
         "status": request.status,
-        "result": request.cache_entry.get("result", None),
+        "result": request.cache_entry.get("result", None) if request.cache_entry else None,
         "created_at": request.created_at.isoformat(),
         "updated_at": request.updated_at.isoformat(),
         "started_at": request.started_at.isoformat()
@@ -321,7 +321,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "user_request": True,
         "process_id": request.process_id,
         "requeue_counter": request.requeue_counter,
-        **request.error,
+        **request.response_error,
     }
     return kwargs
 
