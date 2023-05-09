@@ -370,6 +370,20 @@ def get_request(
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
+async def get_request_async(
+    request_uid: str,
+    session: sa.orm.Session,
+) -> SystemRequest:
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    try:
+        result = await session.execute(statement)
+        request = result.scalars().one()
+        return request
+    except sqlalchemy.orm.exc.NoResultFound:
+        logger.exception("get_request failed")
+        raise NoResultFound(f"No request found with request_uid {request_uid}")
+
+
 def get_request_result(
     request_uid: str,
     session: sa.orm.Session,
