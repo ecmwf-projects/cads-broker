@@ -150,16 +150,19 @@ class Broker:
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
-        requeue_counter = 0
+        resubmit_number = 0
         if request_uid in self.futures:
-            return requeue_counter, DASK_STATUS_TO_STATUS[self.futures[request_uid].status]
+            return (
+                resubmit_number,
+                DASK_STATUS_TO_STATUS[self.futures[request_uid].status],
+            )
         # check if the task is in the scheduler
         elif request_uid in (tasks := get_tasks(self.client)):
-            return requeue_counter, tasks.get(request_uid)
+            return resubmit_number, tasks.get(request_uid)
         # if request is not in the dask scheduler, re-queue it
         else:
-            requeue_counter = 1
-            return requeue_counter, "accepted"
+            resubmit_number = 1
+            return resubmit_number, "accepted"
 
     def update_database(self, session: sa.orm.Session) -> None:
         """Update the database with the current status of the dask tasks.
@@ -170,8 +173,10 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            requeue_counter, status = self.fetch_dask_task_status(request.request_uid)
-            request.requeue_counter += requeue_counter
+            resubmit_number, status = self.fetch_dask_task_status(request.request_uid)
+            request.request_metadata["resubmit_number"] = (
+                request.request_metadata.get("resubmit_number", 0) + resubmit_number
+            )
             if status in ("successful", "failed"):
                 # status successful or failed must be set by on_future_done method
                 request.status = "running"

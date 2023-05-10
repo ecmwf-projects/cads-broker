@@ -49,7 +49,7 @@ class SystemRequest(BaseModel):
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
-    requeue_counter = sa.Column(sa.Integer, default=0)
+    origin = sa.Column(sa.Text, default="ui")
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -320,7 +320,9 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
-        "requeue_counter": request.requeue_counter,
+        "resubmit_number": request.request_metadata.get("resubmit_number", 0),
+        "origin": request.origin,
+        "entry_point": request.request_body.get("entry_point", None),
         **request.response_error,
     }
     return kwargs
@@ -335,6 +337,7 @@ def create_request(
     process_id: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
+    origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
@@ -350,6 +353,7 @@ def create_request(
             "kwargs": kwargs,
         },
         request_metadata=metadata,
+        origin=origin,
     )
     session.add(request)
     session.commit()
