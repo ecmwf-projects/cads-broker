@@ -12,6 +12,7 @@ dependencies:
 - cachetools
 - dask-core==2022.11.1
 - distributed==2022.11.1
+- lz4  # dask distributed needs this to compress / de-compress
 - minio
 - postgresql
 - psycopg
