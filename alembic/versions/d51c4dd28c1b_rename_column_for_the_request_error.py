@@ -19,7 +19,7 @@ def upgrade() -> None:
     op.alter_column(
         "system_requests",
         "response_traceback",
-        server_default=sa.text("{}"),
+        server_default=sa.text("'{}'"),
         new_column_name="response_error",
     )
     op.execute(

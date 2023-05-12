@@ -426,7 +426,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.create_all(engine)
     else:
         # update db structure
-        migration_directory = os.path.dirname(__file__)
+        migration_directory = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
         os.chdir(migration_directory)
         alembic_args = [
             "--raiseerr",
