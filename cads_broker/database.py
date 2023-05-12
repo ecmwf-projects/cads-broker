@@ -412,7 +412,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     Make sure the db located at URI `connection_string` exists updated and return the engine object.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    force: if True, drop the database structure and build again from scratch
+    :param force: if True, drop the database structure and build again from scratch
     """
     engine = sa.create_engine(connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
@@ -426,12 +426,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.create_all(engine)
     else:
         # update db structure
-        migration_directory = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
-        os.chdir(migration_directory)
-        alembic_args = [
-            "--raiseerr",
-            "upgrade",
-            "head",
-        ]
-        alembic.config.main(argv=alembic_args)
+        alembic_ini_path = os.path.abspath(os.path.join(__file__, "..", "..", "alembic.ini"))
+        alembic_cfg = alembic.config.Config(alembic_ini_path)
+        alembic.command.upgrade(alembic_cfg, 'head')
     return engine
