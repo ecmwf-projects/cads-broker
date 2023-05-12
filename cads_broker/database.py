@@ -1,8 +1,10 @@
 """SQLAlchemy ORM model."""
 import datetime
+import os
 import uuid
 from typing import Any
 
+import alembic.config
 import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
@@ -407,26 +409,29 @@ def delete_request(
 
 def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
     """
-    Initialize the database located at URI `connection_string` and return the engine object.
+    Make sure the db located at URI `connection_string` exists updated and return the engine object.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    force: if True, drop the database structure and build again from scratch
     """
-    structure_exists = True
     engine = sa.create_engine(connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
-        structure_exists = False
-    else:
-        conn = engine.connect()
-        query = sa.text(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
-        )
-
-        if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
-            structure_exists = False
-    if not structure_exists or force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
-    conn.close()
+    elif force:
+        # cleanup and create the schema
+        BaseModel.metadata.drop_all(engine)
+        BaseModel.metadata.create_all(engine)
+    else:
+        # update db structure
+        migration_directory = os.path.dirname(__file__)
+        os.chdir(migration_directory)
+        alembic_args = [
+            "--raiseerr",
+            "upgrade",
+            "head",
+        ]
+        alembic.config.main(argv=alembic_args)
     return engine

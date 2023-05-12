@@ -13,6 +13,7 @@ classifiers = [
   "Topic :: Scientific/Engineering"
 ]
 dependencies = [
+  "alembic",
   "attrs",
   "cacholote",
   "distributed",
