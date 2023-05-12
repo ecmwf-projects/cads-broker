@@ -426,7 +426,12 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.create_all(engine)
     else:
         # update db structure
-        alembic_ini_path = os.path.abspath(os.path.join(__file__, "..", "..", "alembic.ini"))
-        alembic_cfg = alembic.config.Config(alembic_ini_path)
-        alembic.command.upgrade(alembic_cfg, 'head')
+        migration_directory = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
+        os.chdir(migration_directory)
+        alembic_args = [
+            "--raiseerr",
+            "upgrade",
+            "head",
+        ]
+        alembic.config.main(argv=alembic_args)
     return engine
