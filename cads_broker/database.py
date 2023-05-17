@@ -300,6 +300,7 @@ def set_request_status(
     return request
 
 
+# FIXME: find a way to have only one function for async and sync
 async def set_request_status_async(
     request_uid: str,
     status: str,
