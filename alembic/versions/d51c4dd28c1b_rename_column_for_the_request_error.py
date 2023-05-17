@@ -5,8 +5,9 @@ Revises:
 Create Date: 2023-05-12 10:52:11.114619
 
 """
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "d51c4dd28c1b"
@@ -22,9 +23,11 @@ def upgrade() -> None:
         server_default=sa.text("'{}'"),
         new_column_name="response_error",
     )
+    op.add_column("system_requests", sa.Column("origin", sa.Text, default="ui"))
     op.execute(
         "UPDATE system_requests SET response_error='{}' WHERE response_error IS NULL"
     )
+    op.execute("UPDATE system_requests SET origin='ui'")
 
 
 def downgrade() -> None:
@@ -34,3 +37,4 @@ def downgrade() -> None:
         server_default=None,
         new_column_name="response_traceback",
     )
+    op.drop_column("system_requests", "origin")
