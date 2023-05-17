@@ -277,30 +277,7 @@ def count_running_users(session: sa.orm.Session) -> list:
     ).all()
 
 
-def set_request_status(
-    request_uid: str,
-    status: str,
-    session: sa.orm.Session,
-    cache_id: int | None = None,
-    traceback: str | None = None,
-) -> SystemRequest:
-    """Set the status of a request."""
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    request = session.scalars(statement).one()
-    if status == "successful":
-        request.finished_at = sa.func.now()
-        request.cache_id = cache_id
-    elif status == "failed":
-        request.finished_at = sa.func.now()
-        request.response_traceback = traceback
-    elif status == "running":
-        request.started_at = sa.func.now()
-    request.status = status
-    session.commit()
-    return request
-
-
-async def set_request_status_async(
+async def set_request_status(
     request_uid: str,
     status: str,
     session: sa.orm.Session,
@@ -345,42 +322,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     return kwargs
 
 
-def create_request(
-    session: sa.orm.Session,
-    user_uid: str,
-    setup_code: str,
-    entry_point: str,
-    kwargs: dict[str, Any],
-    process_id: str,
-    metadata: dict[str, Any] = {},
-    resources: dict[str, Any] = {},
-    request_uid: str | None = None,
-) -> dict[str, Any]:
-    """Temporary function to create a request."""
-    metadata["resources"] = resources
-    request = SystemRequest(
-        request_uid=request_uid or str(uuid.uuid4()),
-        process_id=process_id,
-        user_uid=user_uid,
-        status="accepted",
-        request_body={
-            "setup_code": setup_code,
-            "entry_point": entry_point,
-            "kwargs": kwargs,
-        },
-        request_metadata=metadata,
-    )
-    session.add(request)
-    session.commit()
-    logger.info("accepted job", **logger_kwargs(request=request))
-    ret_value = {
-        column.key: getattr(request, column.key)
-        for column in sa.inspect(request).mapper.column_attrs
-    }
-    return ret_value
-
-
-async def create_request_async(
+async def create_request(
     session: sa.orm.Session,
     user_uid: str,
     setup_code: str,
@@ -416,21 +358,7 @@ async def create_request_async(
     return ret_value
 
 
-def get_request(
-    request_uid: str,
-    session: sa.orm.Session,
-) -> SystemRequest:
-    try:
-        statement = sa.select(SystemRequest).where(
-            SystemRequest.request_uid == request_uid
-        )
-        return session.scalars(statement).one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        logger.exception("get_request failed")
-        raise NoResultFound(f"No request found with request_uid {request_uid}")
-
-
-async def get_request_async(
+async def get_request(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
@@ -444,11 +372,11 @@ async def get_request_async(
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
-def get_request_result(
+async def get_request_result(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    request = get_request(request_uid, session)
+    request = await get_request(request_uid, session)
     logger.info(
         "result accessed",
         user_uid=request.user_uid,
@@ -459,40 +387,14 @@ def get_request_result(
     return request.cache_entry.result
 
 
-async def get_request_result_async(
+async def delete_request(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    request = await get_request_async(request_uid, session)
-    logger.info(
-        "result accessed",
-        user_uid=request.user_uid,
-        job_id=request.request_uid,
-        process_id=request.process_id,
-        status=request.status,
-    )
-    return request.cache_entry.result
-
-
-def delete_request(
-    request_uid: str,
-    session: sa.orm.Session,
-) -> SystemRequest:
-    set_request_status(request_uid=request_uid, status="dismissed", session=session)
-    request = get_request(request_uid, session)
-    session.delete(request)
-    session.commit()
-    return request
-
-
-async def delete_request_async(
-    request_uid: str,
-    session: sa.orm.Session,
-) -> SystemRequest:
-    await set_request_status_async(
+    await set_request_status(
         request_uid=request_uid, status="dismissed", session=session
     )
-    request = await get_request_async(request_uid, session)
+    request = await get_request(request_uid, session)
     await session.delete(request)
     await session.commit()
     return request
