@@ -435,6 +435,21 @@ def get_request_result(
     return request.cache_entry.result
 
 
+async def get_request_result_async(
+    request_uid: str,
+    session: sa.orm.Session,
+) -> SystemRequest:
+    request = await get_request_async(request_uid, session)
+    logger.info(
+        "result accessed",
+        user_uid=request.user_uid,
+        job_id=request.request_uid,
+        process_id=request.process_id,
+        status=request.status,
+    )
+    return request.cache_entry.result
+
+
 def delete_request(
     request_uid: str,
     session: sa.orm.Session,
