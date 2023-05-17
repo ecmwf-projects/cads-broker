@@ -7,7 +7,6 @@
 # nor does it submit to any jurisdiction.
 #
 
-import asyncio
 import threading
 from functools import wraps
 
@@ -133,8 +132,7 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
-                    loop = asyncio.get_event_loop()
-                    coroutine = database.set_request_status(
+                    database.set_request_status(
                         request_uid=request.request_uid,
                         status="failed",
                         session=session,
@@ -142,7 +140,6 @@ class QoS:
                             Context(request, self.environment)
                         ),
                     )
-                    loop.run_until_complete(coroutine)
                     break
 
         # Add general limits
