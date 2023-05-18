@@ -439,7 +439,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     expected_tables_complete = set(db.BaseModel.metadata.tables)
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
 
-    db.init_database(connection_string)
+    db.init_database(connection_string, force=True)
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
     request = mock_system_request()

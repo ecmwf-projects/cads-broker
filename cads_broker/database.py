@@ -4,7 +4,6 @@ import os
 import uuid
 from typing import Any
 
-import alembic.config
 import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
@@ -12,6 +11,8 @@ import sqlalchemy_utils
 import structlog
 from sqlalchemy.dialects.postgresql import JSONB
 
+import alembic.command
+import alembic.config
 from cads_broker import config
 
 BaseModel = cacholote.database.Base
@@ -426,12 +427,10 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.create_all(engine)
     else:
         # update db structure
-        migration_directory = os.path.dirname(os.path.abspath(os.path.join(__file__, '..')))
-        os.chdir(migration_directory)
-        alembic_args = [
-            "--raiseerr",
-            "upgrade",
-            "head",
-        ]
-        alembic.config.main(argv=alembic_args)
+        alembic_config_path = os.path.abspath(
+            os.path.join(__file__, "..", "..", "alembic.ini")
+        )
+        alembic_cfg = alembic.config.Config(alembic_config_path)
+        alembic_cfg.set_main_option("sqlalchemy.url", connection_string)
+        alembic.command.upgrade(alembic_cfg, "head")
     return engine

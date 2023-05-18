@@ -16,8 +16,10 @@
 
 import sqlalchemy as sa
 
-import alembic
-import cads_broker.config
+import alembic.context
+import cads_broker
+
+config = alembic.context.config
 
 
 def run_migrations_offline() -> None:
@@ -31,8 +33,7 @@ def run_migrations_offline() -> None:
     Calls to alembic.context.execute() here emit the given string to the
     script output.
     """
-    db_settings = cads_broker.config.ensure_settings(cads_broker.config.dbsettings)
-    url = db_settings.connection_string
+    url = config.get_main_option("sqlalchemy.url")
     alembic.context.configure(
         url=url,
         target_metadata=cads_broker.database.BaseModel.metadata,
@@ -49,13 +50,18 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine
     and associate a connection with the alembic.context.
     """
-    db_settings = cads_broker.config.ensure_settings(cads_broker.config.dbsettings)
-    engine = sa.create_engine(db_settings.connection_string)
-    with engine.connect() as connection:
+    connectable = sa.engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=sa.pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
         alembic.context.configure(
             connection=connection,
             target_metadata=cads_broker.database.BaseModel.metadata,
         )
+
         with alembic.context.begin_transaction():
             alembic.context.run_migrations()
 
