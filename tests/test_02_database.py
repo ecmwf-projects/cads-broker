@@ -331,7 +331,7 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
     assert successful_request.status == "successful"
     assert successful_request.cache_id == cache_id
-    assert successful_request.response_traceback is None
+    assert successful_request.response_error == {}
     assert successful_request.finished_at is not None
 
     # failed status
@@ -358,8 +358,8 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         failed_request = session.scalars(statement).one()
 
     assert failed_request.status == "failed"
-    assert failed_request.response_error["error_reason"] == error_reason
-    assert failed_request.response_error["error_message"] == error_message
+    assert failed_request.response_error["reason"] == error_reason
+    assert failed_request.response_error["message"] == error_message
     assert failed_request.cache_id is None
     assert failed_request.finished_at is not None
 
