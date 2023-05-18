@@ -331,7 +331,7 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
 
     assert successful_request.status == "successful"
     assert successful_request.cache_id == cache_id
-    assert successful_request.response_traceback is None
+    assert successful_request.response_error == {}
     assert successful_request.finished_at is not None
 
     # failed status
@@ -342,11 +342,13 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request)
         session.commit()
 
-        traceback = "traceback"
+        error_message = "error_message"
+        error_reason = "error_reason"
         db.set_request_status(
             request_uid,
             status="failed",
-            traceback=traceback,
+            error_message=error_message,
+            error_reason=error_reason,
             session=session,
         )
     with session_obj() as session:
@@ -356,7 +358,8 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
         failed_request = session.scalars(statement).one()
 
     assert failed_request.status == "failed"
-    assert failed_request.response_traceback == traceback
+    assert failed_request.response_error["reason"] == error_reason
+    assert failed_request.response_error["message"] == error_message
     assert failed_request.cache_id is None
     assert failed_request.finished_at is not None
 
@@ -432,11 +435,15 @@ def test_init_database(postgresql: Connection[str]) -> None:
     query = sa.text(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
+    # start with an empty db structure
     expected_tables_at_beginning: set[str] = set()
-    expected_tables_complete = set(db.BaseModel.metadata.tables)
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
 
-    db.init_database(connection_string)
+    # verify create structure
+    db.init_database(connection_string, force=True)
+    expected_tables_complete = set(db.BaseModel.metadata.tables).union(
+        {"alembic_version"}
+    )
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
     request = mock_system_request()
