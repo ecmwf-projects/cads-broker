@@ -30,21 +30,21 @@ Before pushing to GitHub, run the following commands:
 
 ### Instructions for database updating
 
-The package `cads-broker` comes with its 'broker' database. 
+The package `cads-broker` comes with its 'broker' database.
 In case of database structure upgrade, developers must follow these steps:
 
-1) Update the new database structure modifying [/cads_broker/database.py](/cads_broker/database.py), using 
+1. Update the new database structure modifying [/cads_broker/database.py](/cads_broker/database.py), using
    [SQLAlchemy ORM technologies](https://docs.sqlalchemy.org/en/latest/orm/)
-2) Execute from the cads-broker work folder:
-    ```
+1. Execute from the cads-broker work folder:
+   ```
    alembic revision -m "message about the db modification"
    ```
-3) The last command will create a new python file inside [/alembic/versions](/alembic/versions). Fill the `upgrade` 
-   function with the operations that must be executed to migrate the database from the old structure to the new one. 
-   Keep in mind both DDL (structure modification) and DML (data modification) instructions. For reference, 
+1. The last command will create a new python file inside [/alembic/versions](/alembic/versions). Fill the `upgrade`
+   function with the operations that must be executed to migrate the database from the old structure to the new one.
+   Keep in mind both DDL (structure modification) and DML (data modification) instructions. For reference,
    use https://alembic.sqlalchemy.org/en/latest/ops.html#ops.
    Similarly, do the same with the `downgrade` function.
-4) Commit and push the modifications and the new file.
+1. Commit and push the modifications and the new file.
 
 For details about the alembic migration tool, see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
 
