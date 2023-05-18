@@ -416,21 +416,23 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     :param force: if True, drop the database structure and build again from scratch
     """
     engine = sa.create_engine(connection_string)
+    alembic_config_path = os.path.abspath(
+        os.path.join(__file__, "..", "..", "alembic.ini")
+    )
+    alembic_cfg = alembic.config.Config(alembic_config_path)
+    alembic_cfg.set_main_option("sqlalchemy.url", connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, 'head')
     elif force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, 'head')
     else:
         # update db structure
-        alembic_config_path = os.path.abspath(
-            os.path.join(__file__, "..", "..", "alembic.ini")
-        )
-        alembic_cfg = alembic.config.Config(alembic_config_path)
-        alembic_cfg.set_main_option("sqlalchemy.url", connection_string)
         alembic.command.upgrade(alembic_cfg, "head")
     return engine

@@ -435,11 +435,13 @@ def test_init_database(postgresql: Connection[str]) -> None:
     query = sa.text(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
+    # start with an empty db structure
     expected_tables_at_beginning: set[str] = set()
-    expected_tables_complete = set(db.BaseModel.metadata.tables)
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
 
+    # verify create structure
     db.init_database(connection_string, force=True)
+    expected_tables_complete = set(db.BaseModel.metadata.tables).union({'alembic_version'})
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
     request = mock_system_request()
