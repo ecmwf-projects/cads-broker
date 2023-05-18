@@ -39,5 +39,7 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     patch_storage.assert_called_once_with(
         "cache", object_storage_url, **object_storage_kws
     )
-    assert set(conn.execute(query).scalars()) == set(database.BaseModel.metadata.tables).union({'alembic_version'})
+    assert set(conn.execute(query).scalars()) == set(
+        database.BaseModel.metadata.tables
+    ).union({"alembic_version"})
     conn.close()

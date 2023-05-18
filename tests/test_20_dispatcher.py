@@ -103,9 +103,9 @@ def test_broker_fetch_dask_task_status(
     # add a pending future to the broker
     broker.futures = {"future": distributed.Future("future", CLIENT)}
 
-    assert (
-        broker.fetch_dask_task_status("future")
-        == (0, dispatcher.DASK_STATUS_TO_STATUS["pending"])
+    assert broker.fetch_dask_task_status("future") == (
+        0,
+        dispatcher.DASK_STATUS_TO_STATUS["pending"],
     )
     assert broker.fetch_dask_task_status("dask-scheduler") == (0, "successful")
     assert broker.fetch_dask_task_status("unknown") == (1, "accepted")
