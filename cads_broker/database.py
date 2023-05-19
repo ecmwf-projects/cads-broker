@@ -417,6 +417,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     """
     engine = sa.create_engine(connection_string)
     migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
+    os.chdir(migration_directory)
     alembic_config_path = os.path.join(migration_directory, "alembic.ini")
     alembic_cfg = alembic.config.Config(alembic_config_path)
     alembic_cfg.set_main_option("sqlalchemy.url", connection_string)
@@ -433,6 +434,5 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         alembic.command.stamp(alembic_cfg, "head")
     else:
         # update db structure
-        os.chdir(migration_directory)
         alembic.command.upgrade(alembic_cfg, "head")
     return engine
