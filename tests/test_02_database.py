@@ -1,5 +1,4 @@
 import datetime
-import random
 import uuid
 from collections import defaultdict
 from typing import Any
@@ -24,7 +23,6 @@ def mock_system_request(
     request_body: dict | None = None,
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
-        request_id=random.randrange(1, 100),
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
         status=status,
@@ -39,7 +37,6 @@ def mock_system_request(
 
 def mock_cache_entry() -> db.SystemRequest:
     cache_entry = cacholote.database.CacheEntry(
-        id=random.randint(0, 100),
         result={"href": "", "args": [1, 2]},
     )
     return cache_entry
@@ -398,13 +395,14 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
 
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
     cache_entry = mock_cache_entry()
-    request = mock_system_request(
-        status="successful",
-        cache_id=cache_entry.id,
-    )
-    request_uid = request.request_uid
     with session_obj() as session:
         session.add(cache_entry)
+        session.flush()
+        request = mock_system_request(
+            status="successful",
+            cache_id=cache_entry.id,
+        )
+        request_uid = request.request_uid
         session.add(request)
         session.commit()
         result = db.get_request_result(request_uid, session=session)
