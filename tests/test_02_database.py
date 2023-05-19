@@ -1,5 +1,4 @@
 import datetime
-import random
 import uuid
 from collections import defaultdict
 from typing import Any
@@ -14,6 +13,18 @@ from cads_broker import config
 from cads_broker import database as db
 
 
+def unique_id_generator():
+    """Make a generator of a sequence of integers."""
+    current_id = 1
+    while True:
+        yield current_id
+        current_id += 1
+
+
+request_ids = unique_id_generator()
+cache_ids = unique_id_generator()
+
+
 def mock_system_request(
     status: str | None = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
@@ -24,7 +35,7 @@ def mock_system_request(
     request_body: dict | None = None,
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
-        request_id=random.randrange(1, 100),
+        request_id=next(request_ids),
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
         status=status,
@@ -39,7 +50,7 @@ def mock_system_request(
 
 def mock_cache_entry() -> db.SystemRequest:
     cache_entry = cacholote.database.CacheEntry(
-        id=random.randint(0, 100),
+        id=next(cache_ids),
         result={"href": "", "args": [1, 2]},
     )
     return cache_entry
