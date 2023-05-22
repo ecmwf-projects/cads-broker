@@ -427,7 +427,15 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
-    elif force:
+    else:
+        # check the structure is empty or incomplete
+        query = sa.text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        )
+        conn = engine.connect()
+        if "system_requests" not in conn.execute(query).scalars().all():
+            force = True
+    if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
