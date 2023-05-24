@@ -26,6 +26,7 @@ def mock_system_request(
         created_at=created_at,
         started_at=None,
         request_body={"request_type": "test"},
+        request_metadata={},
     )
     return system_request
 
@@ -55,13 +56,13 @@ def test_broker_update_database(
         session.add(queued_in_dask_request)
         session.commit()
 
-    def mock_fetch_dask_task_status(_, uid: str) -> str:
+    def mock_fetch_dask_task_status(_, uid: str) -> tuple[int, str]:
         if uid == successful_uid:
-            return "successful"
+            return 0, "successful"
         if uid == queued_in_dask_uid:
-            return "running"
+            return 0, "running"
         else:
-            return "failed"
+            return 0, "failed"
 
     mocker.patch(
         "cads_broker.dispatcher.Broker.fetch_dask_task_status",
@@ -102,9 +103,9 @@ def test_broker_fetch_dask_task_status(
     # add a pending future to the broker
     broker.futures = {"future": distributed.Future("future", CLIENT)}
 
-    assert (
-        broker.fetch_dask_task_status("future")
-        == dispatcher.DASK_STATUS_TO_STATUS["pending"]
+    assert broker.fetch_dask_task_status("future") == (
+        0,
+        dispatcher.DASK_STATUS_TO_STATUS["pending"],
     )
-    assert broker.fetch_dask_task_status("dask-scheduler") == "successful"
-    assert broker.fetch_dask_task_status("unknown") == "accepted"
+    assert broker.fetch_dask_task_status("dask-scheduler") == (0, "successful")
+    assert broker.fetch_dask_task_status("unknown") == (1, "accepted")

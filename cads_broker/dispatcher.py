@@ -150,14 +150,19 @@ class Broker:
 
     def fetch_dask_task_status(self, request_uid: str) -> str | Any:
         # check if the task is in the future object
+        resubmit_number = 0
         if request_uid in self.futures:
-            return DASK_STATUS_TO_STATUS[self.futures[request_uid].status]
+            return (
+                resubmit_number,
+                DASK_STATUS_TO_STATUS[self.futures[request_uid].status],
+            )
         # check if the task is in the scheduler
         elif request_uid in (tasks := get_tasks(self.client)):
-            return tasks.get(request_uid)
+            return resubmit_number, tasks.get(request_uid)
         # if request is not in the dask scheduler, re-queue it
         else:
-            return "accepted"
+            resubmit_number = 1
+            return resubmit_number, "accepted"
 
     def update_database(self, session: sa.orm.Session) -> None:
         """Update the database with the current status of the dask tasks.
@@ -168,7 +173,10 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            status = self.fetch_dask_task_status(request.request_uid)
+            resubmit_number, status = self.fetch_dask_task_status(request.request_uid)
+            request.request_metadata["resubmit_number"] = (
+                request.request_metadata.get("resubmit_number", 0) + resubmit_number
+            )
             if status in ("successful", "failed"):
                 # status successful or failed must be set by on_future_done method
                 request.status = "running"
@@ -188,16 +196,16 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                logger_kwargs["result"] = request.cache_entry.result
                 metrics.increase_bytes_counter(result=request.cache_entry.result)
             elif future.status == "error":
+                exception = future.exception()
                 request = db.set_request_status(
                     future.key,
                     job_status,
-                    traceback="".join(traceback.format_exception(future.exception())),
+                    error_message="".join(traceback.format_exception(exception)),
+                    error_reason=traceback.format_exception_only(exception)[0],
                     session=session,
                 )
-                logger_kwargs["traceback"] = request.response_traceback
             else:
                 request = db.set_request_status(
                     future.key,

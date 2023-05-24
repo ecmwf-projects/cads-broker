@@ -29,17 +29,18 @@ def info(connection_string: str | None = None) -> None:
 
 @app.command()
 def init_db(connection_string: str | None = None, force: bool = False) -> None:
-    """Create the database structure and the cache area in the object storage.
+    """Create/update the database structure and the cache area in the object storage.
 
     Parameters
     ----------
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    force: if True, drop the database structure and build again from scratch
     """
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     database.init_database(connection_string, force=force)
-    print("successfully created the broker database structure.")
+    print("successfully created/updated the broker database structure.")
 
     # get storage parameters from environment
     for key in ("OBJECT_STORAGE_URL", "STORAGE_ADMIN", "STORAGE_PASSWORD"):

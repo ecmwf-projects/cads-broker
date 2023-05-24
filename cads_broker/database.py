@@ -1,5 +1,6 @@
 """SQLAlchemy ORM model."""
 import datetime
+import os
 import uuid
 from typing import Any
 
@@ -10,6 +11,8 @@ import sqlalchemy_utils
 import structlog
 from sqlalchemy.dialects.postgresql import JSONB
 
+import alembic.command
+import alembic.config
 from cads_broker import config
 
 BaseModel = cacholote.database.Base
@@ -43,12 +46,13 @@ class SystemRequest(BaseModel):
     cache_id = sa.Column(sa.Integer)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
-    response_traceback = sa.Column(JSONB)
+    response_error = sa.Column(JSONB, default={})
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
     started_at = sa.Column(sa.TIMESTAMP)
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
+    origin = sa.Column(sa.Text, default="ui")
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -282,7 +286,8 @@ def set_request_status(
     status: str,
     session: sa.orm.Session,
     cache_id: int | None = None,
-    traceback: str | None = None,
+    error_message: str | None = None,
+    error_reason: str | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -292,7 +297,7 @@ def set_request_status(
         request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
-        request.response_traceback = traceback
+        request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
     request.status = status
@@ -306,6 +311,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "job_id": request.request_uid,
         "user_uid": request.user_uid,
         "status": request.status,
+        "result": request.cache_entry.result if request.cache_entry else None,
         "created_at": request.created_at.isoformat(),
         "updated_at": request.updated_at.isoformat(),
         "started_at": request.started_at.isoformat()
@@ -317,6 +323,10 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
+        "resubmit_number": request.request_metadata.get("resubmit_number", 0),
+        "origin": request.origin,
+        "entry_point": request.request_body.get("entry_point", None),
+        **request.response_error,
     }
     return kwargs
 
@@ -330,6 +340,7 @@ def create_request(
     process_id: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
+    origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Temporary function to create a request."""
@@ -345,6 +356,7 @@ def create_request(
             "kwargs": kwargs,
         },
         request_metadata=metadata,
+        origin=origin,
     )
     session.add(request)
     session.commit()
@@ -412,26 +424,37 @@ def delete_request(
 
 def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
     """
-    Initialize the database located at URI `connection_string` and return the engine object.
+    Make sure the db located at URI `connection_string` exists updated and return the engine object.
 
     :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    :param force: if True, drop the database structure and build again from scratch
     """
-    structure_exists = True
     engine = sa.create_engine(connection_string)
+    migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
+    os.chdir(migration_directory)
+    alembic_config_path = os.path.join(migration_directory, "alembic.ini")
+    alembic_cfg = alembic.config.Config(alembic_config_path)
+    alembic_cfg.set_main_option("sqlalchemy.url", connection_string)
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
-        structure_exists = False
-    else:
-        conn = engine.connect()
-        query = sa.text(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
-        )
-
-        if set(conn.execute(query).scalars()) != set(BaseModel.metadata.tables):  # type: ignore
-            structure_exists = False
-    if not structure_exists or force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
-    conn.close()
+        alembic.command.stamp(alembic_cfg, "head")
+    else:
+        # check the structure is empty or incomplete
+        query = sa.text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        )
+        conn = engine.connect()
+        if "system_requests" not in conn.execute(query).scalars().all():
+            force = True
+    if force:
+        # cleanup and create the schema
+        BaseModel.metadata.drop_all(engine)
+        BaseModel.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, "head")
+    else:
+        # update db structure
+        alembic.command.upgrade(alembic_cfg, "head")
     return engine

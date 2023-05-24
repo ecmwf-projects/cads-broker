@@ -28,7 +28,7 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     }
     result = runner.invoke(
         entry_points.app,
-        ["init-db", "--connection-string", connection_string],
+        ["init-db", "--connection-string", connection_string, "--force"],
         env={
             "OBJECT_STORAGE_URL": object_storage_url,
             "STORAGE_ADMIN": object_storage_kws["access_key"],
@@ -39,5 +39,7 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     patch_storage.assert_called_once_with(
         "cache", object_storage_url, **object_storage_kws
     )
-    assert set(conn.execute(query).scalars()) == set(database.BaseModel.metadata.tables)  # type: ignore
+    assert set(conn.execute(query).scalars()) == set(
+        database.BaseModel.metadata.tables
+    ).union({"alembic_version"})
     conn.close()
