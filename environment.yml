@@ -24,5 +24,3 @@ dependencies:
 - structlog
 - tornado==6.1
 - typer
-- pip:
-  - prometheus-client
