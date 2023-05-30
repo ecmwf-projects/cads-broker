@@ -428,7 +428,7 @@ async def delete_request(
     request_uid: str,
     session: sa.orm.Session,
 ) -> SystemRequest:
-    await set_request_status(
+    await set_request_status_async(
         request_uid=request_uid, status="dismissed", session=session
     )
     request = await get_request(request_uid, session)
