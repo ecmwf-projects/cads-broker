@@ -311,7 +311,8 @@ async def set_request_status_async(
     status: str,
     session: sa.orm.Session,
     cache_id: int | None = None,
-    traceback: str | None = None,
+    error_message: str | None = None,
+    error_reason: str | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -322,7 +323,7 @@ async def set_request_status_async(
         request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
-        request.response_traceback = traceback
+        request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
     request.status = status
