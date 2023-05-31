@@ -38,7 +38,7 @@ DASK_STATUS_TO_STATUS = {
     info=True,
 )
 def get_number_of_workers(client: distributed.Client) -> int:
-    workers = client.scheduler_info()["workers"]
+    workers = client.scheduler_info().get("workers", {})
     number_of_workers = len(
         [w for w in workers.values() if w.get("status", None) == "running"]
     )
