@@ -148,8 +148,8 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    def update_database(self, session: sa.orm.Session) -> None:
-        """Update the database with the current status of the dask tasks.
+    def sync_database(self, session: sa.orm.Session) -> None:
+        """Sync the database with the current status of the dask tasks.
 
         If the task is not in the dask scheduler, it is re-queued.
         """
@@ -253,7 +253,7 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
-                self.update_database(session=session)
+                self.sync_database(session=session)
                 self.running_requests = len(
                     [
                         future
