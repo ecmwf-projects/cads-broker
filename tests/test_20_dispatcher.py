@@ -52,9 +52,7 @@ def test_broker_sync_database(
     in_dask_request = mock_system_request(
         request_uid=in_dask_request_uid, status="running"
     )
-    lost_request = mock_system_request(
-        request_uid=lost_request_uid, status="running"
-    )
+    lost_request = mock_system_request(request_uid=lost_request_uid, status="running")
     with session_obj() as session:
         session.add(in_futures_request)
         session.add(in_dask_request)
