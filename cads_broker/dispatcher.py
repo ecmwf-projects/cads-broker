@@ -148,24 +148,8 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    def fetch_dask_task_status(self, request_uid: str) -> str | Any:
-        # check if the task is in the future object
-        resubmit_number = 0
-        if request_uid in self.futures:
-            return (
-                resubmit_number,
-                DASK_STATUS_TO_STATUS[self.futures[request_uid].status],
-            )
-        # check if the task is in the scheduler
-        elif request_uid in (tasks := get_tasks(self.client)):
-            return resubmit_number, tasks.get(request_uid)
-        # if request is not in the dask scheduler, re-queue it
-        else:
-            resubmit_number = 1
-            return resubmit_number, "accepted"
-
-    def update_database(self, session: sa.orm.Session) -> None:
-        """Update the database with the current status of the dask tasks.
+    def sync_database(self, session: sa.orm.Session) -> None:
+        """Sync the database with the current status of the dask tasks.
 
         If the task is not in the dask scheduler, it is re-queued.
         """
@@ -173,16 +157,20 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            resubmit_number, status = self.fetch_dask_task_status(request.request_uid)
-            request.request_metadata["resubmit_number"] = (
-                request.request_metadata.get("resubmit_number", 0) + resubmit_number
-            )
-            if status in ("successful", "failed"):
-                # status successful or failed must be set by on_future_done method
-                request.status = "running"
+            # if request is in futures, go on
+            if request.request_uid in self.futures:
+                continue
+            # if request is in the scheduler, go on
+            elif request.request_uid in get_tasks(self.client):
+                continue
+            # if it doesn't find the request: re-queue it
             else:
-                request.status = status
-        session.commit()
+                db.set_request_status(
+                    request_uid=request.request_uid,
+                    status="accepted",
+                    session=session,
+                    resubmit=True,
+                )
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -206,13 +194,15 @@ class Broker:
                     session=session,
                 )
             else:
+                # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
                     job_status,
                     session=session,
+                    resubmit=True,
                 )
                 logger.warning(
-                    "unknown dask status",
+                    "unknown dask status, re-queing",
                     job_status={future.status},
                     job_id=request.request_uid,
                 )
@@ -263,7 +253,7 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
-                self.update_database(session=session)
+                self.sync_database(session=session)
                 self.running_requests = len(
                     [
                         future
