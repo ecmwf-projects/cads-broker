@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, expressions, metrics
+from cads_broker import Environment, config, expressions
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -38,7 +38,7 @@ DASK_STATUS_TO_STATUS = {
     info=True,
 )
 def get_number_of_workers(client: distributed.Client) -> int:
-    workers = client.scheduler_info()["workers"]
+    workers = client.scheduler_info().get("workers", {})
     number_of_workers = len(
         [w for w in workers.values() if w.get("status", None) == "running"]
     )
@@ -196,7 +196,6 @@ class Broker:
                     cache_id=result,
                     session=session,
                 )
-                metrics.increase_bytes_counter(result=request.cache_entry.result)
             elif future.status == "error":
                 exception = future.exception()
                 request = db.set_request_status(
