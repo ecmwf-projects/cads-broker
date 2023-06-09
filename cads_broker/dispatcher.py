@@ -1,4 +1,5 @@
 import hashlib
+import io
 import os
 import time
 import traceback
@@ -15,8 +16,9 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, expressions
+from cads_broker import Environment, config
 from cads_broker import database as db
+from cads_broker import expressions
 from cads_broker.qos import QoS
 
 config.configure_logger()
@@ -52,8 +54,11 @@ def get_number_of_workers(client: distributed.Client) -> int:
     info=True,
 )
 def get_rules_hash(rules_path: str):
-    with open(rules_path) as f:
-        rules = f.read()
+    if rules_path is None or not os.path.exists(rules_path):
+        rules = os.getenv("DEFAULT_RULES", "")
+    else:
+        with open(rules_path) as f:
+            rules = f.read()
     return hashlib.md5(rules.encode()).hexdigest()
 
 
@@ -82,9 +87,14 @@ def get_tasks(client: distributed.Client) -> Any:
 
 class QoSRules:
     def __init__(self) -> None:
-        self.qos_rules: str = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "qos.rules"
-        )
+        self.environment = Environment.Environment()
+        self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
+        if os.path.exists(self.rules_path):
+            self.rules = self.rules_path
+        else:
+            parser = QoS.RulesParser(io.StringIO(os.getenv("DEFAULT_RULES", "")))
+            self.rules = QoS.RuleSet()
+            parser.parse_rules(self.rules, self.environment)
 
     def register_functions(self):
         expressions.FunctionFactory.FunctionFactory.register_function(
@@ -125,18 +135,17 @@ class Broker:
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        environment = Environment.Environment()
         qos_config = QoSRules()
         qos_config.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
-        rules_hash = get_rules_hash(qos_config.qos_rules)
+        rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(
             client=client,
             session_maker=session_maker,
-            environment=environment,
+            environment=qos_config.environment,
             qos=QoS.QoS(
-                qos_config.qos_rules,
-                environment,
+                qos_config.rules,
+                qos_config.environment,
                 rules_hash=rules_hash,
             ),
         )
