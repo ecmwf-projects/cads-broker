@@ -289,10 +289,19 @@ def set_request_status(
     cache_id: int | None = None,
     error_message: str | None = None,
     error_reason: str | None = None,
+    resubmit: bool | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
+    if resubmit:
+        # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
+        # FIXME: use a specific column for resubmit_number
+        metadata = dict(request.request_metadata)
+        metadata.update(
+            {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
+        )
+        request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
         request.cache_id = cache_id
