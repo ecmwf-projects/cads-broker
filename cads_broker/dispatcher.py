@@ -106,10 +106,10 @@ class QoSRules:
             lambda context, *args: context.request.request_body.get("entry_point", ""),
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
-            "finished_requests",
+            "userRequestCount",
             lambda context, *args: db.count_finished_requests_per_user(
                 user_uid=context.request.user_uid,
-                last_hours=args[0],
+                seconds=args[0],
             ),
         )
 
