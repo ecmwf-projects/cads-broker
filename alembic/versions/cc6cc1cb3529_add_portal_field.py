@@ -1,17 +1,17 @@
-"""Add portal field
+"""Add portal field.
 
 Revision ID: cc6cc1cb3529
 Revises: d51c4dd28c1b
 Create Date: 2023-06-14 14:00:25.914273
 
 """
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'cc6cc1cb3529'
-down_revision = 'd51c4dd28c1b'
+revision = "cc6cc1cb3529"
+down_revision = "d51c4dd28c1b"
 branch_labels = None
 depends_on = None
 
