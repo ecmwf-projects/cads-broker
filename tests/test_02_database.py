@@ -371,6 +371,7 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
             metadata={},
             process_id="submit-workflow",
             session=session,
+            portal="c3s",
         )
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_dict["request_uid"]
