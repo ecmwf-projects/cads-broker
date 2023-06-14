@@ -53,6 +53,7 @@ class SystemRequest(BaseModel):
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
+    portal = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -347,6 +348,7 @@ def create_request(
     entry_point: str,
     kwargs: dict[str, Any],
     process_id: str,
+    portal: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
@@ -366,6 +368,7 @@ def create_request(
         },
         request_metadata=metadata,
         origin=origin,
+        portal=portal,
     )
     session.add(request)
     session.commit()
