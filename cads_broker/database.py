@@ -53,6 +53,7 @@ class SystemRequest(BaseModel):
     finished_at = sa.Column(sa.TIMESTAMP)
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
+    portal = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -119,7 +120,7 @@ def get_accepted_requests(
 def count_finished_requests_per_user_in_session(
     user_uid: str,
     session: sa.orm.Session,
-    last_hours: int | None = None,
+    seconds: int | None = None,
 ) -> int:
     """Count running requests for user_uid."""
     statement = (
@@ -127,22 +128,22 @@ def count_finished_requests_per_user_in_session(
         .where(SystemRequest.user_uid == user_uid)
         .where(SystemRequest.status.in_(("successful", "failed")))
     )
-    if last_hours is not None:
-        finished_at = datetime.datetime.now() - datetime.timedelta(hours=last_hours)
+    if seconds is not None:
+        finished_at = datetime.datetime.now() - datetime.timedelta(seconds=seconds)
         statement = statement.where(SystemRequest.finished_at >= finished_at)
     return statement.count()
 
 
 def count_finished_requests_per_user(
     user_uid: str,
-    last_hours: int | None = None,
+    seconds: int | None = None,
     session_maker: sa.orm.Session = None,
 ) -> int:
     """Count running requests for user_uid."""
     session_maker = ensure_session_obj(session_maker)
     with session_maker() as session:
         ret_value = count_finished_requests_per_user_in_session(
-            user_uid=user_uid, last_hours=last_hours, session=session
+            user_uid=user_uid, seconds=seconds, session=session
         )
         return ret_value
 
@@ -288,10 +289,19 @@ def set_request_status(
     cache_id: int | None = None,
     error_message: str | None = None,
     error_reason: str | None = None,
+    resubmit: bool | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
+    if resubmit:
+        # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
+        # FIXME: use a specific column for resubmit_number
+        metadata = dict(request.request_metadata)
+        metadata.update(
+            {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
+        )
+        request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
         request.cache_id = cache_id
@@ -338,6 +348,7 @@ def create_request(
     entry_point: str,
     kwargs: dict[str, Any],
     process_id: str,
+    portal: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
@@ -357,6 +368,7 @@ def create_request(
         },
         request_metadata=metadata,
         origin=origin,
+        portal=portal,
     )
     session.add(request)
     session.commit()

@@ -73,7 +73,7 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
         session.add(request2)
         session.commit()
         assert 2 == db.count_finished_requests_per_user_in_session(
-            user_uid=request1.user_uid, last_hours=1, session=session
+            user_uid=request1.user_uid, seconds=60, session=session
         )
 
 
@@ -371,6 +371,7 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
             metadata={},
             process_id="submit-workflow",
             session=session,
+            portal="c3s",
         )
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_dict["request_uid"]

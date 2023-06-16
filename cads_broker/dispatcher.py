@@ -1,4 +1,5 @@
 import hashlib
+import io
 import os
 import time
 import traceback
@@ -15,8 +16,9 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, expressions
+from cads_broker import Environment, config
 from cads_broker import database as db
+from cads_broker import expressions
 from cads_broker.qos import QoS
 
 config.configure_logger()
@@ -52,8 +54,11 @@ def get_number_of_workers(client: distributed.Client) -> int:
     info=True,
 )
 def get_rules_hash(rules_path: str):
-    with open(rules_path) as f:
-        rules = f.read()
+    if rules_path is None or not os.path.exists(rules_path):
+        rules = os.getenv("DEFAULT_RULES", "")
+    else:
+        with open(rules_path) as f:
+            rules = f.read()
     return hashlib.md5(rules.encode()).hexdigest()
 
 
@@ -82,9 +87,14 @@ def get_tasks(client: distributed.Client) -> Any:
 
 class QoSRules:
     def __init__(self) -> None:
-        self.qos_rules: str = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "qos.rules"
-        )
+        self.environment = Environment.Environment()
+        self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
+        if os.path.exists(self.rules_path):
+            self.rules = self.rules_path
+        else:
+            parser = QoS.RulesParser(io.StringIO(os.getenv("DEFAULT_RULES", "")))
+            self.rules = QoS.RuleSet()
+            parser.parse_rules(self.rules, self.environment)
 
     def register_functions(self):
         expressions.FunctionFactory.FunctionFactory.register_function(
@@ -96,10 +106,10 @@ class QoSRules:
             lambda context, *args: context.request.request_body.get("entry_point", ""),
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
-            "finished_requests",
+            "userRequestCount",
             lambda context, *args: db.count_finished_requests_per_user(
                 user_uid=context.request.user_uid,
-                last_hours=args[0],
+                seconds=args[0],
             ),
         )
 
@@ -125,18 +135,17 @@ class Broker:
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        environment = Environment.Environment()
         qos_config = QoSRules()
         qos_config.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
-        rules_hash = get_rules_hash(qos_config.qos_rules)
+        rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(
             client=client,
             session_maker=session_maker,
-            environment=environment,
+            environment=qos_config.environment,
             qos=QoS.QoS(
-                qos_config.qos_rules,
-                environment,
+                qos_config.rules,
+                qos_config.environment,
                 rules_hash=rules_hash,
             ),
         )
@@ -148,24 +157,8 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    def fetch_dask_task_status(self, request_uid: str) -> str | Any:
-        # check if the task is in the future object
-        resubmit_number = 0
-        if request_uid in self.futures:
-            return (
-                resubmit_number,
-                DASK_STATUS_TO_STATUS[self.futures[request_uid].status],
-            )
-        # check if the task is in the scheduler
-        elif request_uid in (tasks := get_tasks(self.client)):
-            return resubmit_number, tasks.get(request_uid)
-        # if request is not in the dask scheduler, re-queue it
-        else:
-            resubmit_number = 1
-            return resubmit_number, "accepted"
-
-    def update_database(self, session: sa.orm.Session) -> None:
-        """Update the database with the current status of the dask tasks.
+    def sync_database(self, session: sa.orm.Session) -> None:
+        """Sync the database with the current status of the dask tasks.
 
         If the task is not in the dask scheduler, it is re-queued.
         """
@@ -173,16 +166,20 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         for request in session.scalars(statement):
-            resubmit_number, status = self.fetch_dask_task_status(request.request_uid)
-            request.request_metadata["resubmit_number"] = (
-                request.request_metadata.get("resubmit_number", 0) + resubmit_number
-            )
-            if status in ("successful", "failed"):
-                # status successful or failed must be set by on_future_done method
-                request.status = "running"
+            # if request is in futures, go on
+            if request.request_uid in self.futures:
+                continue
+            # if request is in the scheduler, go on
+            elif request.request_uid in get_tasks(self.client):
+                continue
+            # if it doesn't find the request: re-queue it
             else:
-                request.status = status
-        session.commit()
+                db.set_request_status(
+                    request_uid=request.request_uid,
+                    status="accepted",
+                    session=session,
+                    resubmit=True,
+                )
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -206,13 +203,15 @@ class Broker:
                     session=session,
                 )
             else:
+                # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
                     job_status,
                     session=session,
+                    resubmit=True,
                 )
                 logger.warning(
-                    "unknown dask status",
+                    "unknown dask status, re-queing",
                     job_status={future.status},
                     job_id=request.request_uid,
                 )
@@ -263,7 +262,7 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
-                self.update_database(session=session)
+                self.sync_database(session=session)
                 self.running_requests = len(
                     [
                         future
