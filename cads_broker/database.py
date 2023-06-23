@@ -387,6 +387,7 @@ async def create_request_async(
     entry_point: str,
     kwargs: dict[str, Any],
     process_id: str,
+    portal: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
@@ -406,6 +407,7 @@ async def create_request_async(
         },
         request_metadata=metadata,
         origin=origin,
+        portal=portal,
     )
     session.add(request)
     await session.commit()
