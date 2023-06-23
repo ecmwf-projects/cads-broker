@@ -380,6 +380,44 @@ def create_request(
     return ret_value
 
 
+async def create_request_async(
+    session: sa.orm.Session,
+    user_uid: str,
+    setup_code: str,
+    entry_point: str,
+    kwargs: dict[str, Any],
+    process_id: str,
+    metadata: dict[str, Any] = {},
+    resources: dict[str, Any] = {},
+    origin: str = "ui",
+    request_uid: str | None = None,
+) -> dict[str, Any]:
+    """Temporary function to create a request."""
+    metadata["resources"] = resources
+    request = SystemRequest(
+        request_uid=request_uid or str(uuid.uuid4()),
+        process_id=process_id,
+        user_uid=user_uid,
+        status="accepted",
+        request_body={
+            "setup_code": setup_code,
+            "entry_point": entry_point,
+            "kwargs": kwargs,
+        },
+        request_metadata=metadata,
+        origin=origin,
+    )
+    session.add(request)
+    await session.commit()
+    await session.refresh(request)
+    logger.info("accepted job", **logger_kwargs(request=request))
+    ret_value = {
+        column.key: getattr(request, column.key)
+        for column in sa.inspect(request).mapper.column_attrs
+    }
+    return ret_value
+
+
 def get_request(
     request_uid: str,
     session: sa.orm.Session,
