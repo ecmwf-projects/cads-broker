@@ -40,6 +40,7 @@ def test_broker_sync_database(
         client=CLIENT,
         environment=environment,
         qos=qos,
+        address="scheduler-address",
         session_maker=session_obj,
     )
 

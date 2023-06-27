@@ -16,9 +16,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config
+from cads_broker import Environment, config, expressions
 from cads_broker import database as db
-from cads_broker import expressions
 from cads_broker.qos import QoS
 
 config.configure_logger()
@@ -119,6 +118,7 @@ class Broker:
     client: distributed.Client
     environment: Environment.Environment
     qos: QoS.QoS
+    address: str
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
 
     futures: dict[str, distributed.Future] = attrs.field(
@@ -148,11 +148,14 @@ class Broker:
                 qos_config.environment,
                 rules_hash=rules_hash,
             ),
+            address=address,
         )
         return self
 
     @property
     def number_of_workers(self):
+        if self.client.scheduler is None:
+            self.client = distributed.Client(self.address)
         number_of_workers = get_number_of_workers(client=self.client)
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
