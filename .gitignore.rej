@@ -1,0 +1,63 @@
+diff a/.gitignore b/.gitignore	(rejected hunks)
+@@ -4,8 +4,59 @@ version.py
+ # Sphinx automatic generation of API
+ docs/_api/
+ 
+-# Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,vim,visualstudiocode,pycharm
+-# Edit at https://www.toptal.com/developers/gitignore?templates=python,jupyternotebooks,vim,visualstudiocode,pycharm
++# Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,vim,visualstudiocode,pycharm,emacs,linux,macos,windows
++# Edit at https://www.toptal.com/developers/gitignore?templates=python,jupyternotebooks,vim,visualstudiocode,pycharm,emacs,linux,macos,windows
++
++### Emacs ###
++# -*- mode: gitignore; -*-
++*~
++\#*\#
++/.emacs.desktop
++/.emacs.desktop.lock
++*.elc
++auto-save-list
++tramp
++.\#*
++
++# Org-mode
++.org-id-locations
++*_archive
++
++# flymake-mode
++*_flymake.*
++
++# eshell files
++/eshell/history
++/eshell/lastdir
++
++# elpa packages
++/elpa/
++
++# reftex files
++*.rel
++
++# AUCTeX auto folder
++/auto/
++
++# cask packages
++.cask/
++dist/
++
++# Flycheck
++flycheck_*.el
++
++# server auth directory
++/server/
++
++# projectiles files
++.projectile
++
++# directory configuration
++.dir-locals.el
++
++# network security
++/network-security.data
++
+ 
+ ### JupyterNotebooks ###
+ # gitignore template for Jupyter Notebooks
