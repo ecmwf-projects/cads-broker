@@ -18,7 +18,7 @@ dependencies:
 - postgresql
 - psycopg
 - psycopg2
-- pydantic
+- pydantic<2
 - sqlalchemy>=2.0.9
 - sqlalchemy-utils
 - structlog
