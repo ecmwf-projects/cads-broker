@@ -220,6 +220,7 @@ class Broker:
                 )
                 return
             logger.info(f"{type(future.key)} - {future.key}")
+            logger.info(f"{self.futures}")
             self.futures.pop(future.key)
             self.qos.notify_end_of_request(request, session)
             logger.info(
