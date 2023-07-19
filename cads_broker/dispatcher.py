@@ -219,6 +219,7 @@ class Broker:
                     job_id=request.request_uid,
                 )
                 return
+            logger.info(f"{type(future.key)} - {future.key}")
             self.futures.pop(future.key)
             self.qos.notify_end_of_request(request, session)
             logger.info(
