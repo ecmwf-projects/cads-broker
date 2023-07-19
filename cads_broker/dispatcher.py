@@ -250,6 +250,9 @@ class Broker:
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
+        logger.info("ADDING FUTURES")
+        self.futures[request.request_uid] = future
+        logger.info("ADDED FUTURES")
         logger.info("ADDING DONE CALLBACK")
         future.add_done_callback(self.on_future_done)
         logger.info("ADDED DONE CALLBACK")
@@ -257,7 +260,6 @@ class Broker:
             request_uid=request.request_uid, status="running", session=session
         )
         self.qos.notify_start_of_request(request, session)
-        self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",
             **db.logger_kwargs(request=request),
