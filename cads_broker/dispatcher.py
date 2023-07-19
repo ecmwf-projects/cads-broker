@@ -219,8 +219,6 @@ class Broker:
                     job_id=request.request_uid,
                 )
                 return
-            logger.info(f"{type(future.key)} - {future.key}")
-            logger.info(f"{self.futures}")
             self.futures.pop(future.key)
             self.qos.notify_end_of_request(request, session)
             logger.info(
@@ -250,12 +248,8 @@ class Broker:
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
-        logger.info("ADDING FUTURES")
         self.futures[request.request_uid] = future
-        logger.info("ADDED FUTURES")
-        logger.info("ADDING DONE CALLBACK")
         future.add_done_callback(self.on_future_done)
-        logger.info("ADDED DONE CALLBACK")
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
