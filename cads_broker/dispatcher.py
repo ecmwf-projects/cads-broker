@@ -250,7 +250,9 @@ class Broker:
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
+        logger.info("ADDING DONE CALLBACK")
         future.add_done_callback(self.on_future_done)
+        logger.info("ADDED DONE CALLBACK")
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
