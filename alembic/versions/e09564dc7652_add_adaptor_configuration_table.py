@@ -20,12 +20,12 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "adaptor_configurations",
-        sa.Column(sa.Text, primary_key=True, index=True),
-        sa.Column(JSONB),
+        sa.Column("config_hash", sa.Text, primary_key=True, index=True),
+        sa.Column("config", JSONB),
     )
     op.add_column(
         "system_requests",
-        sa.Column("config_hash", sa.Text, sa.ForeignKey("adaptor_configs.config_hash")),
+        sa.Column("config_hash", sa.Text, sa.ForeignKey("adaptor_configurations.config_hash")),
     )
     op.add_column(
         "system_requests",
