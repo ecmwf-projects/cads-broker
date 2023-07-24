@@ -1,19 +1,21 @@
 """SQLAlchemy ORM model."""
 import datetime
+import hashlib
+import json
 import os
 import uuid
 from typing import Any
 
-import cacholote
+import alembic.command
+import alembic.config
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
+from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-import alembic.command
-import alembic.config
-from cads_broker import config
+import cacholote
 
 BaseModel = cacholote.database.Base
 
@@ -27,6 +29,15 @@ status_enum = sa.Enum(
 
 class NoResultFound(Exception):
     pass
+
+
+class AdaptorConfig(BaseModel):
+    """Resource ORM model."""
+
+    __tablename__ = "adaptor_configurations"
+
+    config_hash = sa.Column(sa.Text, primary_key=True)
+    config = sa.Column(JSONB)
 
 
 class SystemRequest(BaseModel):
@@ -54,6 +65,8 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
     portal = sa.Column(sa.Text)
+    config_hash = sa.Column(sa.Text, sa.ForeignKey("adaptor_configs.config_hash"), nullable=False)
+    entry_point = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -64,6 +77,9 @@ class SystemRequest(BaseModel):
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
+    config = sa.orm.relationship(
+        "adaptor_configs", back_populates="requests", lazy="joined"
+    )
 
     @property
     def age(self):
@@ -341,6 +357,33 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     return kwargs
 
 
+def generate_config_hash(config: dict[str, Any]) -> str:
+    return hashlib.md5(json.dumps(config, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def get_adaptor_config(
+    config_hash: str,
+    session: sa.orm.Session,
+) -> AdaptorConfig | None:
+    try:
+        statement = sa.select(AdaptorConfig).where(
+            AdaptorConfig.config_hash == config_hash
+        )
+        return session.scalars(statement).one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        return None
+
+
+def add_adaptor_config(
+    config_hash: str, config: dict[str, Any], session: sa.orm.Session
+):
+    config = AdaptorConfig(
+        config_hash=config_hash,
+        config=config,
+    )
+    session.add(config)
+
+
 def create_request(
     session: sa.orm.Session,
     user_uid: str,
@@ -349,12 +392,18 @@ def create_request(
     kwargs: dict[str, Any],
     process_id: str,
     portal: str,
+    adaptor_config: dict[str, Any],
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
-    """Temporary function to create a request."""
+    """Create a request."""
+    config_hash = generate_config_hash(adaptor_config)
+    if get_adaptor_config(config_hash=config_hash, session=session) is None:
+        add_adaptor_config(
+            config_hash=config_hash, config=adaptor_config, session=session
+        )
     metadata["resources"] = resources
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
@@ -363,12 +412,13 @@ def create_request(
         status="accepted",
         request_body={
             "setup_code": setup_code,
-            "entry_point": entry_point,
             "kwargs": kwargs,
         },
         request_metadata=metadata,
         origin=origin,
         portal=portal,
+        config_hash=config_hash,
+        entry_point=entry_point,
     )
     session.add(request)
     session.commit()
