@@ -44,7 +44,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        "update system_requests set request_body['entry_point']=entry_point"
+        "update system_requests set request_body['entry_point']=to_jsonb(\"entry_point\")"
     )
     op.drop_column("system_requests", "entry_point")
     op.drop_column("system_requests", "config_hash")
