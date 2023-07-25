@@ -244,8 +244,8 @@ class Broker:
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.entry_point,
-            config=request.adaptor_metadata.config
-            form=request.adaptor_metadata.form
+            config=request.adaptor_metadata.config,
+            form=request.adaptor_metadata.form,
             request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
