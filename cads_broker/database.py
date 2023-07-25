@@ -65,7 +65,9 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
     portal = sa.Column(sa.Text)
-    config_hash = sa.Column(sa.Text, sa.ForeignKey("adaptor_configurations.config_hash"), nullable=False)
+    config_hash = sa.Column(
+        sa.Text, sa.ForeignKey("adaptor_configurations.config_hash"), nullable=False
+    )
     entry_point = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
@@ -165,15 +167,15 @@ def count_finished_requests_per_user(
 def count_requests(
     session: sa.orm.Session,
     status: str | None = None,
-    process_id: str | None = None,
+    entry_point: str | None = None,
     user_uid: str | None = None,
 ) -> int:
     """Count requests."""
     statement = session.query(SystemRequest)
     if status is not None:
         statement = statement.filter(SystemRequest.status == status)
-    if process_id is not None:
-        statement = statement.filter(SystemRequest.process_id == process_id)
+    if entry_point is not None:
+        statement = statement.filter(SystemRequest.entry_point == entry_point)
     if user_uid is not None:
         statement = statement.filter(SystemRequest.user_uid == user_uid)
     return statement.count()
@@ -285,15 +287,16 @@ def count_waiting_users_queued(session: sa.orm.Session):
     ).all()
 
 
-def count_running_users(session: sa.orm.Session) -> list:
+def count_users(status: str, entry_point: str, session: sa.orm.Session) -> list:
     """Users that have running requests, per dataset."""
-    return session.execute(
-        sa.select(
-            SystemRequest.process_id, sa.func.count(sa.distinct(SystemRequest.user_uid))
+    return (
+        session.query(SystemRequest.user_uid)
+        .filter(
+            SystemRequest.status == status, SystemRequest.entry_point == entry_point
         )
-        .filter(SystemRequest.status == "running")
-        .group_by(SystemRequest.process_id)
-    ).all()
+        .distinct()
+        .count()
+    )
 
 
 def set_request_status(

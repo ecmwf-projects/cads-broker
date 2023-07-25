@@ -30,6 +30,7 @@ def mock_system_request(
     cache_id: int | None = None,
     request_body: dict | None = None,
     config_hash: str = "config_hash",
+    entry_point: str = "entry_point",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
@@ -41,6 +42,7 @@ def mock_system_request(
         cache_id=cache_id,
         request_body=request_body or {"request_type": "test"},
         config_hash=config_hash,
+        entry_point=entry_point,
     )
     return system_request
 
@@ -100,24 +102,24 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
 
 
 def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
-    process_id1 = "reanalysis-era5-pressure-levels"
-    process_id2 = "reanalysis-era5-single-levels"
+    entry_point1 = "reanalysis-era5-pressure-levels"
+    entry_point2 = "reanalysis-era5-single-levels"
     user_uid1 = str(uuid.uuid4())
     user_uid2 = str(uuid.uuid4())
     config_adaptor = mock_config()
     request1 = mock_system_request(
-        process_id=process_id1,
+        entry_point=entry_point1,
         user_uid=user_uid1,
         config_hash=config_adaptor.config_hash,
     )
     request2 = mock_system_request(
-        process_id=process_id2,
+        entry_point=entry_point2,
         user_uid=user_uid2,
         config_hash=config_adaptor.config_hash,
     )
     request3 = mock_system_request(
         status="running",
-        process_id=process_id2,
+        entry_point=entry_point2,
         user_uid=user_uid2,
         config_hash=config_adaptor.config_hash,
     )
@@ -129,7 +131,7 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request3)
         session.commit()
         assert 3 == db.count_requests(session=session)
-        assert 1 == db.count_requests(session=session, process_id=process_id1)
+        assert 1 == db.count_requests(session=session, entry_point=entry_point1)
         assert 2 == db.count_requests(session=session, status="accepted")
         assert 2 == db.count_requests(session=session, user_uid=user_uid2)
         assert 1 == db.count_requests(
@@ -398,28 +400,33 @@ def test_count_waiting_users_queued(session_obj: sa.orm.sessionmaker) -> None:
 
 def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
     config_adaptor = mock_config()
-    process_id = "reanalysis-era5-pressure-levels"
+    request0 = mock_system_request(
+        status="running", entry_point="foobar", config_hash=config_adaptor.config_hash, user_uid="bob"
+    )
     request1 = mock_system_request(
-        status="running", process_id=process_id, config_hash=config_adaptor.config_hash
+        status="running", entry_point="bar", config_hash=config_adaptor.config_hash, user_uid="bob"
     )
-    request1.user_uid = "aaa"
     request2 = mock_system_request(
-        status="running", process_id=process_id, config_hash=config_adaptor.config_hash
+        status="running", entry_point="bar", config_hash=config_adaptor.config_hash, user_uid="bob"
     )
-    request2.user_uid = "bbb"
     request3 = mock_system_request(
-        status="accepted", process_id=process_id, config_hash=config_adaptor.config_hash
+        status="accepted", entry_point="bar", config_hash=config_adaptor.config_hash, user_uid="carl"
     )
-    request3.user_uid = "ccc"
+    request4 = mock_system_request(
+        status="accepted", entry_point="bar", config_hash=config_adaptor.config_hash, user_uid="bob"
+    )
     with session_obj() as session:
         session.add(config_adaptor)
+        session.add(request0)
         session.add(request1)
         session.add(request2)
         session.add(request3)
+        session.add(request4)
         session.commit()
-        response = db.count_running_users(session=session)
-        assert 1 == len(response)
-        assert 2 == response[0][1]
+        assert 2 == db.count_users(session=session, entry_point="bar", status="accepted")
+        assert 1 == db.count_users(session=session, entry_point="bar", status="running")
+        assert 0 == db.count_users(session=session, entry_point="foobar", status="accepted")
+        assert 1 == db.count_users(session=session, entry_point="foobar", status="running")
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
