@@ -65,7 +65,7 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
     portal = sa.Column(sa.Text)
-    config_hash = sa.Column(sa.Text, sa.ForeignKey("adaptor_configs.config_hash"), nullable=False)
+    config_hash = sa.Column(sa.Text, sa.ForeignKey("adaptor_configurations.config_hash"), nullable=False)
     entry_point = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
@@ -78,7 +78,7 @@ class SystemRequest(BaseModel):
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
     config = sa.orm.relationship(
-        "adaptor_configs", back_populates="requests", lazy="joined"
+        "adaptor_configurations", back_populates="requests", lazy="joined"
     )
 
     @property
