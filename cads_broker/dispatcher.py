@@ -102,7 +102,7 @@ class QoSRules:
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
             "adaptor",
-            lambda context, *args: context.request.request_body.get("entry_point", ""),
+            lambda context, *args: context.request.entry_point,
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
             "userRequestCount",
