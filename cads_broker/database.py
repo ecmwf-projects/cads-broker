@@ -287,7 +287,7 @@ def count_waiting_users_queued(session: sa.orm.Session):
     ).all()
 
 
-def count_users(status: str, entry_point: str, session: sa.orm.Session) -> list:
+def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     """Users that have running requests, per dataset."""
     return (
         session.query(SystemRequest.user_uid)
