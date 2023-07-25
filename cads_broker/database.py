@@ -31,17 +31,18 @@ class NoResultFound(Exception):
     pass
 
 
-class AdaptorConfig(BaseModel):
-    """Resource ORM model."""
+class AdaptorMetadata(BaseModel):
+    """Adaptor Metadata ORM model."""
 
-    __tablename__ = "adaptor_configurations"
+    __tablename__ = "adaptor_metadata"
 
-    config_hash = sa.Column(sa.Text, primary_key=True)
+    hash = sa.Column(sa.Text, primary_key=True)
     config = sa.Column(JSONB)
+    form = sa.Column(JSONB)
 
 
 class SystemRequest(BaseModel):
-    """Resource ORM model."""
+    """System Request ORM model."""
 
     __tablename__ = "system_requests"
 
@@ -65,8 +66,8 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
     portal = sa.Column(sa.Text)
-    config_hash = sa.Column(
-        sa.Text, sa.ForeignKey("adaptor_configurations.config_hash"), nullable=False
+    adaptor_metadata_hash = sa.Column(
+        sa.Text, sa.ForeignKey("adaptor_metadata.hash"), nullable=False
     )
     entry_point = sa.Column(sa.Text)
 
@@ -79,7 +80,7 @@ class SystemRequest(BaseModel):
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
-    config = sa.orm.relationship(AdaptorConfig, lazy="joined")
+    adaptor_metadata = sa.orm.relationship(AdaptorMetadata, lazy="joined")
 
     @property
     def age(self):
@@ -347,28 +348,31 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "finished_at": request.finished_at.isoformat()
         if request.finished_at is not None
         else None,
-        "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
+        "request_kwargs": request.request_body.get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
         "resubmit_number": request.request_metadata.get("resubmit_number", 0),
         "origin": request.origin,
-        "entry_point": request.request_body.get("entry_point", None),
+        "entry_point": request.entry_point,
         **request.response_error,
     }
     return kwargs
 
 
-def generate_config_hash(config: dict[str, Any]) -> str:
-    return hashlib.md5(json.dumps(config, sort_keys=True).encode("utf-8")).hexdigest()
+def generate_adaptor_metadata_hash(config: dict[str, Any], form: dict[str, Any]) -> str:
+    config_form = {"config": config, "form": form}
+    return hashlib.md5(
+        json.dumps(config_form, sort_keys=True).encode("utf-8")
+    ).hexdigest()
 
 
 def get_adaptor_config(
-    config_hash: str,
+    adaptor_metadata_hash: str,
     session: sa.orm.Session,
-) -> AdaptorConfig | None:
+) -> AdaptorMetadata | None:
     try:
-        statement = sa.select(AdaptorConfig).where(
-            AdaptorConfig.config_hash == config_hash
+        statement = sa.select(AdaptorMetadata).where(
+            AdaptorMetadata.hash == adaptor_metadata_hash
         )
         return session.scalars(statement).one()
     except sqlalchemy.orm.exc.NoResultFound:
@@ -376,12 +380,12 @@ def get_adaptor_config(
 
 
 def add_adaptor_config(
-    config_hash: str, config: dict[str, Any], session: sa.orm.Session
+    hash: str,
+    config: dict[str, Any],
+    form: dict[str, Any],
+    session: sa.orm.Session,
 ):
-    config = AdaptorConfig(
-        config_hash=config_hash,
-        config=config,
-    )
+    config = AdaptorMetadata(hash=hash, config=config, form=form)
     session.add(config)
 
 
@@ -390,20 +394,24 @@ def create_request(
     user_uid: str,
     setup_code: str,
     entry_point: str,
-    kwargs: dict[str, Any],
+    request: dict[str, Any],
     process_id: str,
     portal: str,
     adaptor_config: dict[str, Any],
+    adaptor_form: dict[str, Any],
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Create a request."""
-    config_hash = generate_config_hash(adaptor_config)
-    if get_adaptor_config(config_hash=config_hash, session=session) is None:
+    adaptor_metadata_hash = generate_adaptor_metadata_hash(config=adaptor_config, form=adaptor_form)
+    if get_adaptor_config(adaptor_metadata_hash=adaptor_metadata_hash, session=session) is None:
         add_adaptor_config(
-            config_hash=config_hash, config=adaptor_config, session=session
+            hash=adaptor_metadata_hash,
+            config=adaptor_config,
+            form=adaptor_form,
+            session=session,
         )
     metadata["resources"] = resources
     request = SystemRequest(
@@ -413,12 +421,12 @@ def create_request(
         status="accepted",
         request_body={
             "setup_code": setup_code,
-            "kwargs": kwargs,
+            "request": request,
         },
         request_metadata=metadata,
         origin=origin,
         portal=portal,
-        config_hash=config_hash,
+        adaptor_metadata_hash=adaptor_metadata_hash,
         entry_point=entry_point,
     )
     session.add(request)
