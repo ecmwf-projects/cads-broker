@@ -19,13 +19,14 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "adaptor_configurations",
-        sa.Column("config_hash", sa.Text, primary_key=True, index=True),
+        "adaptor_metadata",
+        sa.Column("hash", sa.Text, primary_key=True),
         sa.Column("config", JSONB),
+        sa.Column("form", JSONB),
     )
     op.add_column(
         "system_requests",
-        sa.Column("config_hash", sa.Text, sa.ForeignKey("adaptor_configurations.config_hash")),
+        sa.Column("adaptor_metadata_hash", sa.Text, sa.ForeignKey("adaptor_metadata.hash")),
     )
     op.add_column(
         "system_requests",
@@ -35,10 +36,10 @@ def upgrade() -> None:
         "update system_requests set entry_point=request_body['entry_point']"
     )
     op.execute(
-        "insert into adaptor_configurations (config_hash, config) values ('098f6bcd4621d373cade4e832627b4f6', '{}')"
+        "insert into adaptor_metadata (hash, config, form) values ('098f6bcd4621d373cade4e832627b4f6', '{}', '{}')"
     )
     op.execute(
-        "update system_requests set config_hash='098f6bcd4621d373cade4e832627b4f6'"
+        "update system_requests set adaptor_metadata_hash='098f6bcd4621d373cade4e832627b4f6'"
     )
 
 
@@ -47,6 +48,6 @@ def downgrade() -> None:
         "update system_requests set request_body['entry_point']=to_jsonb(\"entry_point\")"
     )
     op.drop_column("system_requests", "entry_point")
-    op.drop_column("system_requests", "config_hash")
-    op.drop_table("adaptor_configurations")
+    op.drop_column("system_requests", "adaptor_metadata_hash")
+    op.drop_table("adaptor_metadata")
 
