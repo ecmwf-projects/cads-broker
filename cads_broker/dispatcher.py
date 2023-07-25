@@ -243,7 +243,7 @@ class Broker:
             worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
-            entry_point=request.request_body.get("entry_point", ""),
+            entry_point=request.entry_point,
             kwargs=request.request_body.get("kwargs", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
