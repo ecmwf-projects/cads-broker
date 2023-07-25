@@ -1,23 +1,33 @@
 import datetime
 import random
 import uuid
+from typing import Any
 
 import distributed
 import pytest_mock
 import sqlalchemy as sa
-
-from cads_broker import Environment, dispatcher
+from cads_broker import Environment
 from cads_broker import database as db
+from cads_broker import dispatcher
 from cads_broker.qos import QoS, Rule
 
 # create client object and connect to local cluster
 CLIENT = distributed.Client(distributed.LocalCluster())
 
 
+def mock_config(config_hash: str = "", config: dict[str, Any] = {}):
+    config_adaptor = db.AdaptorConfig(
+        config_hash=config_hash,
+        config=config,
+    )
+    return config_adaptor
+
+
 def mock_system_request(
     status: str = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
+    config_hash: str = "config_hash",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
@@ -27,6 +37,7 @@ def mock_system_request(
         started_at=None,
         request_body={"request_type": "test"},
         request_metadata={},
+        config_hash=config_hash,
     )
     return system_request
 
@@ -47,14 +58,24 @@ def test_broker_sync_database(
     in_futures_request_uid = str(uuid.uuid4())
     in_dask_request_uid = str(uuid.uuid4())
     lost_request_uid = str(uuid.uuid4())
+    config_adaptor = mock_config()
     in_futures_request = mock_system_request(
-        request_uid=in_futures_request_uid, status="running"
+        request_uid=in_futures_request_uid,
+        status="running",
+        config_hash=config_adaptor.config_hash,
     )
     in_dask_request = mock_system_request(
-        request_uid=in_dask_request_uid, status="running"
+        request_uid=in_dask_request_uid,
+        status="running",
+        config_hash=config_adaptor.config_hash,
     )
-    lost_request = mock_system_request(request_uid=lost_request_uid, status="running")
+    lost_request = mock_system_request(
+        request_uid=lost_request_uid,
+        status="running",
+        config_hash=config_adaptor.config_hash,
+    )
     with session_obj() as session:
+        session.add(config_adaptor)
         session.add(in_futures_request)
         session.add(in_dask_request)
         session.add(lost_request)
