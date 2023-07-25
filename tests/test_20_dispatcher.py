@@ -16,7 +16,7 @@ CLIENT = distributed.Client(distributed.LocalCluster())
 
 
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
-    adaptor_metadata = db.AdaptorMetadata(
+    adaptor_metadata = db.AdaptorProperties(
         hash=hash,
         config=config,
         form=form,
@@ -28,7 +28,7 @@ def mock_system_request(
     status: str = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
-    adaptor_metadata_hash: str = "adaptor_metadata_hash",
+    adaptor_properties_hash: str = "adaptor_properties_hash",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
@@ -38,7 +38,7 @@ def mock_system_request(
         started_at=None,
         request_body={"request_type": "test"},
         request_metadata={},
-        adaptor_metadata_hash=adaptor_metadata_hash,
+        adaptor_properties_hash=adaptor_properties_hash,
     )
     return system_request
 
@@ -63,17 +63,17 @@ def test_broker_sync_database(
     in_futures_request = mock_system_request(
         request_uid=in_futures_request_uid,
         status="running",
-        adaptor_metadata_hash=adaptor_metadata.hash,
+        adaptor_properties_hash=adaptor_metadata.hash,
     )
     in_dask_request = mock_system_request(
         request_uid=in_dask_request_uid,
         status="running",
-        adaptor_metadata_hash=adaptor_metadata.hash,
+        adaptor_properties_hash=adaptor_metadata.hash,
     )
     lost_request = mock_system_request(
         request_uid=lost_request_uid,
         status="running",
-        adaptor_metadata_hash=adaptor_metadata.hash,
+        adaptor_properties_hash=adaptor_metadata.hash,
     )
     with session_obj() as session:
         session.add(adaptor_metadata)
