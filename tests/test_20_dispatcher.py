@@ -15,19 +15,20 @@ from cads_broker.qos import QoS, Rule
 CLIENT = distributed.Client(distributed.LocalCluster())
 
 
-def mock_config(config_hash: str = "", config: dict[str, Any] = {}):
-    config_adaptor = db.AdaptorConfig(
-        config_hash=config_hash,
+def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
+    adaptor_metadata = db.AdaptorMetadata(
+        hash=hash,
         config=config,
+        form=form,
     )
-    return config_adaptor
+    return adaptor_metadata
 
 
 def mock_system_request(
     status: str = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
-    config_hash: str = "config_hash",
+    adaptor_metadata_hash: str = "adaptor_metadata_hash",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_id=random.randrange(1, 100),
@@ -37,7 +38,7 @@ def mock_system_request(
         started_at=None,
         request_body={"request_type": "test"},
         request_metadata={},
-        config_hash=config_hash,
+        adaptor_metadata_hash=adaptor_metadata_hash,
     )
     return system_request
 
@@ -58,24 +59,24 @@ def test_broker_sync_database(
     in_futures_request_uid = str(uuid.uuid4())
     in_dask_request_uid = str(uuid.uuid4())
     lost_request_uid = str(uuid.uuid4())
-    config_adaptor = mock_config()
+    adaptor_metadata = mock_config()
     in_futures_request = mock_system_request(
         request_uid=in_futures_request_uid,
         status="running",
-        config_hash=config_adaptor.config_hash,
+        adaptor_metadata_hash=adaptor_metadata.hash,
     )
     in_dask_request = mock_system_request(
         request_uid=in_dask_request_uid,
         status="running",
-        config_hash=config_adaptor.config_hash,
+        adaptor_metadata_hash=adaptor_metadata.hash,
     )
     lost_request = mock_system_request(
         request_uid=lost_request_uid,
         status="running",
-        config_hash=config_adaptor.config_hash,
+        adaptor_metadata_hash=adaptor_metadata.hash,
     )
     with session_obj() as session:
-        session.add(config_adaptor)
+        session.add(adaptor_metadata)
         session.add(in_futures_request)
         session.add(in_dask_request)
         session.add(lost_request)
