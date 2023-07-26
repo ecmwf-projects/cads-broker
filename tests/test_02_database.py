@@ -13,6 +13,15 @@ from cads_broker import config
 from cads_broker import database as db
 
 
+def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
+    adaptor_properties = db.AdaptorProperties(
+        hash=hash,
+        config=config,
+        form=form,
+    )
+    return adaptor_properties
+
+
 def mock_system_request(
     status: str | None = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
@@ -21,6 +30,8 @@ def mock_system_request(
     user_uid: str | None = None,
     cache_id: int | None = None,
     request_body: dict | None = None,
+    adaptor_properties_hash: str = "adaptor_properties_hash",
+    entry_point: str = "entry_point",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
@@ -31,6 +42,8 @@ def mock_system_request(
         started_at=None,
         cache_id=cache_id,
         request_body=request_body or {"request_type": "test"},
+        adaptor_properties_hash=adaptor_properties_hash,
+        entry_point=entry_point,
     )
     return system_request
 
@@ -50,10 +63,16 @@ def response_as_dict(response: list[tuple]) -> dict:
 
 
 def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
-    successful_request = mock_system_request(status="running")
-    accepted_request = mock_system_request(status="accepted")
+    adaptor_properties = mock_config()
+    successful_request = mock_system_request(
+        status="running", adaptor_properties_hash=adaptor_properties.hash
+    )
+    accepted_request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
     accepted_request_uid = accepted_request.request_uid
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(successful_request)
         session.add(accepted_request)
         session.commit()
@@ -63,12 +82,18 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> None:
-    request1 = mock_system_request(status="successful")
+    adaptor_properties = mock_config()
+    request1 = mock_system_request(
+        status="successful", adaptor_properties_hash=adaptor_properties.hash
+    )
     request1.finished_at = datetime.datetime.now()
-    request2 = mock_system_request(status="failed")
+    request2 = mock_system_request(
+        status="failed", adaptor_properties_hash=adaptor_properties.hash
+    )
     request2.finished_at = datetime.datetime.now()
 
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.commit()
@@ -78,23 +103,36 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
 
 
 def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
-    process_id1 = "reanalysis-era5-pressure-levels"
-    process_id2 = "reanalysis-era5-single-levels"
+    entry_point1 = "reanalysis-era5-pressure-levels"
+    entry_point2 = "reanalysis-era5-single-levels"
     user_uid1 = str(uuid.uuid4())
     user_uid2 = str(uuid.uuid4())
-    request1 = mock_system_request(process_id=process_id1, user_uid=user_uid1)
-    request2 = mock_system_request(process_id=process_id2, user_uid=user_uid2)
+    adaptor_properties = mock_config()
+    request1 = mock_system_request(
+        entry_point=entry_point1,
+        user_uid=user_uid1,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request2 = mock_system_request(
+        entry_point=entry_point2,
+        user_uid=user_uid2,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request3 = mock_system_request(
-        status="running", process_id=process_id2, user_uid=user_uid2
+        status="running",
+        entry_point=entry_point2,
+        user_uid=user_uid2,
+        adaptor_properties_hash=adaptor_properties.hash,
     )
 
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
         session.commit()
         assert 3 == db.count_requests(session=session)
-        assert 1 == db.count_requests(session=session, process_id=process_id1)
+        assert 1 == db.count_requests(session=session, entry_point=entry_point1)
         assert 2 == db.count_requests(session=session, status="accepted")
         assert 2 == db.count_requests(session=session, user_uid=user_uid2)
         assert 1 == db.count_requests(
@@ -105,10 +143,24 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
 def test_count_requests_per_dataset_status(session_obj: sa.orm.sessionmaker) -> None:
     process_id_era5 = "reanalysis-era5-pressure-levels"
     process_id_dummy = "dummy-dataset"
-    request1 = mock_system_request(status="accepted", process_id=process_id_era5)
-    request2 = mock_system_request(status="accepted", process_id=process_id_era5)
-    request3 = mock_system_request(status="accepted", process_id=process_id_dummy)
+    adaptor_properties = mock_config()
+    request1 = mock_system_request(
+        status="accepted",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request2 = mock_system_request(
+        status="accepted",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request3 = mock_system_request(
+        status="accepted",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -129,13 +181,31 @@ def test_count_last_day_requests_per_dataset_status(
     session_obj: sa.orm.sessionmaker,
 ) -> None:
     process_id_era5 = "reanalysis-era5-pressure-levels"
+    adaptor_properties = mock_config()
     process_id_dummy = "dummy-dataset"
-    request1 = mock_system_request(status="failed", process_id=process_id_era5)
-    request2 = mock_system_request(status="failed", process_id=process_id_era5)
-    request3 = mock_system_request(status="successful", process_id=process_id_dummy)
-    request4 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request1 = mock_system_request(
+        status="failed",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request2 = mock_system_request(
+        status="failed",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request3 = mock_system_request(
+        status="successful",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request4 = mock_system_request(
+        status="successful",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request4.created_at = datetime.datetime(2020, 1, 1)
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -151,28 +221,50 @@ def test_count_last_day_requests_per_dataset_status(
 def test_total_request_time_per_dataset_status(
     session_obj: sa.orm.sessionmaker,
 ) -> None:
+    adaptor_properties = mock_config()
     process_id_era5 = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="successful", process_id=process_id_era5)
+    request1 = mock_system_request(
+        status="successful",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     # entry not counted (created before yesterday)
     request1.created_at = datetime.datetime(2020, 1, 1)
     request1.started_at = datetime.datetime(2023, 1, 1)
     request1.finished_at = datetime.datetime(2023, 1, 2)
-    request2 = mock_system_request(status="successful", process_id=process_id_era5)
+    request2 = mock_system_request(
+        status="successful",
+        process_id=process_id_era5,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request2.started_at = datetime.datetime(2023, 1, 1)
     request2.finished_at = datetime.datetime(2023, 1, 2)
 
     process_id_dummy = "dummy-dataset"
-    request3 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request3 = mock_system_request(
+        status="successful",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request3.started_at = datetime.datetime(2023, 1, 1)
     request3.finished_at = datetime.datetime(2023, 1, 2)
-    request4 = mock_system_request(status="successful", process_id=process_id_dummy)
+    request4 = mock_system_request(
+        status="successful",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request4.started_at = datetime.datetime(2023, 2, 1)
     request4.finished_at = datetime.datetime(2023, 2, 2)
-    request5 = mock_system_request(status="failed", process_id=process_id_dummy)
+    request5 = mock_system_request(
+        status="failed",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request5.started_at = datetime.datetime(2023, 1, 1)
     request5.finished_at = datetime.datetime(2023, 1, 2)
 
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -188,17 +280,35 @@ def test_total_request_time_per_dataset_status(
 
 
 def test_count_active_users(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
     process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request1.user_uid = "aaa"
-    request2 = mock_system_request(status="successful", process_id=process_id)
+    request2 = mock_system_request(
+        status="successful",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request2.user_uid = "aaa"
-    request3 = mock_system_request(status="running", process_id=process_id)
+    request3 = mock_system_request(
+        status="running",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request3.user_uid = "bbb"
-    request4 = mock_system_request(status="failed", process_id=process_id)
+    request4 = mock_system_request(
+        status="failed",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     # third user is inactive
     request4.user_uid = "ccc"
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -210,14 +320,28 @@ def test_count_active_users(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_count_queued_users(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
     process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request1.user_uid = "aaa"
-    request2 = mock_system_request(status="running", process_id=process_id)
+    request2 = mock_system_request(
+        status="running",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request2.user_uid = "bbb"
-    request3 = mock_system_request(status="accepted", process_id=process_id)
+    request3 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request3.user_uid = "ccc"
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -231,16 +355,34 @@ def test_count_waiting_users_behind_themselves(
     session_obj: sa.orm.sessionmaker,
 ) -> None:
     process_id = "reanalysis-era5-pressure-levels"
+    adaptor_properties = mock_config()
     process_id_dummy = "process_id_dummy"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request1.user_uid = "aaa"
-    request2 = mock_system_request(status="running", process_id=process_id)
+    request2 = mock_system_request(
+        status="running",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request2.user_uid = "aaa"
-    request3 = mock_system_request(status="accepted", process_id=process_id)
+    request3 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request3.user_uid = "bbb"
-    request4 = mock_system_request(status="accepted", process_id=process_id_dummy)
+    request4 = mock_system_request(
+        status="accepted",
+        process_id=process_id_dummy,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request4.user_uid = "bbb"
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.add(request3)
@@ -253,12 +395,22 @@ def test_count_waiting_users_behind_themselves(
 
 
 def test_count_waiting_users_queued(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
     process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="accepted", process_id=process_id)
+    request1 = mock_system_request(
+        status="accepted",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request1.user_uid = "aaa"
-    request2 = mock_system_request(status="successful", process_id=process_id)
+    request2 = mock_system_request(
+        status="successful",
+        process_id=process_id,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
     request2.user_uid = "aaa"
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request1)
         session.add(request2)
         session.commit()
@@ -268,29 +420,67 @@ def test_count_waiting_users_queued(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
-    process_id = "reanalysis-era5-pressure-levels"
-    request1 = mock_system_request(status="running", process_id=process_id)
-    request1.user_uid = "aaa"
-    request2 = mock_system_request(status="running", process_id=process_id)
-    request2.user_uid = "bbb"
-    request3 = mock_system_request(status="accepted", process_id=process_id)
-    request3.user_uid = "ccc"
+    adaptor_properties = mock_config()
+    request0 = mock_system_request(
+        status="running",
+        entry_point="foobar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request1 = mock_system_request(
+        status="running",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request2 = mock_system_request(
+        status="running",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request3 = mock_system_request(
+        status="accepted",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="carl",
+    )
+    request4 = mock_system_request(
+        status="accepted",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
     with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request0)
         session.add(request1)
         session.add(request2)
         session.add(request3)
+        session.add(request4)
         session.commit()
-        response = db.count_running_users(session=session)
-        assert 1 == len(response)
-        assert 2 == response[0][1]
+        assert 2 == db.count_users(
+            session=session, entry_point="bar", status="accepted"
+        )
+        assert 1 == db.count_users(session=session, entry_point="bar", status="running")
+        assert 0 == db.count_users(
+            session=session, entry_point="foobar", status="accepted"
+        )
+        assert 1 == db.count_users(
+            session=session, entry_point="foobar", status="running"
+        )
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
-    request = mock_system_request(status="accepted")
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
     request_uid = request.request_uid
 
     # running status
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
 
@@ -332,10 +522,14 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     assert successful_request.finished_at is not None
 
     # failed status
-    request = mock_system_request(status="accepted")
+    adaptor_properties = mock_config(hash="test")
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
     request_uid = request.request_uid
 
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
 
@@ -367,11 +561,14 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
             user_uid="abc123",
             setup_code="",
             entry_point="sum",
-            kwargs={},
+            request={},
             metadata={},
             process_id="submit-workflow",
             session=session,
             portal="c3s",
+            adaptor_config={"dummy_config": {"foo": "bar"}},
+            adaptor_form={},
+            adaptor_properties_hash="adaptor_properties_hash",
         )
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.request_uid == request_dict["request_uid"]
@@ -382,9 +579,13 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
-    request = mock_system_request(status="accepted")
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
     request_uid = request.request_uid
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
     with session_obj() as session:
@@ -399,11 +600,14 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
     with session_obj() as session:
         session.add(cache_entry)
         session.flush()
+        adaptor_properties = mock_config()
         request = mock_system_request(
             status="successful",
             cache_id=cache_entry.id,
+            adaptor_properties_hash=adaptor_properties.hash,
         )
         request_uid = request.request_uid
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
         result = db.get_request_result(request_uid, session=session)
@@ -411,9 +615,13 @@ def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
-    request = mock_system_request(status="accepted")
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
     request_uid = request.request_uid
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
         request = db.delete_request(request_uid, session=session)
@@ -445,9 +653,11 @@ def test_init_database(postgresql: Connection[str]) -> None:
     )
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
 
-    request = mock_system_request()
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
     session_obj = sa.orm.sessionmaker(engine)
     with session_obj() as session:
+        session.add(adaptor_properties)
         session.add(request)
         session.commit()
 
