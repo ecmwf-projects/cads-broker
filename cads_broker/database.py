@@ -6,16 +6,16 @@ import os
 import uuid
 from typing import Any
 
-import alembic.command
-import alembic.config
+import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-import cacholote
+import alembic.command
+import alembic.config
+from cads_broker import config
 
 BaseModel = cacholote.database.Base
 
@@ -359,6 +359,15 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
     return kwargs
 
 
+def generate_adaptor_properties_hash(
+    config: dict[str, Any], form: dict[str, Any]
+) -> str:
+    config_form = {"config": config, "form": form}
+    return hashlib.md5(
+        json.dumps(config_form, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
 def get_adaptor_properties(
     adaptor_properties_hash: str,
     session: sa.orm.Session,
@@ -399,7 +408,12 @@ def create_request(
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Create a request."""
-    if get_adaptor_properties(adaptor_properties_hash=adaptor_properties_hash, session=session) is None:
+    if (
+        get_adaptor_properties(
+            adaptor_properties_hash=adaptor_properties_hash, session=session
+        )
+        is None
+    ):
         add_adaptor_properties(
             hash=adaptor_properties_hash,
             config=adaptor_config,

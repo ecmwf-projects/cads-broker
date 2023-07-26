@@ -6,9 +6,9 @@ from typing import Any
 import distributed
 import pytest_mock
 import sqlalchemy as sa
-from cads_broker import Environment
+
+from cads_broker import Environment, dispatcher
 from cads_broker import database as db
-from cads_broker import dispatcher
 from cads_broker.qos import QoS, Rule
 
 # create client object and connect to local cluster
