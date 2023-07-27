@@ -1,5 +1,7 @@
 """SQLAlchemy ORM model."""
 import datetime
+import hashlib
+import json
 import os
 import uuid
 from typing import Any
@@ -29,8 +31,18 @@ class NoResultFound(Exception):
     pass
 
 
+class AdaptorProperties(BaseModel):
+    """Adaptor Metadata ORM model."""
+
+    __tablename__ = "adaptor_properties"
+
+    hash = sa.Column(sa.Text, primary_key=True)
+    config = sa.Column(JSONB)
+    form = sa.Column(JSONB)
+
+
 class SystemRequest(BaseModel):
-    """Resource ORM model."""
+    """System Request ORM model."""
 
     __tablename__ = "system_requests"
 
@@ -54,6 +66,10 @@ class SystemRequest(BaseModel):
     updated_at = sa.Column(sa.TIMESTAMP, default=sa.func.now(), onupdate=sa.func.now())
     origin = sa.Column(sa.Text, default="ui")
     portal = sa.Column(sa.Text)
+    adaptor_properties_hash = sa.Column(
+        sa.Text, sa.ForeignKey("adaptor_properties.hash"), nullable=False
+    )
+    entry_point = sa.Column(sa.Text)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -64,6 +80,7 @@ class SystemRequest(BaseModel):
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
+    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="joined")
 
     @property
     def age(self):
@@ -151,15 +168,15 @@ def count_finished_requests_per_user(
 def count_requests(
     session: sa.orm.Session,
     status: str | None = None,
-    process_id: str | None = None,
+    entry_point: str | None = None,
     user_uid: str | None = None,
 ) -> int:
     """Count requests."""
     statement = session.query(SystemRequest)
     if status is not None:
         statement = statement.filter(SystemRequest.status == status)
-    if process_id is not None:
-        statement = statement.filter(SystemRequest.process_id == process_id)
+    if entry_point is not None:
+        statement = statement.filter(SystemRequest.entry_point == entry_point)
     if user_uid is not None:
         statement = statement.filter(SystemRequest.user_uid == user_uid)
     return statement.count()
@@ -271,15 +288,16 @@ def count_waiting_users_queued(session: sa.orm.Session):
     ).all()
 
 
-def count_running_users(session: sa.orm.Session) -> list:
+def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     """Users that have running requests, per dataset."""
-    return session.execute(
-        sa.select(
-            SystemRequest.process_id, sa.func.count(sa.distinct(SystemRequest.user_uid))
+    return (
+        session.query(SystemRequest.user_uid)
+        .filter(
+            SystemRequest.status == status, SystemRequest.entry_point == entry_point
         )
-        .filter(SystemRequest.status == "running")
-        .group_by(SystemRequest.process_id)
-    ).all()
+        .distinct()
+        .count()
+    )
 
 
 def set_request_status(
@@ -330,15 +348,47 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "finished_at": request.finished_at.isoformat()
         if request.finished_at is not None
         else None,
-        "request_kwargs": request.request_body.get("kwargs", {}).get("request", {}),
+        "request_kwargs": request.request_body.get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
         "resubmit_number": request.request_metadata.get("resubmit_number", 0),
         "origin": request.origin,
-        "entry_point": request.request_body.get("entry_point", None),
+        "entry_point": request.entry_point,
         **request.response_error,
     }
     return kwargs
+
+
+def generate_adaptor_properties_hash(
+    config: dict[str, Any], form: dict[str, Any]
+) -> str:
+    config_form = {"config": config, "form": form}
+    return hashlib.md5(
+        json.dumps(config_form, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def get_adaptor_properties(
+    adaptor_properties_hash: str,
+    session: sa.orm.Session,
+) -> AdaptorProperties | None:
+    try:
+        statement = sa.select(AdaptorProperties).where(
+            AdaptorProperties.hash == adaptor_properties_hash
+        )
+        return session.scalars(statement).one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        return None
+
+
+def add_adaptor_properties(
+    hash: str,
+    config: dict[str, Any],
+    form: dict[str, Any],
+    session: sa.orm.Session,
+):
+    adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
+    session.add(adaptor_properties)
 
 
 def create_request(
@@ -346,15 +396,30 @@ def create_request(
     user_uid: str,
     setup_code: str,
     entry_point: str,
-    kwargs: dict[str, Any],
+    request: dict[str, Any],
     process_id: str,
     portal: str,
+    adaptor_config: dict[str, Any],
+    adaptor_form: dict[str, Any],
+    adaptor_properties_hash: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
     origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
-    """Temporary function to create a request."""
+    """Create a request."""
+    if (
+        get_adaptor_properties(
+            adaptor_properties_hash=adaptor_properties_hash, session=session
+        )
+        is None
+    ):
+        add_adaptor_properties(
+            hash=adaptor_properties_hash,
+            config=adaptor_config,
+            form=adaptor_form,
+            session=session,
+        )
     metadata["resources"] = resources
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
@@ -363,12 +428,13 @@ def create_request(
         status="accepted",
         request_body={
             "setup_code": setup_code,
-            "entry_point": entry_point,
-            "kwargs": kwargs,
+            "request": request,
         },
         request_metadata=metadata,
         origin=origin,
         portal=portal,
+        adaptor_properties_hash=adaptor_properties_hash,
+        entry_point=entry_point,
     )
     session.add(request)
     session.commit()
