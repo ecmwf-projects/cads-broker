@@ -102,7 +102,7 @@ class QoSRules:
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
             "adaptor",
-            lambda context, *args: context.request.request_body.get("entry_point", ""),
+            lambda context, *args: context.request.entry_point,
         )
         expressions.FunctionFactory.FunctionFactory.register_function(
             "userRequestCount",
@@ -243,8 +243,10 @@ class Broker:
             worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
-            entry_point=request.request_body.get("entry_point", ""),
-            kwargs=request.request_body.get("kwargs", {}),
+            entry_point=request.entry_point,
+            config=request.adaptor_properties.config,
+            form=request.adaptor_properties.form,
+            request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
