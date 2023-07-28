@@ -482,7 +482,6 @@ def delete_request(
     request = get_request(request_uid, session)
     session.delete(request)
     session.commit()
-    request.status = "dismissed"
     return request
 
 
