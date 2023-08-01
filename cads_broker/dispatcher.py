@@ -166,9 +166,13 @@ class Broker:
         If the task is not in the dask scheduler, it is re-queued.
         """
         statement = sa.select(db.SystemRequest).where(
-            db.SystemRequest.status == "running"
+            db.SystemRequest.status.in_(("running", "dismissed"))
         )
         for request in session.scalars(statement):
+            if request.status == "dismissed":
+                db.delete_request(request=request, session=session)
+                self.qos.notify_end_of_request(request, session)
+                continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
