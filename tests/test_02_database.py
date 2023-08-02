@@ -624,9 +624,7 @@ def test_delete_request(session_obj: sa.orm.sessionmaker) -> None:
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-        request = db.delete_request(request_uid, session=session)
-    assert request.request_uid == request_uid
-    assert request.status == "dismissed"
+        db.delete_request(request, session=session)
     with pytest.raises(db.NoResultFound):
         with session_obj() as session:
             request = db.get_request(request_uid, session=session)
