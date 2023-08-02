@@ -169,6 +169,8 @@ class Broker:
             db.SystemRequest.status.in_(("running", "dismissed"))
         )
         for request in session.scalars(statement):
+            # the retrieve API set the status to "dismissed", here the broker deletes the request
+            # this is to better control the status of the QoS
             if request.status == "dismissed":
                 db.delete_request(request=request, session=session)
                 self.qos.notify_end_of_request(request, session)
