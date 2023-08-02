@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 import distributed
+import pytest
 import pytest_mock
 import sqlalchemy as sa
 
@@ -59,6 +60,7 @@ def test_broker_sync_database(
     in_futures_request_uid = str(uuid.uuid4())
     in_dask_request_uid = str(uuid.uuid4())
     lost_request_uid = str(uuid.uuid4())
+    dismissed_request_uid = str(uuid.uuid4())
     adaptor_metadata = mock_config()
     in_futures_request = mock_system_request(
         request_uid=in_futures_request_uid,
@@ -75,11 +77,17 @@ def test_broker_sync_database(
         status="running",
         adaptor_properties_hash=adaptor_metadata.hash,
     )
+    dismissed_request = mock_system_request(
+        request_uid=dismissed_request_uid,
+        status="dismissed",
+        adaptor_properties_hash=adaptor_metadata.hash,
+    )
     with session_obj() as session:
         session.add(adaptor_metadata)
         session.add(in_futures_request)
         session.add(in_dask_request)
         session.add(lost_request)
+        session.add(dismissed_request)
         session.commit()
 
     def mock_get_tasks() -> dict[str, str]:
@@ -110,3 +118,7 @@ def test_broker_sync_database(
         output_request = session.scalars(statement).first()
         assert output_request.status == "accepted"
         assert output_request.request_metadata.get("resubmit_number") == 1
+
+        with pytest.raises(db.NoResultFound):
+            with session_obj() as session:
+                db.get_request(dismissed_request_uid, session=session)

@@ -476,13 +476,11 @@ def get_request_result(
 
 
 def delete_request(
-    request_uid: str,
+    request: SystemRequest,
     session: sa.orm.Session,
-) -> SystemRequest:
-    request = get_request(request_uid, session)
+) -> None:
     session.delete(request)
     session.commit()
-    return request
 
 
 def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:

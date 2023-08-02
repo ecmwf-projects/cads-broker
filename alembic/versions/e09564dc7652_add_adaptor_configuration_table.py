@@ -51,9 +51,7 @@ def downgrade() -> None:
     op.execute(
         "update system_requests set request_body['entry_point']=to_jsonb(\"entry_point\")"
     )
-    op.execute(
-        "update system_requests set request_body['kwargs']=to_jsonb({})"
-    )
+    op.execute("update system_requests set request_body['kwargs']=to_jsonb({})")
     op.execute(
         "update system_requests set request_body['kwargs']['request']=to_jsonb(request_body['request'])"
     )
