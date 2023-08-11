@@ -16,8 +16,9 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, expressions
+from cads_broker import Environment, config
 from cads_broker import database as db
+from cads_broker import expressions
 from cads_broker.qos import QoS
 
 config.configure_logger()
