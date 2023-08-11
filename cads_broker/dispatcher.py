@@ -192,7 +192,8 @@ class Broker:
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
-        logger_kwargs = {}
+        logger_kwargs: dict[str, Any] = {}
+        log_messages = list(self.client.get_events(future.key))
         with self.session_maker() as session:
             if future.status == "finished":
                 result = future.result()
@@ -201,6 +202,7 @@ class Broker:
                     job_status,
                     cache_id=result,
                     session=session,
+                    log_message=log_messages,
                 )
             elif future.status == "error":
                 exception = future.exception()
@@ -209,6 +211,7 @@ class Broker:
                     job_status,
                     error_message="".join(traceback.format_exception(exception)),
                     error_reason=traceback.format_exception_only(exception)[0],
+                    log_message=log_messages,
                     session=session,
                 )
             else:
@@ -218,6 +221,7 @@ class Broker:
                     job_status,
                     session=session,
                     resubmit=True,
+                    log_message=log_messages,
                 )
                 logger.warning(
                     "unknown dask status, re-queing",
@@ -245,6 +249,10 @@ class Broker:
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
     ) -> None:
+        request = db.set_request_status(
+            request_uid=request.request_uid, status="running", session=session
+        )
+        self.qos.notify_start_of_request(request, session)
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -258,10 +266,6 @@ class Broker:
         )
         self.futures[request.request_uid] = future
         future.add_done_callback(self.on_future_done)
-        request = db.set_request_status(
-            request_uid=request.request_uid, status="running", session=session
-        )
-        self.qos.notify_start_of_request(request, session)
         logger.info(
             "submitted job to scheduler",
             **db.logger_kwargs(request=request),
