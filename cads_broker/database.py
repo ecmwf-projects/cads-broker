@@ -6,16 +6,16 @@ import os
 import uuid
 from typing import Any
 
-import alembic.command
-import alembic.config
+import cacholote
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from cads_broker import config
 from sqlalchemy.dialects.postgresql import JSONB
 
-import cacholote
+import alembic.command
+import alembic.config
+from cads_broker import config
 
 BaseModel = cacholote.database.Base
 
