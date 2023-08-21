@@ -58,7 +58,7 @@ class SystemRequest(BaseModel):
     cache_id = sa.Column(sa.Integer)
     request_body = sa.Column(JSONB, nullable=False)
     request_metadata = sa.Column(JSONB)
-    response_error = sa.Column(JSONB, default="{}")
+    response_error = sa.Column(JSONB, default={})
     response_log = sa.Column(JSONB, default="[]")
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
