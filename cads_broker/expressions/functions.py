@@ -199,31 +199,6 @@ class FunctionAvailable(FunctionExpression):
         return context.environment.resource_enabled(resource)
 
 
-# class FunctionDataset(FunctionExpression):
-#     def execute(self, context):
-#         return request.dataset
-
-
-# class FunctionTagged(FunctionExpression):
-#     def execute(self, context, value):
-#         if value in context.request.request_metadata.get("qos_tags"):
-#             return True
-
-
-# class FunctionRequestContainsAll(FunctionExpression):
-#     def execute(self, context, key, values):
-#         s1 = set(context.request.request_body.get(key))
-#         s2 = set(values)
-#         return len(s1 & s2) == len(s2)
-
-
-# class FunctionRequestContainsAny(FunctionExpression):
-#     def execute(self, context, key, values):
-#         s1 = set(context.request.request_body.get(key))
-#         s2 = set(values)
-#         return len(s1 & s2) > 0
-
-
 class FunctionEstimatedSize(FunctionExpression):
     def execute(self, context):
         return context.request.cost[0]
