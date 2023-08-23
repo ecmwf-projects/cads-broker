@@ -422,7 +422,6 @@ def create_request(
             session=session,
         )
     metadata["resources"] = resources
-    logger.info("QOS_TAGS", qos_tags=qos_tags)
     metadata["qos_tags"] = qos_tags
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
