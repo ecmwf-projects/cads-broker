@@ -16,7 +16,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, expressions
+from cads_broker import Environment, config, factory
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -95,23 +95,6 @@ class QoSRules:
             self.rules = QoS.RuleSet()
             parser.parse_rules(self.rules, self.environment)
 
-    def register_functions(self):
-        expressions.FunctionFactory.FunctionFactory.register_function(
-            "dataset",
-            lambda context, *args: context.request.process_id,
-        )
-        expressions.FunctionFactory.FunctionFactory.register_function(
-            "adaptor",
-            lambda context, *args: context.request.entry_point,
-        )
-        expressions.FunctionFactory.FunctionFactory.register_function(
-            "userRequestCount",
-            lambda context, *args: db.count_finished_requests_per_user(
-                user_uid=context.request.user_uid,
-                seconds=args[0],
-            ),
-        )
-
 
 @attrs.define
 class Broker:
@@ -136,7 +119,7 @@ class Broker:
     ):
         client = distributed.Client(address)
         qos_config = QoSRules()
-        qos_config.register_functions()
+        factory.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
         rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(

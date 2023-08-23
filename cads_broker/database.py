@@ -404,6 +404,7 @@ def create_request(
     adaptor_properties_hash: str,
     metadata: dict[str, Any] = {},
     resources: dict[str, Any] = {},
+    qos_tags: list[str] = [],
     origin: str = "ui",
     request_uid: str | None = None,
 ) -> dict[str, Any]:
@@ -421,6 +422,8 @@ def create_request(
             session=session,
         )
     metadata["resources"] = resources
+    logger.info("QOS_TAGS", qos_tags=qos_tags)
+    metadata["qos_tags"] = qos_tags
     request = SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
         process_id=process_id,
