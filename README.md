@@ -48,6 +48,40 @@ In case of database structure upgrade, developers must follow these steps:
 
 For details about the alembic migration tool, see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
 
+## Quality of Service rules examples
+
+```
+# User limits
+# user "Limit for anonymous"       (user == "anonymous") : numberOfWorkers
+# user "Default per-user limit"   (user ~ ".*")        : 8
+
+# limits for finished requests in the last hours
+# user "Limit for test user 1: 10 finished requests in the last 24 hours" (user == "00000000-0000-4000-a000-000000000000")   : 10 - userRequestCount(hour(24))
+# user "Limit for users: 10 finished requests in the last 24 hours" (user ~ ".*")   : 10 - userRequestCount(hour(24))
+
+# Limits
+# limit "Limit for dummy-dataset"    (dataset == "test-dummy-adaptor")      : numberOfWorkers
+# limit "Limit for cads_adaptors:DummyAdaptor" (adaptor == "cads_adaptors:DummyAdaptor")   : numberOfWorkers - 6
+
+# Permissions
+# permission "anonymous cannot access dummy-dataset"  (dataset == "test-dummy-adaptor"): user != 'anonymous'
+
+# Priorities
+priority "Priority for test user 1"    (user == "00000000-0000-4000-a000-000000000000")  :  hour(1)
+priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-000000000001")  :  -hour(1)
+
+# Functions examples
+
+# Request contains any of the specified variable 
+# priority "Priority for temperature and humidity" (request_contains_any("variable", ["temperature", "relative_humidity"])): -hour(1)
+
+# Request contains all the specified months
+# limit "Limit for retrieve with all months" (request_contains_all("month", ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"])): 2
+
+# The adaptor is tagged with "block"
+# permission "The adaptor is blocked." (tagged("block")): false
+
+```
 ## License
 
 ```
