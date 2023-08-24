@@ -60,6 +60,7 @@ class SystemRequest(BaseModel):
     request_metadata = sa.Column(JSONB)
     response_error = sa.Column(JSONB, default={})
     response_log = sa.Column(JSONB, default="[]")
+    response_user_visible_log = sa.Column(JSONB, default="[]")
     response_metadata = sa.Column(JSONB)
     created_at = sa.Column(sa.TIMESTAMP, default=sa.func.now())
     started_at = sa.Column(sa.TIMESTAMP)
@@ -308,7 +309,8 @@ def set_request_status(
     cache_id: int | None = None,
     error_message: str | None = None,
     error_reason: str | None = None,
-    log_message: list[tuple[int, str]] = [],
+    log: list[tuple[int, str]] = [],
+    user_visible_log: list[tuple[int, str]] = [],
     resubmit: bool | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
@@ -330,7 +332,9 @@ def set_request_status(
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
-    request.response_log = json.dumps(log_message)
+    # FIXME: logs can't be live updated
+    request.response_log = json.dumps(log)
+    request.response_user_visible_log = json.dumps(user_visible_log)
     request.status = status
     session.commit()
     return request
