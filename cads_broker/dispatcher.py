@@ -194,7 +194,9 @@ class Broker:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
         logger_kwargs: dict[str, Any] = {}
         log = list(self.client.get_events(f"{future.key}/log"))
-        user_visible_log = list(self.client.get_events(f"{future.key}/user_visible_log"))
+        user_visible_log = list(
+            self.client.get_events(f"{future.key}/user_visible_log")
+        )
         with self.session_maker() as session:
             if future.status == "finished":
                 result = future.result()

@@ -21,8 +21,11 @@ def upgrade() -> None:
     op.add_column("system_requests", sa.Column("response_log", JSONB, default=[]))
     op.execute("UPDATE system_requests SET response_log='[]'")
 
-    op.add_column("system_requests", sa.Column("response_user_visible_log", JSONB, default=[]))
+    op.add_column(
+        "system_requests", sa.Column("response_user_visible_log", JSONB, default=[])
+    )
     op.execute("UPDATE system_requests SET response_user_visible_log='[]'")
+
 
 def downgrade() -> None:
     op.drop_column("system_requests", "response_log")
