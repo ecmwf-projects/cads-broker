@@ -72,7 +72,7 @@ priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-0000000
 
 # Functions examples
 
-# Request contains any of the specified variable 
+# Request contains any of the specified variable
 # priority "Priority for temperature and humidity" (request_contains_any("variable", ["temperature", "relative_humidity"])): -hour(1)
 
 # Request contains all the specified months
@@ -82,6 +82,7 @@ priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-0000000
 # permission "The adaptor is blocked." (tagged("block")): false
 
 ```
+
 ## License
 
 ```

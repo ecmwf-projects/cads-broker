@@ -8,8 +8,8 @@
 #
 
 from .FunctionFactory import FunctionFactory
-from .NumberExpression import NumberExpression
 from .ListExpression import ListExpression
+from .NumberExpression import NumberExpression
 from .Parser import Parser, ParserError
 from .StringExpression import StringExpression
 
