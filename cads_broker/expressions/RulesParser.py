@@ -8,6 +8,7 @@
 #
 
 from .FunctionFactory import FunctionFactory
+from .ListExpression import ListExpression
 from .NumberExpression import NumberExpression
 from .Parser import Parser, ParserError
 from .StringExpression import StringExpression
@@ -119,6 +120,11 @@ class RulesParser(Parser):
             self.consume(")")
             return e
 
+        if c == "[":
+            self.consume("[")
+            e = self.parse_list()
+            return e
+
         if c == "-":
             self.consume("-")
             return FunctionFactory.create("neg", self.parse_atom())
@@ -136,7 +142,7 @@ class RulesParser(Parser):
         while str.isalpha(c) or c == "_":
             name = self.parse_ident()
             if self.peek() == "(":
-                args = self.parse_list()
+                args = self.parse_args()
                 return FunctionFactory.create(name, *args)
             else:
                 return FunctionFactory.create(name)
@@ -163,7 +169,7 @@ class RulesParser(Parser):
 
         return result
 
-    def parse_list(self):
+    def parse_args(self):
         result = []
         self.consume("(")
         while self.peek() != ")":
@@ -175,6 +181,18 @@ class RulesParser(Parser):
 
         self.consume(")")
         return result
+
+    def parse_list(self):
+        result = []
+        while self.peek() != "]":
+            result.append(self.parse_expression())
+            if self.peek() == "]":
+                break
+
+            self.consume(",")
+
+        self.consume("]")
+        return ListExpression(result)
 
     def parse_factor(self):
         result = self.parse_power()

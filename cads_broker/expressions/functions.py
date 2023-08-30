@@ -199,11 +199,6 @@ class FunctionAvailable(FunctionExpression):
         return context.environment.resource_enabled(resource)
 
 
-# class FunctionDataset(FunctionExpression):
-#     def execute(self, context):
-#         return request.dataset
-
-
 class FunctionEstimatedSize(FunctionExpression):
     def execute(self, context):
         return context.request.cost[0]
