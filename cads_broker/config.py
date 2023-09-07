@@ -13,16 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
 import logging
+import os
 import sys
 
-import pydantic
 import structlog
 
 dbsettings = None
 
 
-class SqlalchemySettings(pydantic.BaseSettings):
+@dataclasses.dataclass
+class SqlalchemySettings:
     """Postgres-specific API settings.
 
     - ``compute_db_user``: postgres username.
@@ -31,19 +33,55 @@ class SqlalchemySettings(pydantic.BaseSettings):
     - ``compute_db_name``: database name.
     """
 
+    compute_db_password: str = dataclasses.field(repr=False)
     compute_db_user: str = "broker"
-    compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
     compute_db_name: str = "broker"
     pool_timeout: float = 1.0
     pool_recycle: int = 60
 
-    @pydantic.validator("compute_db_password")
-    def password_must_be_set(cls: pydantic.BaseSettings, v: str | None) -> str | None:
-        """Check that password is explicitly set."""
-        if v is None:
+    def __init__(self, **kwargs):
+        self.match_args = kwargs
+        for field in dataclasses.fields(self):
+            if field.name in kwargs:
+                setattr(self, field.name, kwargs[field.name])
+            else:
+                setattr(self, field.name, field.default)
+        self.__post_init__()
+
+    def __post_init__(self):
+        # overwrite instance getting attributes from the environment
+        environ = os.environ.copy()
+        environ_lower = {k.lower(): v for k, v in environ.items()}
+        for field in dataclasses.fields(self):
+            if field.name in self.match_args:
+                # do not overwrite if passed to __init__
+                continue
+            if field.name in environ:
+                setattr(self, field.name, environ[field.name])
+            elif field.name in environ_lower:
+                setattr(self, field.name, environ_lower[field.name])
+
+        # automatic casting
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if value != dataclasses.MISSING and not isinstance(value, field.type):
+                try:
+                    setattr(self, field.name, field.type(value))
+                except:  # noqa
+                    raise ValueError(
+                        f"{field.name} '{value}' has not type {repr(field.type)}"
+                    )
+
+        # validations
+        # defined fields without a default must have a value
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if field.default == dataclasses.MISSING and value == dataclasses.MISSING:
+                raise ValueError(f"{field.name} must be set")
+        # compute_db_password must be set
+        if self.compute_db_password is None:
             raise ValueError("compute_db_password must be set")
-        return v
 
     @property
     def connection_string(self) -> str:
