@@ -1,18 +1,18 @@
-"""Add qos_status column
+"""Add qos_status column.
 
 Revision ID: 01374a5b3c41
 Revises: ba380b5614b8
 Create Date: 2023-09-08 12:21:35.601773
 
 """
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '01374a5b3c41'
-down_revision = 'ba380b5614b8'
+revision = "01374a5b3c41"
+down_revision = "ba380b5614b8"
 branch_labels = None
 depends_on = None
 
