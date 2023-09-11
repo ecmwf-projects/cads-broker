@@ -303,14 +303,22 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
+def get_request_qos_status(request_uid: str, session: sa.orm.Session):
+    request = get_request(request_uid=request_uid, session=session)
+    ret_value: dict[str, list[str]] = {}
+    for rule_name, rules in request.qos_status.items():
+        ret_value[rule_name] = []
+        for rule in rules.values():
+            ret_value[rule_name].append(rule.get("info", ""))
+    return ret_value
+
+
 def set_request_qos_rule(
-    request_uid: SystemRequest,
+    request_uid: str,
     rule,
     session: sa.orm.Session,
 ):
-    request = session.scalars(
-        sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    ).one()
+    request = get_request(request_uid=request_uid, session=session)
     qos_status = request.qos_status
     old_rules = qos_status.get(rule.name, {})
     if rule.uid in old_rules:
