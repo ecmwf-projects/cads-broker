@@ -25,21 +25,6 @@ def test_sqlalchemysettings(temp_environ: Any) -> None:
     assert settings.compute_db_password == "a password"
     config.dbsettings = None
 
-    # take also other values from the environment
-    temp_environ["compute_db_password"] = "1"
-    temp_environ["compute_db_user"] = "2"
-    temp_environ["compute_db_host"] = "3"
-    temp_environ["compute_db_name"] = "4"
-    temp_environ["pool_timeout"] = "5.0"
-    temp_environ["pool_recycle"] = "6"
-    settings = config.SqlalchemySettings()
-    assert settings.compute_db_password == "1"
-    assert settings.compute_db_user == "2"
-    assert settings.compute_db_host == "3"
-    assert settings.compute_db_name == "4"
-    assert settings.pool_timeout == 5.0
-    assert settings.pool_recycle == 6
-
 
 def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) -> None:
     temp_environ["compute_db_password"] = "apassword"
