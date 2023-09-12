@@ -516,9 +516,9 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         query = sa.text(
             "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
         )
-        with engine.connect() as conn:
-            if "system_requests" not in conn.execute(query).scalars().all():
-                force = True
+        conn = engine.connect()
+        if "system_requests" not in conn.execute(query).scalars().all():
+            force = True
     if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
