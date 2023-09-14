@@ -17,12 +17,13 @@ import logging
 import sys
 
 import pydantic
+import pydantic_settings
 import structlog
 
 dbsettings = None
 
 
-class SqlalchemySettings(pydantic.BaseSettings):
+class SqlalchemySettings(pydantic_settings.BaseSettings):
     """Postgres-specific API settings.
 
     - ``compute_db_user``: postgres username.
@@ -38,8 +39,10 @@ class SqlalchemySettings(pydantic.BaseSettings):
     pool_timeout: float = 1.0
     pool_recycle: int = 60
 
-    @pydantic.validator("compute_db_password")
-    def password_must_be_set(cls: pydantic.BaseSettings, v: str | None) -> str | None:
+    @pydantic.field_validator("compute_db_password")
+    def password_must_be_set(
+        cls: pydantic_settings.BaseSettings, v: str | None
+    ) -> str | None:
         """Check that password is explicitly set."""
         if v is None:
             raise ValueError("compute_db_password must be set")
