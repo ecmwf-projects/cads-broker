@@ -16,6 +16,7 @@ classifiers = [
 dependencies = [
   "alembic",
   "attrs",
+  "boto3",
   "cacholote",
   "distributed",
   "minio",
