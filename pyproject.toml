@@ -19,7 +19,6 @@ dependencies = [
   "boto3",
   "cacholote",
   "distributed",
-  "minio",
   "sqlalchemy>=2.0.9",
   "sqlalchemy-utils",
   "typer"

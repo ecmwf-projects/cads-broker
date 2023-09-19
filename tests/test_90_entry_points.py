@@ -22,17 +22,16 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     )
     object_storage_url = "http://myobject-storage:myport/"
     object_storage_kws: dict[str, Any] = {
-        "access_key": "storage_user",
-        "secret_key": "storage_password",
-        "secure": False,
+        "aws_access_key_id": "storage_user",
+        "aws_secret_access_key": "storage_password",
     }
     result = runner.invoke(
         entry_points.app,
         ["init-db", "--connection-string", connection_string, "--force"],
         env={
             "OBJECT_STORAGE_URL": object_storage_url,
-            "STORAGE_ADMIN": object_storage_kws["access_key"],
-            "STORAGE_PASSWORD": object_storage_kws["secret_key"],
+            "STORAGE_ADMIN": object_storage_kws["aws_access_key_id"],
+            "STORAGE_PASSWORD": object_storage_kws["aws_secret_access_key"],
         },
     )
     assert result.exit_code == 0

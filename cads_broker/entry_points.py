@@ -52,9 +52,8 @@ def init_db(connection_string: str | None = None, force: bool = False) -> None:
             raise KeyError(msg)
     object_storage_url = os.environ["OBJECT_STORAGE_URL"]
     storage_kws: dict[str, Any] = {
-        "access_key": os.environ["STORAGE_ADMIN"],
-        "secret_key": os.environ["STORAGE_PASSWORD"],
-        "secure": False,
+        "aws_access_key_id": os.environ["STORAGE_ADMIN"],
+        "aws_secret_access_key": os.environ["STORAGE_PASSWORD"],
     }
     object_storage.create_download_bucket(
         os.environ.get("CACHE_BUCKET", "cache"), object_storage_url, **storage_kws
