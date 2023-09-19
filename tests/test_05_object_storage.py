@@ -140,9 +140,8 @@ def test_create_download_bucket(mocker: pytest_mock.MockerFixture) -> None:
     object_storage_url = "http://myobject-storage:myport/"
     bucket_name = "download-bucket"
     storage_kws: dict[str, Any] = {
-        "access_key": "storage_user",
-        "secret_key": "storage_password",
-        "secure": False,
+        "aws_access_key_id": "storage_user",
+        "aws_secret_access_key": "storage_password",
     }
     test_client = DummyBotoClient("s3", object_storage_url, **storage_kws)
     # define spies
