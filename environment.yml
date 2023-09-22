@@ -15,8 +15,6 @@ dependencies:
 - distributed==2022.11.1
 - lz4  # dask distributed needs this to compress / de-compress
 - minio
-- postgresql
-- psycopg
 - psycopg2
 - pydantic>2
 - pydantic-settings

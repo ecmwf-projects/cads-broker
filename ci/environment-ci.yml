@@ -6,6 +6,7 @@ dependencies:
 - make
 - mypy
 - myst-parser
+- postgresql
 - pre-commit
 - pydata-sphinx-theme
 - pytest
