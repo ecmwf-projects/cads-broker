@@ -33,15 +33,16 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     - ``compute_db_name``: database name.
     """
 
-    compute_db_user: str = "broker"
+    compute_db_user: str | None = None
     compute_db_password: str | None = None
-    compute_db_host: str = "compute-db"
-    compute_db_name: str = "broker"
-    # do not prepend ro_* fields: ordering is important
-    ro_compute_db_user: str | None = None
-    ro_compute_db_password: str | None = None
-    ro_compute_db_host: str | None = None
-    ro_compute_db_name: str | None = None
+    compute_db_host: str | None = None
+    compute_db_name: str | None = None
+
+    read_db_user: str | None = None
+    read_db_password: str | None = None
+    write_db_user: str | None = None
+    write_db_password: str | None = None
+    db_host: str | None = None
 
     pool_timeout: float = 1.0
     pool_recycle: int = 60
@@ -53,43 +54,39 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
         info: pydantic_core.core_schema.FieldValidationInfo,
     ) -> str | None:
         """Set defaults for read-only db connection fields."""
-        default_fields_map = [
-            ("ro_compute_db_user", "compute_db_user"),
-            ("ro_compute_db_password", "compute_db_password"),
-            ("ro_compute_db_host", "compute_db_host"),
-            ("ro_compute_db_name", "compute_db_name"),
-        ]
-        for ro_field, rw_field in default_fields_map:
-            if info.field_name == ro_field and not v:
-                return info.data.get(rw_field)
+        default_fields_map = {
+            "read_db_user": "compute_db_user",
+            "write_db_user": "compute_db_user",
+            "read_db_password": "compute_db_password",
+            "write_db_password": "compute_db_password",
+            "db_host": "compute_db_host",
+        }
+        if info.field_name in default_fields_map and v is None:
+            return info.data.get(default_fields_map[info.field_name])
         return v
 
-    @pydantic.field_validator("compute_db_password")
+    @pydantic.field_validator("read_db_password", "write_db_password")
     def password_must_be_set(
-        cls: pydantic_settings.BaseSettings, v: str | None
+        cls: pydantic_settings.BaseSettings,
+        v: str | None,
+        info: pydantic_core.core_schema.FieldValidationInfo,
     ) -> str | None:
         """Check that password is explicitly set."""
         if v is None:
-            raise ValueError("compute_db_password must be set")
+            raise ValueError(f"{info.field_name} must be set")
         return v
 
     @property
     def connection_string(self) -> str:
         """Create reader psql connection string."""
-        return (
-            f"postgresql://{self.compute_db_user}"
-            f":{self.compute_db_password}@{self.compute_db_host}"
-            f"/{self.compute_db_name}"
-        )
+        url = f"postgresql://{self.write_db_user}:{self.write_db_password}@{self.db_host}/{self.compute_db_name}"
+        return url
 
     @property
     def connection_string_ro(self) -> str:
         """Create reader psql connection string in read-only mode."""
-        return (
-            f"postgresql://{self.ro_compute_db_user}"
-            f":{self.ro_compute_db_password}@{self.ro_compute_db_host}"
-            f"/{self.ro_compute_db_name}"
-        )
+        url = f"postgresql://{self.read_db_user}:{self.read_db_password}@{self.db_host}/{self.compute_db_name}"
+        return url
 
 
 def ensure_settings(settings: SqlalchemySettings | None = None) -> SqlalchemySettings:
