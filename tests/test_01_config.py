@@ -28,7 +28,7 @@ def test_sqlalchemysettings(temp_environ: Any) -> None:
 
 def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) -> None:
     temp_environ["compute_db_password"] = "apassword"
-
+    temp_environ["ro_compute_db_password"] = "ro_apassword"
     # initially global settings is importable, but it is None
     assert config.dbsettings is None
 
@@ -37,6 +37,10 @@ def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) ->
     assert (
         effective_settings.connection_string
         == "postgresql://broker:apassword@compute-db/broker"
+    )
+    assert (
+        effective_settings.connection_string_ro
+        == "postgresql://broker:ro_apassword@compute-db/broker"
     )
     assert config.dbsettings == effective_settings
     config.dbsettings = None
@@ -47,10 +51,18 @@ def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) ->
         "compute_db_password": "secret1",
         "compute_db_host": "myhost",
         "compute_db_name": "mybroker",
+        "ro_compute_db_user": "monica2",
+        "ro_compute_db_password": "secret2",
+        "ro_compute_db_host": "myhost2",
+        "ro_compute_db_name": "mybroker2",
     }
     my_settings_connection_string = (
         "postgresql://%(compute_db_user)s:%(compute_db_password)s"
         "@%(compute_db_host)s/%(compute_db_name)s" % my_settings_dict
+    )
+    my_settings_connection_string_ro = (
+        "postgresql://%(ro_compute_db_user)s:%(ro_compute_db_password)s"
+        "@%(ro_compute_db_host)s/%(ro_compute_db_name)s" % my_settings_dict
     )
     mysettings = config.SqlalchemySettings(**my_settings_dict)
     effective_settings = config.ensure_settings(mysettings)
@@ -58,4 +70,5 @@ def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) ->
     assert config.dbsettings == effective_settings
     assert effective_settings == mysettings
     assert effective_settings.connection_string == my_settings_connection_string
+    assert effective_settings.connection_string_ro == my_settings_connection_string_ro
     config.dbsettings = None

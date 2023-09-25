@@ -17,6 +17,7 @@ import logging
 import sys
 
 import pydantic
+import pydantic_core
 import pydantic_settings
 import structlog
 
@@ -36,8 +37,32 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
     compute_db_name: str = "broker"
+    # do not prepend ro_* fields: ordering is important
+    ro_compute_db_user: str | None = None
+    ro_compute_db_password: str | None = None
+    ro_compute_db_host: str | None = None
+    ro_compute_db_name: str | None = None
+
     pool_timeout: float = 1.0
     pool_recycle: int = 60
+
+    @pydantic.field_validator("*", mode="before")
+    def assign_defaults_for_ro_fields(
+        cls: pydantic_settings.BaseSettings,
+        v: str | None,
+        info: pydantic_core.core_schema.FieldValidationInfo,
+    ) -> str | None:
+        """Set defaults for read-only db connection fields."""
+        default_fields_map = [
+            ("ro_compute_db_user", "compute_db_user"),
+            ("ro_compute_db_password", "compute_db_password"),
+            ("ro_compute_db_host", "compute_db_host"),
+            ("ro_compute_db_name", "compute_db_name"),
+        ]
+        for ro_field, rw_field in default_fields_map:
+            if info.field_name == ro_field and not v:
+                return info.data.get(rw_field)
+        return v
 
     @pydantic.field_validator("compute_db_password")
     def password_must_be_set(
@@ -55,6 +80,15 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
             f"postgresql://{self.compute_db_user}"
             f":{self.compute_db_password}@{self.compute_db_host}"
             f"/{self.compute_db_name}"
+        )
+
+    @property
+    def connection_string_ro(self) -> str:
+        """Create reader psql connection string in read-only mode."""
+        return (
+            f"postgresql://{self.ro_compute_db_user}"
+            f":{self.ro_compute_db_password}@{self.ro_compute_db_host}"
+            f"/{self.ro_compute_db_name}"
         )
 
 
