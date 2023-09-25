@@ -13,6 +13,15 @@ from cads_broker import config
 from cads_broker import database as db
 
 
+class MockRule:
+    def __init__(self, name, uid, conclusion, info, condition):
+        self.name = name
+        self.uid = uid
+        self.conclusion = conclusion
+        self.info = info
+        self.condition = condition
+
+
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
     adaptor_properties = db.AdaptorProperties(
         hash=hash,
@@ -469,6 +478,81 @@ def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
         assert 1 == db.count_users(
             session=session, entry_point="foobar", status="running"
         )
+
+
+def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
+    request_uid = request.request_uid
+    rule_name = "limit"
+    limit_1 = MockRule(
+        name=rule_name,
+        uid="1",
+        condition="condition",
+        conclusion="condition",
+        info="info",
+    )
+    limit_2 = MockRule(
+        name=rule_name,
+        uid="2",
+        condition="condition",
+        conclusion="condition",
+        info="info",
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request)
+        session.commit()
+        db.set_request_qos_rule(request_uid=request_uid, rule=limit_1, session=session)
+        db.set_request_qos_rule(request_uid=request_uid, rule=limit_2, session=session)
+        session.commit()
+    with session_obj() as session:
+        request = db.get_request(request_uid=request_uid, session=session)
+        assert "1" in request.qos_status.get(rule_name, [])
+        assert "2" in request.qos_status.get(rule_name, [])
+
+
+def test_get_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
+    request_uid = request.request_uid
+    rule_name = "limit"
+    info_1 = "info_1"
+    info_2 = "info_2"
+    limit_1 = MockRule(
+        name=rule_name,
+        uid="1",
+        condition="condition",
+        conclusion="conclusion",
+        info=info_1,
+    )
+    limit_2 = MockRule(
+        name=rule_name,
+        uid="2",
+        condition="condition",
+        conclusion="condition",
+        info=info_2,
+    )
+    user_1 = MockRule(
+        name="user", uid="3", condition="condition", conclusion="condition", info="info"
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request)
+        session.commit()
+        db.set_request_qos_rule(request_uid=request_uid, rule=limit_1, session=session)
+        db.set_request_qos_rule(request_uid=request_uid, rule=limit_2, session=session)
+        db.set_request_qos_rule(request_uid=request_uid, rule=user_1, session=session)
+        session.commit()
+        qos_status = db.get_request_qos_status(request_uid=request_uid, session=session)
+    assert rule_name in qos_status
+    assert "user" in qos_status
+    assert len(qos_status[rule_name]) == 2
+    assert qos_status[rule_name][0] == info_1
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:

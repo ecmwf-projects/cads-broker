@@ -16,11 +16,10 @@ classifiers = [
 dependencies = [
   "alembic",
   "attrs",
+  "boto3",
   "cacholote",
   "distributed",
-  "minio",
-  "pydantic",
-  "pydantic-settings",
+
   "sqlalchemy>=2.0.9",
   "sqlalchemy-utils",
   "typer"
