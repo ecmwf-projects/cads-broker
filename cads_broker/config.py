@@ -65,7 +65,13 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
             return info.data.get(default_fields_map[info.field_name])
         return v
 
-    @pydantic.field_validator("read_db_password", "write_db_password")
+    @pydantic.field_validator(
+        "read_db_password",
+        "write_db_password",
+        "read_db_user",
+        "write_db_user",
+        "db_host",
+    )
     def password_must_be_set(
         cls: pydantic_settings.BaseSettings,
         v: str | None,

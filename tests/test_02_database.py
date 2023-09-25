@@ -767,6 +767,8 @@ def test_ensure_session_obj(
 
     # case of session not set
     temp_environ["compute_db_password"] = postgresql.info.password
+    temp_environ["compute_db_user"] = postgresql.info.user
+    temp_environ["compute_db_host"] = postgresql.info.host
     ret_value = db.ensure_session_obj(None)
     assert isinstance(ret_value, sessionmaker)
     config.dbsettings = None

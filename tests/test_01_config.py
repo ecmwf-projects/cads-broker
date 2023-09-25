@@ -11,7 +11,7 @@ def test_sqlalchemysettings(temp_environ: Any) -> None:
     temp_environ.pop("compute_db_password", default=None)
     with pytest.raises(ValueError) as excinfo:
         config.SqlalchemySettings()
-    assert "read_db_password" in str(excinfo.value)
+    assert "read_db_user" in str(excinfo.value)
 
     # also an empty password can be set
     temp_environ["compute_db_user"] = "user1"
