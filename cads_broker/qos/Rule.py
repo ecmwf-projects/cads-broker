@@ -47,6 +47,10 @@ class QoSRule:
     def dump(self, out):
         out(self)
 
+    @property
+    def uid(self):
+        return hash(self.__repr__)
+
     def __repr__(self):
         return f"{self.name} {self.info} {self.condition} : {self.conclusion}"
 

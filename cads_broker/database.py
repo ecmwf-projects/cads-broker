@@ -72,6 +72,7 @@ class SystemRequest(BaseModel):
         sa.Text, sa.ForeignKey("adaptor_properties.hash"), nullable=False
     )
     entry_point = sa.Column(sa.Text)
+    qos_status = sa.Column(JSONB, default=dict)
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -302,6 +303,39 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
+def get_request_qos_status(request_uid: str, session: sa.orm.Session):
+    request = get_request(request_uid=request_uid, session=session)
+    ret_value: dict[str, list[str]] = {}
+    for rule_name, rules in request.qos_status.items():
+        ret_value[rule_name] = []
+        for rule in rules.values():
+            ret_value[rule_name].append(rule.get("info", ""))
+    return ret_value
+
+
+def set_request_qos_rule(
+    request_uid: str,
+    rule,
+    session: sa.orm.Session,
+):
+    request = get_request(request_uid=request_uid, session=session)
+    qos_status = request.qos_status
+    old_rules = qos_status.get(rule.name, {})
+    if rule.uid in old_rules:
+        return
+    old_rules[rule.uid] = {
+        "conclusion": str(rule.conclusion),
+        "info": str(rule.info),
+        "condition": str(rule.condition),
+    }
+    qos_status[rule.name] = old_rules
+    session.execute(
+        sa.update(SystemRequest)
+        .filter_by(request_uid=request_uid)
+        .values(qos_status=qos_status)
+    )
+
+
 def set_request_status(
     request_uid: str,
     status: str,
@@ -332,6 +366,7 @@ def set_request_status(
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
+        request.qos_status = {}
     # FIXME: logs can't be live updated
     request.response_log = json.dumps(log)
     request.response_user_visible_log = json.dumps(user_visible_log)

@@ -25,17 +25,6 @@ def locked(method):
     return wrapped
 
 
-def and_func(data: list):
-    """Apply the "and" operator on a list of values.
-
-    In case the list is empty it returns True.
-    """
-    result = 1
-    for i in data:
-        result *= i
-    return bool(result)
-
-
 class QoS:
     def __init__(self, rules, environment, rules_hash):
         self.lock = threading.RLock()
@@ -107,11 +96,19 @@ class QoS:
     def can_run(self, request, session):
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
-        limits_constraint = not any(limit.full(request) for limit in properties.limits)
-        permissions_contraint = and_func(
-            [permission.evaluate(request) for permission in properties.permissions]
-        )
-        return limits_constraint and permissions_contraint
+        limits = []
+        for i, limit in enumerate(properties.limits):
+            if limit.full(request):
+                # performance. avoid interacting with db if limit is already there
+                if limit.uid not in request.qos_status.get(limit.name, []):
+                    database.set_request_qos_rule(request.request_uid, limit, session)
+                limits.append(limit)
+        session.commit()
+        permissions = []
+        for permission in properties.permissions:
+            if not permission.evaluate(request):
+                permissions.append(permission)
+        return not len(limits) and not len(permissions)
 
     @locked
     def _properties(self, request, session):
