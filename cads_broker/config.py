@@ -71,6 +71,7 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
         "read_db_user",
         "write_db_user",
         "db_host",
+        "compute_db_name",
     )
     def password_must_be_set(
         cls: pydantic_settings.BaseSettings,
