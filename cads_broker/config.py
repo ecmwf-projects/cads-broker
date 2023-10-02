@@ -35,6 +35,7 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     compute_db_user: str = "broker"
     compute_db_password: str | None = None
     compute_db_host: str = "compute-db"
+    compute_db_host_read: str = "compute-db"
     compute_db_name: str = "broker"
     pool_timeout: float = 1.0
     pool_recycle: int = 60
@@ -54,6 +55,15 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
         return (
             f"postgresql://{self.compute_db_user}"
             f":{self.compute_db_password}@{self.compute_db_host}"
+            f"/{self.compute_db_name}"
+        )
+
+    @property
+    def connection_string_read(self) -> str:
+        """Create reader psql connection string."""
+        return (
+            f"postgresql://{self.compute_db_user}"
+            f":{self.compute_db_password}@{self.compute_db_host_read}"
             f"/{self.compute_db_name}"
         )
 
