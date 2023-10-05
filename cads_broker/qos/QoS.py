@@ -259,24 +259,24 @@ class QoS:
         # raise Exception(f"Not rules matching user '{user}'")
 
     @locked
-    def pick(self, queue, session):
+    def pick(self, queue, session, logger):
         # Create the list of requests than can run
-        print("------- CANDIDATES")
+        logger.info("------- CANDIDATES")
         candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r, session)]
-        print("------- END_CANDIDATES")
+        logger.info("------- END_CANDIDATES")
 
         # If no request can run, return 'None'
         if len(candidates) == 0:
             return None
 
         # Sort according to priorities, highest first
-        print("--------- SORTING")
+        logger.info("--------- SORTING")
         candidates = sorted(
             candidates,
             key=lambda candidate: self.priority(candidate[1], session),
             reverse=True,
         )
-        print("--------- END SORTING")
+        logger.info("--------- END SORTING")
 
         # Select the request with the highest priority
         n, request = candidates[0]

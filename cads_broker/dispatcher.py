@@ -231,7 +231,7 @@ class Broker:
         queue = db.get_accepted_requests(session=session)
         for _ in range(number_of_requests):
             logger.info("picking")
-            request = self.qos.pick(queue, session=session)
+            request = self.qos.pick(queue, session=session, logger=logger)
             logger.info("picked")
             if not request:
                 return
