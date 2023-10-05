@@ -228,7 +228,7 @@ class Broker:
             )
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
-        queue = db.get_accepted_requests(session=session)
+        queue = db.get_accepted_requests(session=session)[:200]  # FIXME: better filtering with max priority and time
         for _ in range(number_of_requests):
             logger.info("picking")
             request = self.qos.pick(queue, session=session, logger=logger)

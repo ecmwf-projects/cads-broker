@@ -133,7 +133,11 @@ def get_accepted_requests(
     session: sa.orm.Session,
 ):
     """Get all accepted requests."""
-    statement = sa.select(SystemRequest).where(SystemRequest.status == "accepted")
+    statement = (
+        sa.select(SystemRequest)
+        .where(SystemRequest.status == "accepted")
+        .order_by(SystemRequest.created_at)
+    )
     return session.scalars(statement).all()
 
 
