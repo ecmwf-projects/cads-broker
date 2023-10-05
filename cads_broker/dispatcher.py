@@ -34,7 +34,7 @@ DASK_STATUS_TO_STATUS = {
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
+        maxsize=1024, ttl=float(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
     ),
     info=True,
 )
