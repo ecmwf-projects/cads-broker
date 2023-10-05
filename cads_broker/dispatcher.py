@@ -230,7 +230,9 @@ class Broker:
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
         queue = db.get_accepted_requests(session=session)
         for _ in range(number_of_requests):
+            logger.info("picking")
             request = self.qos.pick(queue, session=session)
+            logger.info("picked")
             if not request:
                 return
             self.submit_request(request, session=session)
