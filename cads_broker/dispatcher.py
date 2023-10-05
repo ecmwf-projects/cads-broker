@@ -280,6 +280,7 @@ class Broker:
                     session=session, status="accepted"
                 )
                 available_workers = self.number_of_workers - self.running_requests
+                logger.info("broker info", queued_jobs=number_accepted_requests)
                 if number_accepted_requests > 0:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
