@@ -228,14 +228,19 @@ class Broker:
             )
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
-        queue = db.get_accepted_requests(session=session)[:200]  # FIXME: better filtering with max priority and time
-        for _ in range(number_of_requests):
-            logger.info("picking")
-            request = self.qos.pick(queue, session=session, logger=logger)
-            logger.info("picked")
-            if not request:
-                return
-            self.submit_request(request, session=session)
+        candidates = db.get_accepted_requests(session=session)
+        queue = sorted(
+            candidates,
+            key=lambda candidate: self.qos.priority(candidate, session),
+            reverse=True,
+        )
+        requests_counter = 0
+        for request in queue:
+            if self.qos.can_run(request, session=session):
+                self.submit_request(request, session=session)
+                requests_counter += 1
+                if requests_counter == number_of_requests:
+                    break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
@@ -282,7 +287,6 @@ class Broker:
                     session=session, status="accepted"
                 )
                 available_workers = self.number_of_workers - self.running_requests
-                logger.info("broker info", queued_jobs=number_accepted_requests)
                 if number_accepted_requests > 0:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
