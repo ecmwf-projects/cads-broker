@@ -17,6 +17,7 @@ import logging
 import sys
 
 import pydantic
+import pydantic_core
 import pydantic_settings
 import structlog
 
@@ -32,21 +33,31 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     - ``compute_db_name``: database name.
     """
 
-    compute_db_user: str = "broker"
+    compute_db_user: str | None = None
     compute_db_password: str | None = None
-    compute_db_host: str = "compute-db"
-    compute_db_name: str = "broker"
+    compute_db_host: str | None = None
+    compute_db_host_read: str | None = None
+    compute_db_name: str | None = None
     pool_timeout: float = 1.0
     pool_recycle: int = 60
 
-    @pydantic.field_validator("compute_db_password")
+    @pydantic.field_validator(
+        "compute_db_user",
+        "compute_db_password",
+        "compute_db_host",
+        "compute_db_host_read",
+        "compute_db_name",
+    )
     def password_must_be_set(
-        cls: pydantic_settings.BaseSettings, v: str | None
+        cls: pydantic_settings.BaseSettings,
+        v: str | None,
+        info: pydantic_core.core_schema.FieldValidationInfo,
     ) -> str | None:
         """Check that password is explicitly set."""
         if v is None:
-            raise ValueError("compute_db_password must be set")
+            raise ValueError(f"{info.field_name} must be set")
         return v
+
 
     @property
     def connection_string(self) -> str:
@@ -54,6 +65,15 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
         return (
             f"postgresql://{self.compute_db_user}"
             f":{self.compute_db_password}@{self.compute_db_host}"
+            f"/{self.compute_db_name}"
+        )
+
+    @property
+    def connection_string_read(self) -> str:
+        """Create reader psql connection string."""
+        return (
+            f"postgresql://{self.compute_db_user}"
+            f":{self.compute_db_password}@{self.compute_db_host_read}"
             f"/{self.compute_db_name}"
         )
 

@@ -34,7 +34,7 @@ DASK_STATUS_TO_STATUS = {
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
+        maxsize=1024, ttl=float(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
     ),
     info=True,
 )
@@ -228,12 +228,19 @@ class Broker:
             )
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
-        queue = db.get_accepted_requests(session=session)
-        for _ in range(number_of_requests):
-            request = self.qos.pick(queue, session=session)
-            if not request:
-                return
-            self.submit_request(request, session=session)
+        candidates = db.get_accepted_requests(session=session)
+        queue = sorted(
+            candidates,
+            key=lambda candidate: self.qos.priority(candidate, session),
+            reverse=True,
+        )
+        requests_counter = 0
+        for request in queue:
+            if self.qos.can_run(request, session=session):
+                self.submit_request(request, session=session)
+                requests_counter += 1
+                if requests_counter == number_of_requests:
+                    break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
