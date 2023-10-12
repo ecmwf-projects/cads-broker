@@ -169,7 +169,6 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 logger.info(f"--------> request not found {request.request_uid}")
-                time.sleep(1)
                 db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
