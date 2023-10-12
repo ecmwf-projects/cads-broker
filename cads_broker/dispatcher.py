@@ -240,7 +240,7 @@ class Broker:
             if self.qos.can_run(request, session=session):
                 self.submit_request(request, session=session)
                 requests_counter += 1
-                if requests_counter == number_of_requests * WORKERS_MULTIPLIER:
+                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
                     print(f"------------- CAN RUN {time.time() - can_run_start}")
                     break
 
