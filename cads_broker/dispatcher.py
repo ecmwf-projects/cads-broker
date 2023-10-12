@@ -277,7 +277,10 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
+                sync_start = time.time()
                 self.sync_database(session=session)
+                logger.info(f"------> sync {time.time() - sync_start}")
+                running_start = time.time()
                 self.running_requests = len(
                     [
                         future
@@ -286,9 +289,12 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
+                logger.info(f"------> running {time.time() - running_start}")
+                count_start = time.time()
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
                 )
+                logger.info(f"------> count {time.time() - count_start}")
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
