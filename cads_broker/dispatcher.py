@@ -233,7 +233,7 @@ class Broker:
             key=lambda candidate: self.qos.priority(candidate, session),
             reverse=True,
         )
-        print(f"------------- SORT {time.time() - sort_start}")
+        logger.info(f"------------- SORT {time.time() - sort_start}")
         requests_counter = 0
         can_run_start = time.time()
         for request in queue:
@@ -241,7 +241,7 @@ class Broker:
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    print(f"------------- CAN RUN {time.time() - can_run_start}")
+                    logger.info(f"------------- CAN RUN {time.time() - can_run_start}")
                     break
 
     def submit_request(
@@ -307,5 +307,5 @@ class Broker:
                             available_workers=available_workers,
                             number_of_workers=self.number_of_workers,
                         )
-            print(f"------------ cycle time = {time.time() - start_time}")
+            logger.info(f"------------ cycle time = {time.time() - start_time}")
             time.sleep(self.wait_time)
