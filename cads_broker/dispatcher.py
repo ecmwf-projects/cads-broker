@@ -167,7 +167,8 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                db.requeue_request(request_uid=request.request_uid, session=session)
+                # db.requeue_request(request_uid=request.request_uid, session=session)
+                continue
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
