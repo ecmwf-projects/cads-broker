@@ -31,6 +31,7 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1.5))
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
@@ -234,13 +235,13 @@ class Broker:
         )
         print(f"------------- SORT {time.time() - sort_start}")
         requests_counter = 0
+        can_run_start = time.time()
         for request in queue:
-            can_run_start = time.time()
             if self.qos.can_run(request, session=session):
-                print(f"------------- CAN RUN {time.time() - can_run_start}")
                 self.submit_request(request, session=session)
                 requests_counter += 1
-                if requests_counter == number_of_requests:
+                if requests_counter == number_of_requests * WORKERS_MULTIPLIER:
+                    print(f"------------- CAN RUN {time.time() - can_run_start}")
                     break
 
     def submit_request(
