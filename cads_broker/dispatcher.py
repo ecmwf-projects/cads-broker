@@ -248,10 +248,6 @@ class Broker:
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
     ) -> None:
-        request = db.set_request_status(
-            request_uid=request.request_uid, status="running", session=session
-        )
-        self.qos.notify_start_of_request(request, session)
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -263,6 +259,10 @@ class Broker:
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
+        request = db.set_request_status(
+            request_uid=request.request_uid, status="running", session=session
+        )
+        self.qos.notify_start_of_request(request, session)
         self.futures[request.request_uid] = future
         future.add_done_callback(self.on_future_done)
         logger.info(
