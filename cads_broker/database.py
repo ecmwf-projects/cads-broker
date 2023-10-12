@@ -340,6 +340,27 @@ def set_request_qos_rule(
     )
 
 
+def requeue_request(
+    request_uid: str,
+    session: sa.orm.Session,
+):
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    if request.status == "running":
+        # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
+        # FIXME: use a specific column for resubmit_number
+        metadata = dict(request.request_metadata)
+        metadata.update(
+            {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
+        )
+        request.request_metadata = metadata
+        request.status = "accepted"
+        session.commit()
+        return request
+    else:
+        return
+
+
 def set_request_status(
     request_uid: str,
     status: str,
