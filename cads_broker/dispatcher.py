@@ -31,7 +31,7 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
-WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 2))
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1.5))
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
