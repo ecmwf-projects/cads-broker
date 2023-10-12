@@ -356,6 +356,7 @@ def requeue_request(
         request.request_metadata = metadata
         request.status = "accepted"
         session.commit()
+        logger.info("requeueing request", **logger_kwargs(request=request))
         return request
     else:
         return
