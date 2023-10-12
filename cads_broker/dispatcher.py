@@ -31,7 +31,7 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
-WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1.5))
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 2))
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
@@ -271,6 +271,7 @@ class Broker:
 
     def run(self) -> None:
         while True:
+            start_time = time.time()
             with self.session_maker() as session:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
@@ -306,4 +307,5 @@ class Broker:
                             available_workers=available_workers,
                             number_of_workers=self.number_of_workers,
                         )
+            print(f"------------ cycle time = {time.time() - start_time}")
             time.sleep(self.wait_time)
