@@ -225,14 +225,18 @@ class Broker:
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
         candidates = db.get_accepted_requests(session=session)
+        sort_start = time.time()
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(candidate, session),
             reverse=True,
         )
+        print(f"------------- SORT {time.time() - sort_start}")
         requests_counter = 0
         for request in queue:
+            can_run_start = time.time()
             if self.qos.can_run(request, session=session):
+                print(f"------------- CAN RUN {time.time() - can_run_start}")
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == number_of_requests:
