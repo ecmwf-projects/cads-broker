@@ -31,7 +31,7 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
-WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1.5))
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
@@ -144,6 +144,12 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
+    @cachetools.cached(  # type: ignore
+        cache=cachetools.TTLCache(
+            maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
+        ),
+        info=True,
+    )
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
