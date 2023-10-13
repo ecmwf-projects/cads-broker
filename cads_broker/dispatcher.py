@@ -8,6 +8,7 @@ from typing import Any
 import attrs
 import cachetools
 import distributed
+import operator
 import sqlalchemy as sa
 import structlog
 
@@ -32,6 +33,7 @@ DASK_STATUS_TO_STATUS = {
 }
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
+
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
@@ -104,6 +106,9 @@ class Broker:
     qos: QoS.QoS
     address: str
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
+    cache = cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
+    )
 
     futures: dict[str, distributed.Future] = attrs.field(
         factory=dict,
@@ -144,10 +149,8 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    @cachetools.cached(  # type: ignore
-        cache=cachetools.TTLCache(
-            maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
-        ),
+    @cachetools.cachedmethod(  # type: ignore
+        cache=operator.attrgetter("cache"),
         info=True,
     )
     def sync_database(self, session: sa.orm.Session) -> None:
