@@ -176,7 +176,7 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                logger.info(f"--------> request not found {request.request_uid}")
+                # logger.info(f"--------> request not found {request.request_uid}")
                 db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
@@ -241,7 +241,7 @@ class Broker:
             key=lambda candidate: self.qos.priority(candidate, session),
             reverse=True,
         )
-        logger.info(f"------------- SORT {time.time() - sort_start}")
+        # logger.info(f"------------- SORT {time.time() - sort_start}")
         requests_counter = 0
         can_run_start = time.time()
         for request in queue:
@@ -249,7 +249,7 @@ class Broker:
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    logger.info(f"------------- CAN RUN {time.time() - can_run_start}")
+                    # logger.info(f"------------- CAN RUN {time.time() - can_run_start}")
                     break
 
     def submit_request(
@@ -287,7 +287,7 @@ class Broker:
                     self.qos.rules_hash = rules_hash
                 sync_start = time.time()
                 self.sync_database(session=session)
-                logger.info(f"------> sync {time.time() - sync_start}")
+                # logger.info(f"------> sync {time.time() - sync_start}")
                 running_start = time.time()
                 self.running_requests = len(
                     [
@@ -297,12 +297,12 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
+                # logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
                 count_start = time.time()
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
                 )
-                logger.info(f"------> count {time.time() - count_start}")
+                # logger.info(f"------> count {time.time() - count_start}")
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
@@ -323,5 +323,5 @@ class Broker:
                             running_requests=self.running_requests,
                             number_of_workers=self.number_of_workers,
                         )
-            logger.info(f"------------ cycle time = {time.time() - start_time}")
+            # logger.info(f"------------ cycle time = {time.time() - start_time}")
             time.sleep(self.wait_time)
