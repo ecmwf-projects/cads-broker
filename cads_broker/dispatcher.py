@@ -151,7 +151,6 @@ class Broker:
 
     @cachetools.cachedmethod(  # type: ignore
         cache=operator.attrgetter("cache"),
-        info=True,
     )
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
