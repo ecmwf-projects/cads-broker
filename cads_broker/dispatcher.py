@@ -297,7 +297,7 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                logger.info(f"------> running {time.time() - running_start}")
+                logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
                 count_start = time.time()
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
