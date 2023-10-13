@@ -177,7 +177,8 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 # logger.info(f"--------> request not found {request.request_uid}")
-                db.requeue_request(request_uid=request.request_uid, session=session)
+                continue
+                # db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
