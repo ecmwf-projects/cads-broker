@@ -287,7 +287,7 @@ class Broker:
                     self.qos.rules_hash = rules_hash
                 sync_start = time.time()
                 self.sync_database(session=session)
-                logger.info(f"------> sync {time.time() - sync_start}")
+                # logger.info(f"------> sync {time.time() - sync_start}")
                 running_start = time.time()
                 self.running_requests = len(
                     [
@@ -297,12 +297,12 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
+                # logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
                 count_start = time.time()
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
                 )
-                logger.info(f"------> count {time.time() - count_start}")
+                # logger.info(f"------> count {time.time() - count_start}")
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     if available_workers > 0:
@@ -323,6 +323,6 @@ class Broker:
                             running_requests=self.running_requests,
                             number_of_workers=self.number_of_workers,
                         )
-            logger.info(f"------------ cycle time = {time.time() - start_time}")
+            # logger.info(f"------------ cycle time = {time.time() - start_time}")
             # time.sleep(self.wait_time)
             time.sleep(.2)
