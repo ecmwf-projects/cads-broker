@@ -323,6 +323,6 @@ class Broker:
                             running_requests=self.running_requests,
                             number_of_workers=self.number_of_workers,
                         )
-            # logger.info(f"------------ cycle time = {time.time() - start_time}")
+            logger.info(f"------------ cycle time = {time.time() - start_time}")
             # time.sleep(self.wait_time)
             time.sleep(.2)
