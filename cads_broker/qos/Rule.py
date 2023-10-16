@@ -6,10 +6,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 #
-import structlog
-
-logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
-
 class Context:
     def __init__(self, request, environment):
         self.request = request
