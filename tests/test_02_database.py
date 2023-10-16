@@ -514,30 +514,26 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         assert "2" in request.qos_status.get(rule_name, [])
 
 
-def test_qos_status_from_request() -> None:
+def test_get_qos_status_from_request() -> None:
     test_request = {
         "qos_status": {
-            "rule_name_1": [
-                {
-                    "rule_key_1_1": {
-                        "condition": "condition_1_1",
-                        "info": "info_1_1",
-                        "conclusion": "conclusion_1_1",
-                    }
+            "rule_name_1": {
+                "rule_key_1_1": {
+                    "condition": "condition_1_1",
+                    "info": "info_1_1",
+                    "conclusion": "conclusion_1_1",
                 },
-                {
-                    "rule_key_1_2": {
-                        "condition": "condition_1_2",
-                        "info": "info_1_2",
-                        "conclusion": "conclusion_1_2",
-                    }
+                "rule_key_1_2": {
+                    "condition": "condition_1_2",
+                    "info": "info_1_2",
+                    "conclusion": "conclusion_1_2",
                 },
-            ],
-            "rule_name_2": [{"rule_key_2_1": {}}],
+            },
+            "rule_name_2": {"rule_key_2_1": {}},
         }
     }
     exp_qos_status = {"rule_name_1": ["info_1_1", "info_1_2"], "rule_name_2": [""]}
-    res_qos_staus = db.qos_status_from_request(test_request)
+    res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus
 
 
