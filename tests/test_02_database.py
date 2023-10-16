@@ -514,45 +514,31 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         assert "2" in request.qos_status.get(rule_name, [])
 
 
-def test_get_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
-    adaptor_properties = mock_config()
-    request = mock_system_request(
-        status="accepted", adaptor_properties_hash=adaptor_properties.hash
-    )
-    request_uid = request.request_uid
-    rule_name = "limit"
-    info_1 = "info_1"
-    info_2 = "info_2"
-    limit_1 = MockRule(
-        name=rule_name,
-        uid="1",
-        condition="condition",
-        conclusion="conclusion",
-        info=info_1,
-    )
-    limit_2 = MockRule(
-        name=rule_name,
-        uid="2",
-        condition="condition",
-        conclusion="condition",
-        info=info_2,
-    )
-    user_1 = MockRule(
-        name="user", uid="3", condition="condition", conclusion="condition", info="info"
-    )
-    with session_obj() as session:
-        session.add(adaptor_properties)
-        session.add(request)
-        session.commit()
-        db.set_request_qos_rule(request_uid=request_uid, rule=limit_1, session=session)
-        db.set_request_qos_rule(request_uid=request_uid, rule=limit_2, session=session)
-        db.set_request_qos_rule(request_uid=request_uid, rule=user_1, session=session)
-        session.commit()
-        qos_status = db.get_request_qos_status(request_uid=request_uid, session=session)
-    assert rule_name in qos_status
-    assert "user" in qos_status
-    assert len(qos_status[rule_name]) == 2
-    assert qos_status[rule_name][0] == info_1
+def test_qos_status_from_request() -> None:
+    test_request = {
+        "qos_status": {
+            "rule_name_1": [
+                {
+                    "rule_key_1_1": {
+                        "condition": "condition_1_1",
+                        "info": "info_1_1",
+                        "conclusion": "conclusion_1_1",
+                    }
+                },
+                {
+                    "rule_key_1_2": {
+                        "condition": "condition_1_2",
+                        "info": "info_1_2",
+                        "conclusion": "conclusion_1_2",
+                    }
+                },
+            ],
+            "rule_name_2": [{"rule_key_2_1": {}}],
+        }
+    }
+    exp_qos_status = {"rule_name_1": ["info_1_1", "info_1_2"], "rule_name_2": [""]}
+    res_qos_staus = db.qos_status_from_request(test_request)
+    assert exp_qos_status == res_qos_staus
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
