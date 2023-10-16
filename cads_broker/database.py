@@ -307,10 +307,9 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def get_request_qos_status(request_uid: str, session: sa.orm.Session):
-    request = get_request(request_uid=request_uid, session=session)
+def get_qos_status_from_request(request: dict[str, Any]) -> dict[str, list[str]]:
     ret_value: dict[str, list[str]] = {}
-    for rule_name, rules in request.qos_status.items():
+    for rule_name, rules in request["qos_status"].items():
         ret_value[rule_name] = []
         for rule in rules.values():
             ret_value[rule_name].append(rule.get("info", ""))
