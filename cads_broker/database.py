@@ -312,7 +312,9 @@ def get_qos_status_from_request(request: dict[str, Any]) -> dict[str, list[str]]
     for rule_name, rules in request["qos_status"].items():
         ret_value[rule_name] = []
         for rule in rules.values():
-            ret_value[rule_name].append(rule.get("info", ""))
+            ret_value[rule_name].append(
+                [rule.get("info", ""), rule.get("conclusion", "")]
+            )
     return ret_value
 
 
@@ -328,7 +330,7 @@ def set_request_qos_rule(
         return
     old_rules[rule_uid] = {
         "conclusion": str(rule.evaluate(request)),
-        "info": str(rule.info),
+        "info": str(rule.info).replace('"', ""),
         "condition": str(rule.condition),
     }
     qos_status[rule.name] = old_rules

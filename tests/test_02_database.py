@@ -532,7 +532,10 @@ def test_get_qos_status_from_request() -> None:
             "rule_name_2": {"rule_key_2_1": {}},
         }
     }
-    exp_qos_status = {"rule_name_1": ["info_1_1", "info_1_2"], "rule_name_2": [""]}
+    exp_qos_status = {
+        "rule_name_1": [["info_1_1", "conclusion_1_1"], ["info_1_2", "conclusion_1_2"]],
+        "rule_name_2": [["", ""]],
+    }
     res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus
 
