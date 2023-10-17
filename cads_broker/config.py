@@ -51,7 +51,7 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     def db_connection_env_vars_must_be_set(
         cls: pydantic_settings.BaseSettings,
         v: str | None,
-        info: pydantic_core.core_schema.FieldValidationInfo,
+        info: pydantic_core.core_schema.ValidationInfo,
     ) -> str | None:
         """Check that database connection environment variables are explicitly set."""
         if v is None:
