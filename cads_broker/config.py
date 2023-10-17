@@ -48,16 +48,15 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
         "compute_db_host_read",
         "compute_db_name",
     )
-    def password_must_be_set(
+    def db_connection_env_vars_must_be_set(
         cls: pydantic_settings.BaseSettings,
         v: str | None,
         info: pydantic_core.core_schema.FieldValidationInfo,
     ) -> str | None:
-        """Check that password is explicitly set."""
+        """Check that database connection environment variables are explicitly set."""
         if v is None:
             raise ValueError(f"{info.field_name} must be set")
         return v
-
 
     @property
     def connection_string(self) -> str:

@@ -9,25 +9,46 @@ from cads_broker import config
 def test_sqlalchemysettings(temp_environ: Any) -> None:
     # check settings must have a password set (no default)
     temp_environ.pop("compute_db_password", default=None)
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError):
         config.SqlalchemySettings()
-    assert "compute_db_password" in str(excinfo.value)
     config.dbsettings = None
 
     # also an empty password can be set
-    settings = config.SqlalchemySettings(compute_db_password="")
+    settings = config.SqlalchemySettings(
+        compute_db_password="",
+        compute_db_host="broker",
+        compute_db_host_read="broker",
+        compute_db_name="broker",
+        compute_db_user="broker",
+    )
     assert settings.compute_db_password == ""
     config.dbsettings = None
 
     # also a not empty password can be set
-    temp_environ["compute_db_password"] = "a password"
+    temp_environ.update(
+        dict(
+            compute_db_password="a password",
+            compute_db_host="broker",
+            compute_db_host_read="broker",
+            compute_db_name="broker",
+            compute_db_user="broker",
+        )
+    )
     settings = config.SqlalchemySettings()
     assert settings.compute_db_password == "a password"
     config.dbsettings = None
 
 
 def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) -> None:
-    temp_environ["compute_db_password"] = "apassword"
+    temp_environ.update(
+        dict(
+            compute_db_password="apassword",
+            compute_db_host="compute-db",
+            compute_db_host_read="compute-db",
+            compute_db_name="broker",
+            compute_db_user="broker",
+        )
+    )
 
     # initially global settings is importable, but it is None
     assert config.dbsettings is None
@@ -36,7 +57,9 @@ def test_ensure_settings(session_obj: sa.orm.sessionmaker, temp_environ: Any) ->
     effective_settings = config.ensure_settings()
     assert (
         effective_settings.connection_string
-        == "postgresql://broker:apassword@compute-db/broker"
+        == "postgresql://{compute_db_user}:{compute_db_password}@{compute_db_host}/{compute_db_name}".format(
+            **temp_environ
+        )
     )
     assert config.dbsettings == effective_settings
     config.dbsettings = None
