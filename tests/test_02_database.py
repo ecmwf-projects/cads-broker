@@ -20,12 +20,13 @@ class MockRule:
         self.conclusion = conclusion
         self.info = info
         self.condition = condition
-    
+
     def get_uid(self, request):
         return self.uid
 
     def evaluate(self, request):
         return self.uid
+
 
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
     adaptor_properties = db.AdaptorProperties(
@@ -538,8 +539,8 @@ def test_get_qos_status_from_request() -> None:
         }
     }
     exp_qos_status = {
-        "rule_name_1": [["info_1_1", "conclusion_1_1"], ["info_1_2", "conclusion_1_2"]],
-        "rule_name_2": [["", ""]],
+        "rule_name_1": [("info_1_1", "conclusion_1_1"), ("info_1_2", "conclusion_1_2")],
+        "rule_name_2": [("", "")],
     }
     res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus
