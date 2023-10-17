@@ -307,34 +307,38 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def get_qos_status_from_request(request: dict[str, Any]) -> dict[str, list[str]]:
+def get_qos_status_from_request(
+    request: dict[str, Any]
+) -> dict[str, list[tuple[str, str]]]:
     ret_value: dict[str, list[str]] = {}
     for rule_name, rules in request["qos_status"].items():
         ret_value[rule_name] = []
         for rule in rules.values():
-            ret_value[rule_name].append(rule.get("info", ""))
+            ret_value[rule_name].append(
+                (rule.get("info", ""), rule.get("conclusion", ""))
+            )
     return ret_value
 
 
 def set_request_qos_rule(
-    request_uid: str,
+    request: SystemRequest,
     rule,
     session: sa.orm.Session,
 ):
-    request = get_request(request_uid=request_uid, session=session)
     qos_status = request.qos_status
     old_rules = qos_status.get(rule.name, {})
-    if rule.uid in old_rules:
+    rule_uid = rule.get_uid(request)
+    if rule_uid in old_rules:
         return
-    old_rules[rule.uid] = {
-        "conclusion": str(rule.conclusion),
-        "info": str(rule.info),
+    old_rules[rule_uid] = {
+        "conclusion": str(rule.evaluate(request)),
+        "info": str(rule.info).replace('"', ""),
         "condition": str(rule.condition),
     }
     qos_status[rule.name] = old_rules
     session.execute(
         sa.update(SystemRequest)
-        .filter_by(request_uid=request_uid)
+        .filter_by(request_uid=request.request_uid)
         .values(qos_status=qos_status)
     )
 
