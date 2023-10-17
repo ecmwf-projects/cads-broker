@@ -317,24 +317,24 @@ def get_qos_status_from_request(request: dict[str, Any]) -> dict[str, list[str]]
 
 
 def set_request_qos_rule(
-    request_uid: str,
+    request: SystemRequest,
     rule,
     session: sa.orm.Session,
 ):
-    request = get_request(request_uid=request_uid, session=session)
     qos_status = request.qos_status
     old_rules = qos_status.get(rule.name, {})
-    if rule.uid in old_rules:
+    rule_uid = rule.get_uid(request)
+    if rule_uid in old_rules:
         return
-    old_rules[rule.uid] = {
-        "conclusion": str(rule.conclusion),
+    old_rules[rule_uid] = {
+        "conclusion": str(rule.evaluate(request)),
         "info": str(rule.info),
         "condition": str(rule.condition),
     }
     qos_status[rule.name] = old_rules
     session.execute(
         sa.update(SystemRequest)
-        .filter_by(request_uid=request_uid)
+        .filter_by(request_uid=request.request_uid)
         .values(qos_status=qos_status)
     )
 
