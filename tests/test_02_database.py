@@ -20,7 +20,12 @@ class MockRule:
         self.conclusion = conclusion
         self.info = info
         self.condition = condition
+    
+    def get_uid(self, request):
+        return self.uid
 
+    def evaluate(self, request):
+        return self.uid
 
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
     adaptor_properties = db.AdaptorProperties(
@@ -505,8 +510,8 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-        db.set_request_qos_rule(request_uid=request_uid, rule=limit_1, session=session)
-        db.set_request_qos_rule(request_uid=request_uid, rule=limit_2, session=session)
+        db.set_request_qos_rule(request=request, rule=limit_1, session=session)
+        db.set_request_qos_rule(request=request, rule=limit_2, session=session)
         session.commit()
     with session_obj() as session:
         request = db.get_request(request_uid=request_uid, session=session)
