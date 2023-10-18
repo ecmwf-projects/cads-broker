@@ -51,13 +51,12 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     def password_must_be_set(
         cls: pydantic_settings.BaseSettings,
         v: str | None,
-        info: pydantic_core.core_schema.FieldValidationInfo,
+        info: pydantic_core.core_schema.ValidationInfo,
     ) -> str | None:
         """Check that password is explicitly set."""
         if v is None:
             raise ValueError(f"{info.field_name} must be set")
         return v
-
 
     @property
     def connection_string(self) -> str:
