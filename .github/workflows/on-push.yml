@@ -132,7 +132,7 @@ jobs:
   integration-tests:
     needs: [combine-environments, unit-tests]
     if: |
-      success() && false
+      success() && true
     runs-on: ubuntu-latest
 
     strategy:

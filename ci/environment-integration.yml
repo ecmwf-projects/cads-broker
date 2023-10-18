@@ -7,3 +7,5 @@ dependencies:
 - pytest
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+- dask-core==2022.11.1
+- distributed==2022.11.1
