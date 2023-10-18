@@ -6,8 +6,6 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 #
-
-
 class Context:
     def __init__(self, request, environment):
         self.request = request
@@ -47,9 +45,10 @@ class QoSRule:
     def dump(self, out):
         out(self)
 
-    @property
-    def uid(self):
-        return hash(self.__repr__)
+    def get_uid(self, request):
+        return str(
+            hash(f"{self.name} {self.info} {self.condition} : {self.evaluate(request)}")
+        )
 
     def __repr__(self):
         return f"{self.name} {self.info} {self.condition} : {self.conclusion}"

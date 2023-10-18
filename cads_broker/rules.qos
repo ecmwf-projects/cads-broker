@@ -11,7 +11,7 @@ limit "Limit for dummy-dataset"    (dataset == "test-adaptor-dummy")      : 2
 # limit "Limit for cads_adaptors:DummyAdaptor" (adaptor == "cads_adaptors:DummyAdaptor")   : numberOfWorkers - 6
 
 # Permissions
-# permission "anonymous cannot access dummy-dataset"  (dataset == "test-dummy-adaptor"): user != 'anonymous'
+# permission "anonymous cannot access dummy-dataset"  (dataset == "test-adaptor-dummy"): user != 'anonymous'
 
 # Priorities
 priority "Priority for test user 1"    (user == "00000000-0000-4000-a000-000000000000")  :  hour(1)
@@ -19,7 +19,7 @@ priority "Priority for test user 2"    (user == "00000000-0000-3000-abcd-0000000
 
 # Functions examples
 
-# Request contains any of the specified variable 
+# Request contains any of the specified variable
 # priority "Priority for temperature and humidity" (request_contains_any("variable", ["temperature", "relative_humidity"])): -hour(1)
 
 # Request contains all the specified months

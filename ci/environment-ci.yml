@@ -6,7 +6,7 @@ dependencies:
 - make
 - mypy
 - myst-parser
-- postgresql
+- pip
 - pre-commit
 - pydata-sphinx-theme
 - pytest
@@ -14,7 +14,7 @@ dependencies:
 - sphinx
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
-- pip
+- postgresql
 - pytest-mock
 - pip:
   - git+https://github.com/ecmwf-projects/cacholote.git
