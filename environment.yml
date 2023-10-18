@@ -12,8 +12,8 @@ dependencies:
 - attrs
 - boto3
 - cachetools
-- dask-core==2022.11.1
-- distributed==2022.11.1
+- dask-core
+- distributed
 - lz4  # dask distributed needs this to compress / de-compress
 - psycopg2
 - pydantic>2
@@ -21,5 +21,5 @@ dependencies:
 - sqlalchemy>=2.0.9
 - sqlalchemy-utils
 - structlog
-- tornado==6.1
+- tornado
 - typer
