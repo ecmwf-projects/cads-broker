@@ -167,7 +167,9 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                refreshed_request = db.get_request(request_uid=request.request_uid, session=session)
+                refreshed_request = db.get_request(
+                    request_uid=request.request_uid, session=session
+                )
                 if refreshed_request.status == "running":
                     db.set_request_status(
                         request_uid=request.request_uid,

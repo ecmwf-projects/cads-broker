@@ -335,7 +335,7 @@ class RulesParser(Parser):
             rules ([type]): the rules that will be updated with the rules
             environment ([type]): the environment in which the rules will be evaluated
 
-        Raises:
+        Raises
         ------
             ParserError: [description]
         """

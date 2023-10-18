@@ -46,7 +46,9 @@ class QoSRule:
         out(self)
 
     def get_uid(self, request):
-        return str(hash(f"{self.name} {self.info} {self.condition} : {self.evaluate(request)}"))
+        return str(
+            hash(f"{self.name} {self.info} {self.condition} : {self.evaluate(request)}")
+        )
 
     def __repr__(self):
         return f"{self.name} {self.info} {self.condition} : {self.conclusion}"

@@ -1,6 +1,6 @@
 """Module for entry points."""
 import os
-from typing import Any
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import typer
@@ -11,7 +11,7 @@ app = typer.Typer()
 
 
 @app.command()
-def info(connection_string: str | None = None) -> None:
+def info(connection_string: Optional[str] = None) -> None:
     """Test connection to the database located at URI `connection_string`.
 
     Parameters
@@ -28,7 +28,7 @@ def info(connection_string: str | None = None) -> None:
 
 
 @app.command()
-def init_db(connection_string: str | None = None, force: bool = False) -> None:
+def init_db(connection_string: Optional[str] = None, force: bool = False) -> None:
     """Create/update the database structure and the cache area in the object storage.
 
     Parameters
