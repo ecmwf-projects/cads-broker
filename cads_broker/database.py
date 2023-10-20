@@ -83,7 +83,7 @@ class SystemRequest(BaseModel):
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
-    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="joined")
+    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
 
     @property
     def age(self):
