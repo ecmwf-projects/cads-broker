@@ -305,25 +305,17 @@ class Broker:
                 # logger.info(f"------> count {time.time() - count_start}")
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
+                    logger.info(
+                        "broker info",
+                        available_workers=available_workers,
+                        running_requests=self.running_requests,
+                        number_of_workers=self.number_of_workers,
+                        futures=len(self.futures),
+                    )
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
-                        logger.info(
-                            "broker info",
-                            available_workers=available_workers,
-                            running_requests=self.running_requests,
-                            number_of_workers=self.number_of_workers,
-                            futures=len(self.futures),
-                        )
                         self.submit_requests(
                             session=session, number_of_requests=available_workers
-                        )
-                    elif available_workers == 0:
-                        logger.info(
-                            "broker info",
-                            available_workers=available_workers,
-                            running_requests=self.running_requests,
-                            number_of_workers=self.number_of_workers,
-                            futures=len(self.futures),
                         )
             logger.info(f"------------ cycle time = {time.time() - start_time}")
             # time.sleep(self.wait_time)
