@@ -521,7 +521,7 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_get_qos_status_from_request() -> None:
-    test_request = {
+    test_qos_status = {
         "qos_status": {
             "rule_name_1": {
                 "rule_key_1_1": {
@@ -538,6 +538,7 @@ def test_get_qos_status_from_request() -> None:
             "rule_name_2": {"rule_key_2_1": {}},
         }
     }
+    test_request = db.SystemRequest(**test_qos_status)
     exp_qos_status = {
         "rule_name_1": [("info_1_1", "conclusion_1_1"), ("info_1_2", "conclusion_1_2")],
         "rule_name_2": [("", "")],

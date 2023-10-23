@@ -83,7 +83,7 @@ class SystemRequest(BaseModel):
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
-    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="joined")
+    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
 
     @property
     def age(self):
@@ -308,10 +308,10 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
 
 
 def get_qos_status_from_request(
-    request: dict[str, Any]
+    request: SystemRequest,
 ) -> dict[str, list[tuple[str, str]]]:
     ret_value: dict[str, list[str]] = {}
-    for rule_name, rules in request["qos_status"].items():
+    for rule_name, rules in request.qos_status.items():
         ret_value[rule_name] = []
         for rule in rules.values():
             ret_value[rule_name].append(
