@@ -176,9 +176,8 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                # logger.info(f"--------> request not found {request.request_uid}")
-                continue
-                # db.requeue_request(request_uid=request.request_uid, session=session)
+                logger.info(f"--------> request not found {request.request_uid}")
+                db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -313,6 +312,7 @@ class Broker:
                             available_workers=available_workers,
                             running_requests=self.running_requests,
                             number_of_workers=self.number_of_workers,
+                            futures=len(self.futures),
                         )
                         self.submit_requests(
                             session=session, number_of_requests=available_workers
@@ -323,6 +323,7 @@ class Broker:
                             available_workers=available_workers,
                             running_requests=self.running_requests,
                             number_of_workers=self.number_of_workers,
+                            futures=len(self.futures),
                         )
             logger.info(f"------------ cycle time = {time.time() - start_time}")
             # time.sleep(self.wait_time)
