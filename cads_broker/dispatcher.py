@@ -78,6 +78,7 @@ def get_tasks(client: distributed.Client) -> Any:
             "erred": "failed",
             "finished": "successful",
             "no-worker": "accepted",  # if the job is no-worker should be re-submitted
+            "memory": "memory",  # the scheduler didn't submit on_future_done
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -160,6 +161,7 @@ class Broker:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status.in_(("running", "dismissed"))
         )
+        dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
             # the retrieve API set the status to "dismissed", here the broker deletes the request
             # this is to better control the status of the QoS
@@ -169,9 +171,12 @@ class Broker:
                 continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
+                # if status is "memory", manually run self.on_future_done
+                if dask_tasks[request.request_uid] == "memory":
+                    self.on_future_done(self.futures[request.request_uid])
                 continue
             # if request is in the scheduler, go on
-            elif request.request_uid in get_tasks(self.client):
+            elif request.request_uid in dask_tasks:
                 continue
             # if it doesn't find the request: re-queue it
             else:
