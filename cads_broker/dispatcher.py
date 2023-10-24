@@ -32,7 +32,7 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
-WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 2))
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 
 
 @cachetools.cached(  # type: ignore
@@ -171,9 +171,6 @@ class Broker:
                 continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
-                # if status is "memory", manually run self.on_future_done
-                # if dask_tasks[request.request_uid] == "memory":
-                #     self.futures[request.request_uid].done()
                 continue
             # if request is in the scheduler, go on
             elif request.request_uid in dask_tasks:
@@ -181,7 +178,7 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                logger.info(f"--------> request not found {request.request_uid}")
+                logger.info("Request not found: re-queueing", job_id={request.request_uid})
                 db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
@@ -240,21 +237,17 @@ class Broker:
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
         candidates = db.get_accepted_requests(session=session)
-        sort_start = time.time()
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(candidate, session),
             reverse=True,
         )
-        # logger.info(f"------------- SORT {time.time() - sort_start}")
         requests_counter = 0
-        can_run_start = time.time()
         for request in queue:
             if self.qos.can_run(request, session=session):
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    # logger.info(f"------------- CAN RUN {time.time() - can_run_start}")
                     break
 
     def submit_request(
@@ -284,16 +277,12 @@ class Broker:
 
     def run(self) -> None:
         while True:
-            start_time = time.time()
             with self.session_maker() as session:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
-                sync_start = time.time()
                 self.sync_database(session=session)
-                # logger.info(f"------> sync {time.time() - sync_start}")
-                running_start = time.time()
                 self.running_requests = len(
                     [
                         future
@@ -302,12 +291,9 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                # logger.info(f"------> running {time.time() - running_start} - {self.running_requests}")
-                count_start = time.time()
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
                 )
-                # logger.info(f"------> count {time.time() - count_start}")
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
                     logger.info(
@@ -322,6 +308,4 @@ class Broker:
                         self.submit_requests(
                             session=session, number_of_requests=available_workers
                         )
-            logger.info(f"------------ cycle time = {time.time() - start_time}")
-            # time.sleep(self.wait_time)
             time.sleep(.2)
