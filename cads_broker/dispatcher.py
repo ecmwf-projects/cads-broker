@@ -8,6 +8,7 @@ from typing import Any
 import attrs
 import cachetools
 import distributed
+import operator
 import sqlalchemy as sa
 import structlog
 
@@ -30,6 +31,8 @@ DASK_STATUS_TO_STATUS = {
     "error": "failed",
     "finished": "successful",
 }
+
+WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 
 
 @cachetools.cached(  # type: ignore
@@ -75,6 +78,7 @@ def get_tasks(client: distributed.Client) -> Any:
             "erred": "failed",
             "finished": "successful",
             "no-worker": "accepted",  # if the job is no-worker should be re-submitted
+            "memory": "memory",  # the scheduler didn't submit on_future_done
         }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -103,6 +107,9 @@ class Broker:
     qos: QoS.QoS
     address: str
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
+    cache = cachetools.TTLCache(
+        maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
+    )
 
     futures: dict[str, distributed.Future] = attrs.field(
         factory=dict,
@@ -143,6 +150,9 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
+    @cachetools.cachedmethod(  # type: ignore
+        cache=operator.attrgetter("cache"),
+    )
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
@@ -151,6 +161,7 @@ class Broker:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status.in_(("running", "dismissed"))
         )
+        dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
             # the retrieve API set the status to "dismissed", here the broker deletes the request
             # this is to better control the status of the QoS
@@ -162,21 +173,13 @@ class Broker:
             if request.request_uid in self.futures:
                 continue
             # if request is in the scheduler, go on
-            elif request.request_uid in get_tasks(self.client):
+            elif request.request_uid in dask_tasks:
                 continue
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                refreshed_request = db.get_request(
-                    request_uid=request.request_uid, session=session
-                )
-                if refreshed_request.status == "running":
-                    db.set_request_status(
-                        request_uid=request.request_uid,
-                        status="accepted",
-                        session=session,
-                        resubmit=True,
-                    )
+                logger.info("Request not found: re-queueing", job_id={request.request_uid})
+                db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -244,7 +247,7 @@ class Broker:
             if self.qos.can_run(request, session=session):
                 self.submit_request(request, session=session)
                 requests_counter += 1
-                if requests_counter == number_of_requests:
+                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
                     break
 
     def submit_request(
@@ -293,20 +296,16 @@ class Broker:
                 )
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
+                    logger.info(
+                        "broker info",
+                        available_workers=available_workers,
+                        running_requests=self.running_requests,
+                        number_of_workers=self.number_of_workers,
+                        futures=len(self.futures),
+                    )
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
-                        logger.info(
-                            "broker info",
-                            available_workers=available_workers,
-                            number_of_workers=self.number_of_workers,
-                        )
                         self.submit_requests(
                             session=session, number_of_requests=available_workers
-                        )
-                    elif available_workers == 0:
-                        logger.info(
-                            "broker info",
-                            available_workers=available_workers,
-                            number_of_workers=self.number_of_workers,
                         )
             time.sleep(self.wait_time)
