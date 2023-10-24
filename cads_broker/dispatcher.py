@@ -308,4 +308,4 @@ class Broker:
                         self.submit_requests(
                             session=session, number_of_requests=available_workers
                         )
-            time.sleep(.2)
+            time.sleep(self.wait_time)
