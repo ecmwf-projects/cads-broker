@@ -172,8 +172,8 @@ class Broker:
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 # if status is "memory", manually run self.on_future_done
-                if dask_tasks[request.request_uid] == "memory":
-                    self.futures[request.request_uid].done()
+                # if dask_tasks[request.request_uid] == "memory":
+                #     self.futures[request.request_uid].done()
                 continue
             # if request is in the scheduler, go on
             elif request.request_uid in dask_tasks:
