@@ -101,6 +101,7 @@ class QoS:
             if limit.full(request):
                 # performance. avoid interacting with db if limit is already there
                 if limit.get_uid(request) not in request.qos_status.get(limit.name, []):
+                    print(f"--------> write limit for {request.request_uid}")
                     database.set_request_qos_rule(request, limit, session)
                 limits.append(limit)
         session.commit()
