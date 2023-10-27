@@ -108,7 +108,7 @@ class QoS:
         properties = self._properties(request=request, session=session)
         limits = []
         for limit in properties.limits:
-            print(f"-------> limit: {limit}")
+            print(f"-------> limit: {request.request_uid} {limit}")
             if limit.full(request):
                 # performance. avoid interacting with db if limit is already there
                 if limit.get_uid(request) not in request.qos_status_ids:
