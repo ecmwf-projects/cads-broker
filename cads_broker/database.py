@@ -366,10 +366,8 @@ def add_qos_rule_to_request(
     rule,
     session: sa.orm.Session,
 ):
-    print(request.qos_status_ids)
     request.qos_status_ids = request.qos_status_ids + [rule.get_uid(None)]
     session.add(request)
-    print(request.qos_status_ids)
     session.commit()
 
 
