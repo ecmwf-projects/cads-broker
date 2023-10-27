@@ -26,7 +26,7 @@ def locked(method):
 
 
 class QoS:
-    def __init__(self, rules, environment, rules_hash):
+    def __init__(self, rules, environment, rules_hash, session_maker):
         self.lock = threading.RLock()
 
         self.rules_hash = rules_hash
@@ -47,10 +47,11 @@ class QoS:
             self.path = rules
             self.rules = None
             # Read the files from the rules file
-            self.read_rules()
+            with session_maker() as session:
+                self.read_rules(session=session)
 
     @locked
-    def read_rules(self):
+    def read_rules(self, session):
         """Read the rule files and populate the rule_set."""
         # Create a parser to parse the rules file
         parser = RulesParser(self.path)
@@ -60,9 +61,18 @@ class QoS:
 
         # Parse the rules
         parser.parse_rules(self.rules, self.environment)
+        self.fill_qos_rules_db(session=session)
 
         # Print the rules
         self.rules.dump()
+
+    @locked
+    def fill_qos_rules_db(self, session):
+        database.drop_qos_rules_table(session=session)
+        for limit in self.rules.global_limits:
+            database.add_qos_rule(limit, session=session)
+        for limit in self.rules.user_limits:
+            database.add_qos_rule(limit, session=session)
 
     @locked
     def reload_rules(self, session):
@@ -71,7 +81,7 @@ class QoS:
         For example, a thread could be monitoring the time stamp of the rules
         file and call this method.
         """
-        self.read_rules()
+        self.read_rules(session=session)
         self.reconfigure(session=session)
 
     @locked
@@ -100,9 +110,8 @@ class QoS:
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
                 # performance. avoid interacting with db if limit is already there
-                if limit.get_uid(request) not in request.qos_status.get(limit.name, []):
-                    print(f"--------> write limit for {request.request_uid}")
-                    database.set_request_qos_rule(request, limit, session)
+                if limit.get_uid(request) not in request.qos_status_ids:
+                    database.add_qos_rule_to_request(request, limit, session)
                 limits.append(limit)
         session.commit()
         permissions = []

@@ -23,8 +23,8 @@ def locked(method):
 
 
 class Environment:
-    def __init__(self):
-        self.number_of_workers = None
+    def __init__(self, number_of_workers=None):
+        self.number_of_workers = number_of_workers
         self.lock = threading.RLock()
         self._enabled = {}
         self._values = {}

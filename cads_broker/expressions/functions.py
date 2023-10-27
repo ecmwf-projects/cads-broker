@@ -10,6 +10,9 @@
 import operator
 import re
 
+import structlog
+
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 class FunctionExpression:
     def __init__(self, name, args):
@@ -26,7 +29,7 @@ class FunctionExpression:
             return self.execute(context, *args)
         except Exception as e:
             args = ",".join(repr(a) for a in args)
-            print(f"{self.name}({args}): {e}")
+            logger.warning(f"{self.name}({args}): {e}")
             raise
 
 

@@ -41,6 +41,19 @@ class AdaptorProperties(BaseModel):
     form = sa.Column(JSONB)
 
 
+class QosRule(BaseModel):
+    """QoS Rule ORM model."""
+
+    __tablename__ = "qos_rules"
+
+    id = sa.Column(sa.Text, primary_key=True)
+    rule = sa.Column(sa.Text)
+    condition = sa.Column(sa.Text)
+    conclusion = sa.Column(sa.Text)
+    info = sa.Column(sa.Text)
+    timestamp = sa.Column(sa.TIMESTAMP, default=sa.func.now())
+
+
 class SystemRequest(BaseModel):
     """System Request ORM model."""
 
@@ -72,7 +85,7 @@ class SystemRequest(BaseModel):
         sa.Text, sa.ForeignKey("adaptor_properties.hash"), nullable=False
     )
     entry_point = sa.Column(sa.Text)
-    qos_status = sa.Column(JSONB, default=dict)
+    qos_status_ids = sa.Column(sa.dialects.postgresql.ARRAY(sa.Text), default=[])
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
@@ -81,7 +94,6 @@ class SystemRequest(BaseModel):
         {},
     )
 
-    # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
     adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
 
@@ -307,40 +319,58 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
+def drop_qos_rules_table(session: sa.orm.Session):
+    session.query(QosRule).delete()
+    session.commit()
+
+
+def add_qos_rule(
+        rule,
+        session: sa.orm.Session,
+) -> None:
+    session.add(QosRule(
+        id=rule.get_uid(),
+        # this works only if the "request" is not needed in the computation of "conclusion"
+        conclusion=str(rule.evaluate(request=None)),
+        info=str(rule.info).replace('"', ""),
+        condition=str(rule.condition),
+    ))
+    session.commit()
+
+
+def get_qos_rule_from_id(qos_rule_id: str, session: sa.orm.Session) -> QosRule | None:
+    statement = sa.select(QosRule).where(
+        QosRule.id == qos_rule_id
+    )
+    try:
+        return session.scalars(statement).one()
+    except sa.exc.NoResultFound:
+        return None
+
+
 def get_qos_status_from_request(
     request: SystemRequest,
+    session: sa.orm.Session,
 ) -> dict[str, list[tuple[str, str]]]:
-    ret_value: dict[str, list[str]] = {}
-    for rule_name, rules in request.qos_status.items():
-        ret_value[rule_name] = []
-        for rule in rules.values():
-            ret_value[rule_name].append(
-                (rule.get("info", ""), rule.get("conclusion", ""))
-            )
+    ret_value: dict[str, list[tuple[str, str]]] = {}
+    for qos_rule_id in request.qos_status_ids:
+        qos_rule = get_qos_rule_from_id(qos_rule_id=qos_rule_id, session=session)
+        if qos_rule is not None:
+            ret_value.setdefault(qos_rule.rule, [])
+            ret_value[qos_rule.rule].append((qos_rule.info, qos_rule.conclusion))
     return ret_value
 
 
-def set_request_qos_rule(
+def add_qos_rule_to_request(
     request: SystemRequest,
     rule,
     session: sa.orm.Session,
 ):
-    qos_status = request.qos_status
-    old_rules = qos_status.get(rule.name, {})
-    rule_uid = rule.get_uid(request)
-    if rule_uid in old_rules:
-        return
-    old_rules[rule_uid] = {
-        "conclusion": str(rule.evaluate(request)),
-        "info": str(rule.info).replace('"', ""),
-        "condition": str(rule.condition),
-    }
-    qos_status[rule.name] = old_rules
-    session.execute(
-        sa.update(SystemRequest)
-        .filter_by(request_uid=request.request_uid)
-        .values(qos_status=qos_status)
-    )
+    print(request.qos_status_ids)
+    request.qos_status_ids = request.qos_status_ids + [rule.get_uid(None)]
+    session.add(request)
+    print(request.qos_status_ids)
+    session.commit()
 
 
 def requeue_request(
@@ -395,7 +425,7 @@ def set_request_status(
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
-        request.qos_status = {}
+        request.qos_status_ids = []
     # FIXME: logs can't be live updated
     request.response_log = json.dumps(log)
     request.response_user_visible_log = json.dumps(user_visible_log)
