@@ -85,7 +85,7 @@ class SystemRequest(BaseModel):
         sa.Text, sa.ForeignKey("adaptor_properties.hash"), nullable=False
     )
     entry_point = sa.Column(sa.Text)
-    qos_status_ids = sa.Column(sa.dialects.postgresql.ARRAY(sa.Text), default=[])
+    qos_status_ids = sa.Column(sa.dialects.postgresql.ARRAY(sa.Text), default="{}")
 
     __table_args__: tuple[sa.ForeignKeyConstraint, dict[None, None]] = (
         sa.ForeignKeyConstraint(
