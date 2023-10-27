@@ -110,9 +110,8 @@ class QoS:
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
                 # performance. avoid interacting with db if limit is already there
-                if limit.get_uid(request) not in request.qos_status_ids:
-                    pass
-                    # database.add_qos_rule_to_request(request, limit, session)
+                # if limit.get_uid(request) not in request.qos_status_ids:
+                #     database.add_qos_rule_to_request(request, limit, session)
                 limits.append(limit)
         session.commit()
         permissions = []
