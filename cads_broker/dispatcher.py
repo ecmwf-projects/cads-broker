@@ -250,7 +250,6 @@ class Broker:
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    logger.info(f"---------> can_run loop: {time.time() - start_can_run}")
                     break
 
     def submit_request(
