@@ -31,10 +31,10 @@ def upgrade() -> None:
     op.add_column(
         "system_requests",
         sa.Column(
-            "qos_status_ids", sa.dialects.postgresql.ARRAY(sa.Text), default="{}"
+            "qos_status_ids", sa.dialects.postgresql.ARRAY(sa.Text), default=[]
         ),
     )
-    op.execute("update system_requests set qos_status_ids=[]")
+    op.execute("update system_requests set qos_status_ids='{}'")
 
 
 def downgrade() -> None:
