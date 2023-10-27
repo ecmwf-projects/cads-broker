@@ -107,13 +107,12 @@ class QoS:
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
         limits = []
-        for i, limit in enumerate(properties.limits):
-            continue
-            # if limit.full(request):
+        for limit in properties.limits:
+            if limit.full(request):
                 # performance. avoid interacting with db if limit is already there
-                # if limit.get_uid(request) not in request.qos_status_ids:
-                #     database.add_qos_rule_to_request(request, limit, session)
-                # limits.append(limit)
+                if limit.get_uid(request) not in request.qos_status_ids:
+                    database.add_qos_rule_to_request(request, limit, session)
+                limits.append(limit)
         session.commit()
         permissions = []
         for permission in properties.permissions:
