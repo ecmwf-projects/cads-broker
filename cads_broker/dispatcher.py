@@ -244,7 +244,6 @@ class Broker:
             reverse=True,
         )
         requests_counter = 0
-        start_can_run = time.time()
         for request in queue:
             if self.qos.can_run(request, session=session):
                 self.submit_request(request, session=session)
