@@ -49,6 +49,15 @@ def get_number_of_workers(client: distributed.Client) -> int:
     return number_of_workers
 
 
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        ret_value = func(*args, **kwargs)
+        logger.info(f"Time for {func.__name__}: {time.time() - start}")
+        return ret_value
+    return wrapper
+
+
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
         maxsize=1024, ttl=int(os.getenv("QOS_RULES_CACHE_TIME", 10))
@@ -238,9 +247,7 @@ class Broker:
             )
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
-        start_get_accepted = time.time()
-        candidates = db.get_accepted_requests(session=session)
-        logger.info(f"------> time get_accepter {time.time() - start_get_accepted}")
+        candidates = timeit(db.get_accepted_requests)(session=session)
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(candidate, session),
@@ -248,12 +255,8 @@ class Broker:
         )
         requests_counter = 0
         for request in queue:
-            start_can_run = time.time()
-            if self.qos.can_run(request, session=session):
-                logger.info(f"------> time can_run {time.time() - start_can_run}")
-                start_submit = time.time()
-                self.submit_request(request, session=session)
-                logger.info(f"------> time submit {time.time() - start_submit}")
+            if timeit(self.qos.can_run)(request, session=session):
+                timeit(self.submit_request)(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
                     break
@@ -290,11 +293,11 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
-                self.sync_database(session=session)
-                self.number_running_requests = db.count_requests(
+                timeit(self.sync_database)(session=session)
+                self.number_running_requests = timeit(db.count_requests)(
                     session=session, status="running"
                 )
-                number_accepted_requests = db.count_requests(
+                number_accepted_requests = timeit(db.count_requests)(
                     session=session, status="accepted"
                 )
                 available_workers = (
@@ -310,7 +313,7 @@ class Broker:
                     )
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
-                        self.submit_requests(
+                        timeit(self.submit_requests)(
                             session=session, number_of_requests=available_workers
                         )
             time.sleep(self.wait_time)
