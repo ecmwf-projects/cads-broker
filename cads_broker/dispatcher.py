@@ -115,7 +115,7 @@ class Broker:
         factory=dict,
         repr=lambda futures: " ".join(futures.keys()),
     )
-    running_requests: int = 0
+    number_running_requests: int = 0
     session_maker: sa.orm.sessionmaker | None = None
 
     @classmethod
@@ -178,7 +178,9 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                logger.info("Request not found: re-queueing", job_id={request.request_uid})
+                logger.info(
+                    "Request not found: re-queueing", job_id={request.request_uid}
+                )
                 db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
@@ -244,7 +246,9 @@ class Broker:
         )
         requests_counter = 0
         for request in queue:
+            start_can_run = time.time()
             if self.qos.can_run(request, session=session):
+                logger.info(f"------> time can_run {time.time() - start_can_run}")
                 self.submit_request(request, session=session)
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
@@ -283,23 +287,20 @@ class Broker:
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
                 self.sync_database(session=session)
-                self.running_requests = len(
-                    [
-                        future
-                        for future in self.futures.values()
-                        if DASK_STATUS_TO_STATUS.get(future.status)
-                        not in ("successful", "failed")
-                    ]
+                self.number_running_requests = db.count_requests(
+                    session=session, status="running"
                 )
                 number_accepted_requests = db.count_requests(
                     session=session, status="accepted"
                 )
-                available_workers = self.number_of_workers - self.running_requests
+                available_workers = (
+                    self.number_of_workers - self.number_running_requests
+                )
                 if number_accepted_requests > 0:
                     logger.info(
                         "broker info",
                         available_workers=available_workers,
-                        running_requests=self.running_requests,
+                        number_running_requests=self.number_running_requests,
                         number_of_workers=self.number_of_workers,
                         futures=len(self.futures),
                     )
