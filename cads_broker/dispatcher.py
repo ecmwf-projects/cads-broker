@@ -251,7 +251,9 @@ class Broker:
             start_can_run = time.time()
             if self.qos.can_run(request, session=session):
                 logger.info(f"------> time can_run {time.time() - start_can_run}")
+                start_submit = time.time()
                 self.submit_request(request, session=session)
+                logger.info(f"------> time submit {time.time() - start_submit}")
                 requests_counter += 1
                 if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
                     break
