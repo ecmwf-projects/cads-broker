@@ -238,7 +238,9 @@ class Broker:
             )
 
     def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
+        start_get_accepted = time.time()
         candidates = db.get_accepted_requests(session=session)
+        logger.info(f"------> time get_accepter {time.time() - start_get_accepted}")
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(candidate, session),
