@@ -444,10 +444,10 @@ def get_adaptor_properties(
     session: sa.orm.Session,
 ) -> AdaptorProperties | None:
     try:
-        statement = sa.select(AdaptorProperties).where(
+        statement = sa.select(AdaptorProperties.hash).where(
             AdaptorProperties.hash == adaptor_properties_hash
         )
-        return session.scalars(statement).one()
+        return session.execute(statement).one()
     except sqlalchemy.orm.exc.NoResultFound:
         return None
 
