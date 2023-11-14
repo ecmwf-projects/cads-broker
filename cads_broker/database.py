@@ -174,6 +174,7 @@ def count_finished_requests_per_user(
 
 def count_requests(
     session: sa.orm.Session,
+    process_id: str | list[str] | None = None,
     status: str | list[str] | None = None,
     entry_point: str | list[str] | None = None,
     user_uid: str | list[str] | None = None,
@@ -181,6 +182,10 @@ def count_requests(
 ) -> int:
     """Count requests."""
     statement = session.query(SystemRequest)
+    if process_id is not None:
+        if isinstance(process_id, str):
+            process_id = [process_id]
+        statement = statement.filter(SystemRequest.process_id.in_(process_id))
     if status is not None:
         if isinstance(status, str):
             status = [status]
