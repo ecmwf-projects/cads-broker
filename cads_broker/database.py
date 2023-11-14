@@ -174,18 +174,29 @@ def count_finished_requests_per_user(
 
 def count_requests(
     session: sa.orm.Session,
-    status: str | None = None,
-    entry_point: str | None = None,
-    user_uid: str | None = None,
+    status: str | list[str] | None = None,
+    entry_point: str | list[str] | None = None,
+    user_uid: str | list[str] | None = None,
+    portal: str | list[str] | None = None,
 ) -> int:
     """Count requests."""
     statement = session.query(SystemRequest)
     if status is not None:
-        statement = statement.filter(SystemRequest.status == status)
+        if isinstance(status, str):
+            status = [status]
+        statement = statement.filter(SystemRequest.status.in_(status))
     if entry_point is not None:
-        statement = statement.filter(SystemRequest.entry_point == entry_point)
+        if isinstance(entry_point, str):
+            entry_point = [entry_point]
+        statement = statement.filter(SystemRequest.entry_point.in_(entry_point))
     if user_uid is not None:
-        statement = statement.filter(SystemRequest.user_uid == user_uid)
+        if isinstance(user_uid, str):
+            user_uid = [user_uid]
+        statement = statement.filter(SystemRequest.user_uid.in_(user_uid))
+    if portal is not None:
+        if isinstance(portal, str):
+            portal = [portal]
+        statement = statement.filter(SystemRequest.portal.in_(portal))
     return statement.count()
 
 
