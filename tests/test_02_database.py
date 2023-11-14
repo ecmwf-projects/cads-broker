@@ -41,7 +41,7 @@ def mock_system_request(
     status: str | None = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
     request_uid: str | None = None,
-    process_id: str | None = None,
+    process_id: str | None = "process_id",
     user_uid: str | None = None,
     cache_id: int | None = None,
     request_body: dict | None = None,
@@ -118,25 +118,32 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
 
 
 def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
-    entry_point1 = "reanalysis-era5-pressure-levels"
-    entry_point2 = "reanalysis-era5-single-levels"
-    user_uid1 = str(uuid.uuid4())
-    user_uid2 = str(uuid.uuid4())
+    entry_point_1 = "entry_point_1"
+    entry_point_2 = "entry_point_2"
+    process_id_1 = "process_id_1"
+    process_id_2 = "process_id_2"
+    user_uid_1 = str(uuid.uuid4())
+    user_uid_2 = str(uuid.uuid4())
     adaptor_properties = mock_config()
     request1 = mock_system_request(
-        entry_point=entry_point1,
-        user_uid=user_uid1,
+        status="accepted",
+        entry_point=entry_point_1,
+        process_id=process_id_1,
+        user_uid=user_uid_1,
         adaptor_properties_hash=adaptor_properties.hash,
     )
     request2 = mock_system_request(
-        entry_point=entry_point2,
-        user_uid=user_uid2,
+        status="accepted",
+        entry_point=entry_point_2,
+        process_id=process_id_2,
+        user_uid=user_uid_2,
         adaptor_properties_hash=adaptor_properties.hash,
     )
     request3 = mock_system_request(
         status="running",
-        entry_point=entry_point2,
-        user_uid=user_uid2,
+        entry_point=entry_point_2,
+        process_id=process_id_2,
+        user_uid=user_uid_2,
         adaptor_properties_hash=adaptor_properties.hash,
     )
 
@@ -147,12 +154,14 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request3)
         session.commit()
         assert 3 == db.count_requests(session=session)
-        assert 1 == db.count_requests(session=session, entry_point=entry_point1)
+        assert 1 == db.count_requests(session=session, entry_point=entry_point_1)
         assert 2 == db.count_requests(session=session, status="accepted")
-        assert 2 == db.count_requests(session=session, user_uid=user_uid2)
+        assert 2 == db.count_requests(session=session, user_uid=user_uid_2)
+        assert 2 == db.count_requests(session=session, process_id=process_id_2)
         assert 1 == db.count_requests(
-            session=session, status="accepted", user_uid=user_uid2
+            session=session, status="accepted", user_uid=user_uid_2
         )
+        assert 3 == db.count_requests(session=session, status=["accepted", "running"])
 
 
 def test_count_requests_per_dataset_status(session_obj: sa.orm.sessionmaker) -> None:
