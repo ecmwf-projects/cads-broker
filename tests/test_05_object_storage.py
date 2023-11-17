@@ -76,7 +76,7 @@ class DummyBotoClient:
         self,
         resource: str,
         endpoint_url: str | None = None,
-        **storage_kws: dict[str, Any]
+        **storage_kws: dict[str, Any],
     ) -> None:
         self.resource = resource
         self.endpoint_url = endpoint_url
