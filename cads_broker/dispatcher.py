@@ -1,5 +1,6 @@
 import hashlib
 import io
+import operator
 import os
 import time
 import traceback
@@ -8,7 +9,6 @@ from typing import Any
 import attrs
 import cachetools
 import distributed
-import operator
 import sqlalchemy as sa
 import structlog
 
@@ -178,7 +178,9 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                logger.info("Request not found: re-queueing", job_id={request.request_uid})
+                logger.info(
+                    "Request not found: re-queueing", job_id={request.request_uid}
+                )
                 db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
