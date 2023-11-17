@@ -48,6 +48,7 @@ autoapi_options = [
     "imported-members",
 ]
 autoapi_root = "_api"
+autoapi_python_use_implicit_namespaces = True
 
 # napoleon configuration
 napoleon_google_docstring = False
