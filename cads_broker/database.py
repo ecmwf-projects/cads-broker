@@ -52,8 +52,8 @@ class SystemRequest(BaseModel):
         index=True,
         unique=True,
     )
-    process_id = sa.Column(sa.Text)
-    user_uid = sa.Column(sa.Text)
+    process_id = sa.Column(sa.Text, index=True)
+    user_uid = sa.Column(sa.Text, index=True)
     status = sa.Column(status_enum)
     cache_id = sa.Column(sa.Integer, index=True)
     request_body = sa.Column(JSONB, nullable=False)
