@@ -89,8 +89,8 @@ def get_tasks(client: distributed.Client) -> Any:
 
 
 class QoSRules:
-    def __init__(self) -> None:
-        self.environment = Environment.Environment()
+    def __init__(self, number_of_workers) -> None:
+        self.environment = Environment.Environment(number_of_workers=number_of_workers)
         self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
@@ -125,7 +125,7 @@ class Broker:
         session_maker: sa.orm.sessionmaker = None,
     ):
         client = distributed.Client(address)
-        qos_config = QoSRules()
+        qos_config = QoSRules(get_number_of_workers(client=client))
         factory.register_functions()
         session_maker = db.ensure_session_obj(session_maker)
         rules_hash = get_rules_hash(qos_config.rules_path)
@@ -137,6 +137,7 @@ class Broker:
                 qos_config.rules,
                 qos_config.environment,
                 rules_hash=rules_hash,
+                session_maker=session_maker,
             ),
             address=address,
         )

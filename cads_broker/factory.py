@@ -34,6 +34,10 @@ def register_functions():
         lambda context, *args: context.request.entry_point,
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
+        "number_of_workers",
+        lambda context, *args: context.environment.number_of_workers,
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
         "user_request_count",
         lambda context, seconds: database.count_finished_requests_per_user(
             user_uid=context.request.user_uid,
