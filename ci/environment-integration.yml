@@ -7,8 +7,8 @@ dependencies:
 - pytest
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
-- dask-core==2023.3.1
-- distributed==2023.3.1
+- dask-core==2023.3.2
+- distributed==2023.3.2
 - cloudpickle==2.2.1
 - msgpack-python==1.0.5
 - tornado==6.2
