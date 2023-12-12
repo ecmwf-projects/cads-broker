@@ -585,7 +585,10 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     alembic_config_path = os.path.join(migration_directory, "alembic.ini")
     alembic_cfg = alembic.config.Config(alembic_config_path)
     for option in ["drivername", "username", "password", "host", "port", "database"]:
-        alembic_cfg.set_main_option(option, str(getattr(engine.url, option)))
+        value = getattr(engine.url, option)
+        if value is None:
+            value = ""
+        alembic_cfg.set_main_option(option, str(value))
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
         # cleanup and create the schema

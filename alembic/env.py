@@ -33,14 +33,11 @@ def run_migrations_offline() -> None:
     Calls to alembic.context.execute() here emit the given string to the
     script output.
     """
-    url = sa.engine.URL.create(
-        drivername=config.get_main_option("drivername"),  # type: ignore
-        username=config.get_main_option("username"),
-        password=config.get_main_option("password"),
-        host=config.get_main_option("host"),
-        port=config.get_main_option("port"),  # type: ignore
-        database=config.get_main_option("database"),
-    )
+    url_props = dict()
+    for prop in ["drivername", "username", "password", "host", "port", "database"]:
+        url_props[prop] = config.get_main_option(prop)
+    url_props["port"] = url_props["port"] and int(url_props["port"]) or None  # type: ignore
+    url = sa.engine.URL.create(**url_props)  # type: ignore
     alembic.context.configure(
         url=url,
         target_metadata=cads_broker.database.BaseModel.metadata,
@@ -57,14 +54,11 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine
     and associate a connection with the alembic.context.
     """
-    url = sa.engine.URL.create(
-        drivername=config.get_main_option("drivername"),  # type: ignore
-        username=config.get_main_option("username"),
-        password=config.get_main_option("password"),
-        host=config.get_main_option("host"),
-        port=config.get_main_option("port"),  # type: ignore
-        database=config.get_main_option("database"),
-    )
+    url_props = dict()
+    for prop in ["drivername", "username", "password", "host", "port", "database"]:
+        url_props[prop] = config.get_main_option(prop)
+    url_props["port"] = url_props["port"] and int(url_props["port"]) or None  # type: ignore
+    url = sa.engine.URL.create(**url_props)  # type: ignore
     engine = sa.create_engine(url, poolclass=sa.pool.NullPool)
     with engine.connect() as connection:
         alembic.context.configure(
