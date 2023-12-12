@@ -19,6 +19,7 @@ import sys
 import pydantic
 import pydantic_core
 import pydantic_settings
+import sqlalchemy as sa
 import structlog
 
 dbsettings = None
@@ -63,20 +64,28 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     @property
     def connection_string(self) -> str:
         """Create reader psql connection string."""
-        return (
-            f"postgresql://{self.compute_db_user}"
-            f":{self.compute_db_password}@{self.compute_db_host}"
-            f"/{self.compute_db_name}"
+        url = sa.engine.URL.create(
+            drivername="postgresql",
+            username=self.compute_db_user,
+            password=self.compute_db_password,
+            host=self.compute_db_host,
+            database=self.compute_db_name,
         )
+        ret_value = url.render_as_string(False)
+        return ret_value
 
     @property
     def connection_string_read(self) -> str:
         """Create reader psql connection string."""
-        return (
-            f"postgresql://{self.compute_db_user}"
-            f":{self.compute_db_password}@{self.compute_db_host_read}"
-            f"/{self.compute_db_name}"
+        url = sa.engine.URL.create(
+            drivername="postgresql",
+            username=self.compute_db_user,
+            password=self.compute_db_password,
+            host=self.compute_db_host_read,
+            database=self.compute_db_name,
         )
+        ret_value = url.render_as_string(False)
+        return ret_value
 
 
 def ensure_settings(settings: SqlalchemySettings | None = None) -> SqlalchemySettings:
