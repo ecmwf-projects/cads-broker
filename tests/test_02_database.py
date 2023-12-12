@@ -758,6 +758,54 @@ def test_init_database(postgresql: Connection[str]) -> None:
     conn.close()
 
 
+def test_init_database_with_password(postgresql2: Connection[str]) -> None:
+    connection_url = sa.engine.URL.create(
+        drivername="postgresql+psycopg2",
+        username=postgresql2.info.user,
+        password=postgresql2.info.password,
+        host=postgresql2.info.host,
+        port=postgresql2.info.port,
+        database=postgresql2.info.dbname,
+    )
+    connection_string = connection_url.render_as_string(False)
+    engine = sa.create_engine(connection_string)
+    conn = engine.connect()
+    query = sa.text(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+    )
+    # start with an empty db structure
+    expected_tables_at_beginning: set[str] = set()
+    assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
+
+    # verify create structure
+    db.init_database(connection_string, force=True)
+    expected_tables_complete = set(db.BaseModel.metadata.tables).union(
+        {"alembic_version"}
+    )
+    assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
+
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
+    session_obj = sa.orm.sessionmaker(engine)
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request)
+        session.commit()
+
+    db.init_database(connection_string)
+    assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
+    with session_obj() as session:
+        requests = db.get_accepted_requests(session=session)
+    assert len(requests) == 1
+
+    db.init_database(connection_string, force=True)
+    assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
+    with session_obj() as session:
+        requests = db.get_accepted_requests(session=session)
+    assert len(requests) == 0
+    conn.close()
+
+
 def test_ensure_session_obj(
     postgresql: Connection[str], session_obj: sessionmaker, temp_environ: Any
 ) -> None:

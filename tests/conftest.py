@@ -3,9 +3,13 @@ from typing import Any
 
 import pytest
 from psycopg import Connection
+from pytest_postgresql import factories
 from sqlalchemy.orm import sessionmaker
 
 from cads_broker import database
+
+postgresql_proc2 = factories.postgresql_proc(password="my@strange@password")
+postgresql2 = factories.postgresql("postgresql_proc2")
 
 
 @pytest.fixture()
