@@ -33,7 +33,14 @@ def run_migrations_offline() -> None:
     Calls to alembic.context.execute() here emit the given string to the
     script output.
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = sa.engine.URL.create(
+        drivername=config.get_main_option("drivername"),  # type: ignore
+        username=config.get_main_option("username"),
+        password=config.get_main_option("password"),
+        host=config.get_main_option("host"),
+        port=config.get_main_option("port"),  # type: ignore
+        database=config.get_main_option("database"),
+    )
     alembic.context.configure(
         url=url,
         target_metadata=cads_broker.database.BaseModel.metadata,
@@ -50,13 +57,16 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine
     and associate a connection with the alembic.context.
     """
-    connectable = sa.engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=sa.pool.NullPool,
+    url = sa.engine.URL.create(
+        drivername=config.get_main_option("drivername"),  # type: ignore
+        username=config.get_main_option("username"),
+        password=config.get_main_option("password"),
+        host=config.get_main_option("host"),
+        port=config.get_main_option("port"),  # type: ignore
+        database=config.get_main_option("database"),
     )
-
-    with connectable.connect() as connection:
+    engine = sa.create_engine(url, poolclass=sa.pool.NullPool)
+    with engine.connect() as connection:
         alembic.context.configure(
             connection=connection,
             target_metadata=cads_broker.database.BaseModel.metadata,
