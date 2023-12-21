@@ -17,7 +17,7 @@ import alembic.command
 import alembic.config
 from cads_broker import config
 
-BaseModel = cacholote.database.Base
+BaseModel = sa.orm.declarative_base()
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
