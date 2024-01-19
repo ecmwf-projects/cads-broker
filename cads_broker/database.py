@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 import cacholote
+import psycopg2.errors
 import sqlalchemy as sa
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
@@ -28,6 +29,10 @@ status_enum = sa.Enum(
 
 
 class NoResultFound(Exception):
+    pass
+
+
+class InvalidRequestID(Exception):
     pass
 
 
@@ -544,6 +549,8 @@ def get_request(
             SystemRequest.request_uid == request_uid
         )
         return session.scalars(statement).one()
+    except psycopg2.errors.InvalidTextRepresentation:
+        raise InvalidRequestID(f"Invalid request_uid {request_uid}")
     except sqlalchemy.orm.exc.NoResultFound:
         logger.exception("get_request failed")
         raise NoResultFound(f"No request found with request_uid {request_uid}")
