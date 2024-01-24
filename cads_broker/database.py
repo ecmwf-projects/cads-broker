@@ -599,9 +599,9 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     if not sqlalchemy_utils.database_exists(engine.url):
         sqlalchemy_utils.create_database(engine.url)
         # cleanup and create the schema
+        BaseModel.metadata.drop_all(engine)
         cacholote.database.Base.metadata.drop_all(engine)
         cacholote.database.Base.metadata.create_all(engine)
-        BaseModel.metadata.drop_all(engine)
         BaseModel.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
     else:
@@ -615,6 +615,8 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
+        cacholote.database.Base.metadata.drop_all(engine)
+        cacholote.database.Base.metadata.create_all(engine)
         BaseModel.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
     else:
