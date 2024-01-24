@@ -150,9 +150,9 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    # @cachetools.cachedmethod(  # type: ignore
-    #     cache=operator.attrgetter("cache"),
-    # )
+    @cachetools.cachedmethod(  # type: ignore
+        cache=operator.attrgetter("cache"),
+    )
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
