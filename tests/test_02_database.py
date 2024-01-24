@@ -45,6 +45,7 @@ def mock_system_request(
     user_uid: str | None = None,
     cache_id: int | None = None,
     request_body: dict | None = None,
+    request_metadata: dict | None = None,
     adaptor_properties_hash: str = "adaptor_properties_hash",
     entry_point: str = "entry_point",
 ) -> db.SystemRequest:
@@ -57,6 +58,7 @@ def mock_system_request(
         started_at=None,
         cache_id=cache_id,
         request_body=request_body or {"request_type": "test"},
+        request_metadata=request_metadata or {},
         adaptor_properties_hash=adaptor_properties_hash,
         entry_point=entry_point,
     )
@@ -554,6 +556,34 @@ def test_get_qos_status_from_request() -> None:
     }
     res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus
+
+
+def test_set_request_worker_name(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request = mock_system_request(
+        status="running", adaptor_properties_hash=adaptor_properties.hash
+    )
+    request_uid = request.request_uid
+    worker_name = "worker-0"
+
+    # running status
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request)
+        session.commit()
+
+        db.set_request_worker_name(
+            request_uid,
+            worker_name=worker_name,
+            session=session,
+        )
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid
+        )
+        running_request = session.scalars(statement).one()
+
+    assert running_request.request_metadata["worker_name"] == worker_name
 
 
 def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:

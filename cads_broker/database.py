@@ -386,6 +386,21 @@ def requeue_request(
         return
 
 
+def set_request_worker_name(
+    request_uid: str,
+    worker_name: dict[str: Any],
+    session: sa.orm.Session,
+) -> SystemRequest:
+    """Set the status of a request."""
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    metadata = dict(request.request_metadata)
+    metadata.update({"worker_name": worker_name})
+    request.request_metadata = metadata
+    session.commit()
+    return request
+
+
 def set_request_status(
     request_uid: str,
     status: str,
@@ -444,6 +459,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "user_request": True,
         "process_id": request.process_id,
         "resubmit_number": request.request_metadata.get("resubmit_number", 0),
+        "worker_name": request.request_metadata.get("worker_name"),
         "origin": request.origin,
         "entry_point": request.entry_point,
         **request.response_error,

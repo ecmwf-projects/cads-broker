@@ -171,6 +171,20 @@ class Broker:
                 continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
+                future = self.futures.get(request.request_uid)
+                worker_names = self.client.get_events(f"{future.key}/worker_name")
+                if len(worker_names) > 0 and request.request_metadata.get(
+                    "worker_name"
+                ) != (worker_name := worker_names[0][1]):
+                    request = db.set_request_worker_name(
+                        request_uid=request.request_uid,
+                        worker_name=worker_name,
+                        session=session,
+                    )
+                    logger.info(
+                        "submitted job to worker",
+                        **db.logger_kwargs(request=request),
+                    )
                 continue
             # if request is in the scheduler, go on
             elif request.request_uid in dask_tasks:
