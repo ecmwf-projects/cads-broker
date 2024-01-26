@@ -2,7 +2,6 @@ import hashlib
 import io
 import operator
 import os
-import threading
 import time
 import traceback
 from typing import Any
@@ -111,7 +110,6 @@ class Broker:
     cache = cachetools.TTLCache(
         maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
     )
-    lock = threading.Lock()
 
     futures: dict[str, distributed.Future] = attrs.field(
         factory=dict,
@@ -178,12 +176,11 @@ class Broker:
                 if len(worker_names) > 0 and request.request_metadata.get(
                     "worker_name"
                 ) != (worker_name := worker_names[0][1]):
-                    with self.lock:
-                        request = db.set_request_worker_name(
-                            request_uid=request.request_uid,
-                            worker_name=worker_name,
-                            session=session,
-                        )
+                    request = db.set_request_worker_name(
+                        request_uid=request.request_uid,
+                        worker_name=worker_name,
+                        session=session,
+                    )
                     logger.info(
                         "submitted job to worker",
                         **db.logger_kwargs(request=request),
@@ -198,8 +195,7 @@ class Broker:
                 logger.info(
                     "Request not found: re-queueing", job_id={request.request_uid}
                 )
-                with self.lock:
-                    db.requeue_request(request_uid=request.request_uid, session=session)
+                db.requeue_request(request_uid=request.request_uid, session=session)
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -209,46 +205,45 @@ class Broker:
             self.client.get_events(f"{future.key}/user_visible_log")
         )
         with self.session_maker() as session:
-            with self.lock:
-                if future.status == "finished":
-                    result = future.result()
-                    request = db.set_request_status(
-                        future.key,
-                        job_status,
-                        cache_id=result,
-                        session=session,
-                        log=log,
-                        user_visible_log=user_visible_log,
-                    )
-                elif future.status == "error":
-                    exception = future.exception()
-                    request = db.set_request_status(
-                        future.key,
-                        job_status,
-                        error_message="".join(traceback.format_exception(exception)),
-                        error_reason=traceback.format_exception_only(exception)[0],
-                        log=log,
-                        user_visible_log=user_visible_log,
-                        session=session,
-                    )
-                else:
-                    # if the dask status is unknown, re-queue it
-                    request = db.set_request_status(
-                        future.key,
-                        job_status,
-                        session=session,
-                        resubmit=True,
-                        log=log,
-                        user_visible_log=user_visible_log,
-                    )
-                    logger.warning(
-                        "unknown dask status, re-queing",
-                        job_status={future.status},
-                        job_id=request.request_uid,
-                    )
-                    return
-                self.futures.pop(future.key)
-                self.qos.notify_end_of_request(request, session)
+            if future.status == "finished":
+                result = future.result()
+                request = db.set_request_status(
+                    future.key,
+                    job_status,
+                    cache_id=result,
+                    session=session,
+                    log=log,
+                    user_visible_log=user_visible_log,
+                )
+            elif future.status == "error":
+                exception = future.exception()
+                request = db.set_request_status(
+                    future.key,
+                    job_status,
+                    error_message="".join(traceback.format_exception(exception)),
+                    error_reason=traceback.format_exception_only(exception)[0],
+                    log=log,
+                    user_visible_log=user_visible_log,
+                    session=session,
+                )
+            else:
+                # if the dask status is unknown, re-queue it
+                request = db.set_request_status(
+                    future.key,
+                    job_status,
+                    session=session,
+                    resubmit=True,
+                    log=log,
+                    user_visible_log=user_visible_log,
+                )
+                logger.warning(
+                    "unknown dask status, re-queing",
+                    job_status={future.status},
+                    job_id=request.request_uid,
+                )
+                return
+            self.futures.pop(future.key)
+            self.qos.notify_end_of_request(request, session)
         logger.info(
             "job has finished",
             dask_status=future.status,
