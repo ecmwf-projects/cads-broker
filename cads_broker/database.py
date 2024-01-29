@@ -36,6 +36,22 @@ class InvalidRequestID(Exception):
     pass
 
 
+class Events(BaseModel):
+    """Events ORM model."""
+    
+    __tablename__ = "events"
+
+    event_id = sa.Column(sa.Integer, primary_key=True)
+    event_type = sa.Column(sa.Text)
+    request_uid = sa.Column(
+        sa.dialects.postgresql.UUID(False),
+        sa.ForeignKey('system_requests.request_uid'),
+        index=True,
+    )
+    message = sa.Column(sa.Text)
+    timestamp = sa.Column(sa.TIMESTAMP, default=sa.func.now())
+    
+
 class AdaptorProperties(BaseModel):
     """Adaptor Metadata ORM model."""
 
@@ -89,6 +105,7 @@ class SystemRequest(BaseModel):
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
     adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
+    events = sa.orm.relationship(Events, lazy="select")
 
     @property
     def age(self):
@@ -444,6 +461,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "user_request": True,
         "process_id": request.process_id,
         "resubmit_number": request.request_metadata.get("resubmit_number", 0),
+        "worker_name": [event.message for event in request.events if event.event_type == "worker_name"],
         "origin": request.origin,
         "entry_point": request.entry_point,
         **request.response_error,
@@ -481,6 +499,17 @@ def add_adaptor_properties(
 ):
     adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
     session.add(adaptor_properties)
+
+
+def add_event(
+    event_type: str,
+    request_uid: str,
+    message: str,
+    session: sa.orm.Session,
+):
+    event = Events(event_type=event_type, request_uid=request_uid, message=message)
+    session.add(event)
+    session.commit()
 
 
 def create_request(
