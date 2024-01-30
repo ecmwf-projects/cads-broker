@@ -20,7 +20,7 @@ def upgrade() -> None:
     op.create_table(
         "events",
         sa.Column("event_id", sa.Integer, primary_key=True),
-        sa.Column("event_type", sa.Text),
+        sa.Column("event_type", sa.Text, index=True),
         sa.Column("message", sa.Text),
         sa.Column("timestamp", sa.TIMESTAMP, default=sa.func.now()),
         sa.Column(

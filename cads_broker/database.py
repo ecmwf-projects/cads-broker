@@ -42,7 +42,7 @@ class Events(BaseModel):
     __tablename__ = "events"
 
     event_id = sa.Column(sa.Integer, primary_key=True)
-    event_type = sa.Column(sa.Text)
+    event_type = sa.Column(sa.Text, index=True)
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
         sa.ForeignKey('system_requests.request_uid'),
