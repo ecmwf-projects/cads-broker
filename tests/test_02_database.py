@@ -45,6 +45,7 @@ def mock_system_request(
     user_uid: str | None = None,
     cache_id: int | None = None,
     request_body: dict | None = None,
+    request_metadata: dict | None = None,
     adaptor_properties_hash: str = "adaptor_properties_hash",
     entry_point: str = "entry_point",
 ) -> db.SystemRequest:
@@ -57,6 +58,7 @@ def mock_system_request(
         started_at=None,
         cache_id=cache_id,
         request_body=request_body or {"request_type": "test"},
+        request_metadata=request_metadata or {},
         adaptor_properties_hash=adaptor_properties_hash,
         entry_point=entry_point,
     )
@@ -638,6 +640,41 @@ def test_set_request_status(session_obj: sa.orm.sessionmaker) -> None:
     assert failed_request.response_error["message"] == error_message
     assert failed_request.cache_id is None
     assert failed_request.finished_at is not None
+
+
+def test_add_event(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request_1 = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
+    request_2 = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
+    request_uid_1 = request_1.request_uid
+    request_uid_2 = request_2.request_uid
+
+    # running status
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request_1)
+        session.add(request_2)
+        session.commit()
+
+        db.add_event("event_1", request_uid_1, "message_1", session=session)
+        db.add_event("event_1", request_uid_1, "message_11", session=session)
+        db.add_event("event_2", request_uid_2, "message_2", session=session)
+
+    with session_obj() as session:
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_uid_1
+        )
+        request = session.scalars(statement).one()
+
+        assert request.events[0].event_type == "event_1"
+        assert request.events[0].message == "message_1"
+        assert request.events[1].message == "message_11"
+        with pytest.raises(IndexError):
+            request.events[2].message
 
 
 def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
