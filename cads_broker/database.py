@@ -38,19 +38,19 @@ class InvalidRequestID(Exception):
 
 class Events(BaseModel):
     """Events ORM model."""
-    
+
     __tablename__ = "events"
 
     event_id = sa.Column(sa.Integer, primary_key=True)
     event_type = sa.Column(sa.Text, index=True)
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
-        sa.ForeignKey('system_requests.request_uid'),
+        sa.ForeignKey("system_requests.request_uid"),
         index=True,
     )
     message = sa.Column(sa.Text)
     timestamp = sa.Column(sa.TIMESTAMP, default=sa.func.now())
-    
+
 
 class AdaptorProperties(BaseModel):
     """Adaptor Metadata ORM model."""
@@ -461,7 +461,11 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "user_request": True,
         "process_id": request.process_id,
         "resubmit_number": request.request_metadata.get("resubmit_number", 0),
-        "worker_name": [event.message for event in request.events if event.event_type == "worker_name"],
+        "worker_name": [
+            event.message
+            for event in request.events
+            if event.event_type == "worker_name"
+        ],
         "origin": request.origin,
         "entry_point": request.entry_point,
         **request.response_error,

@@ -1,17 +1,17 @@
-"""Add events table
+"""Add events table.
 
 Revision ID: 8924bc485ad5
 Revises: 6460fbf5a6d5
 Create Date: 2024-01-26 14:43:44.421999
 
 """
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '8924bc485ad5'
-down_revision = '6460fbf5a6d5'
+revision = "8924bc485ad5"
+down_revision = "6460fbf5a6d5"
 branch_labels = None
 depends_on = None
 
@@ -30,6 +30,7 @@ def upgrade() -> None:
             index=True,
         ),
     )
+
 
 def downgrade() -> None:
     op.drop_table("events")

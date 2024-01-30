@@ -669,7 +669,7 @@ def test_add_event(session_obj: sa.orm.sessionmaker) -> None:
             db.SystemRequest.request_uid == request_uid_1
         )
         request = session.scalars(statement).one()
-    
+
         assert request.events[0].event_type == "event_1"
         assert request.events[0].message == "message_1"
         assert request.events[1].message == "message_11"
