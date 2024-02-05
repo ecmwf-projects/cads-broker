@@ -1,4 +1,5 @@
 """SQLAlchemy ORM model."""
+
 import datetime
 import hashlib
 import json
@@ -345,6 +346,23 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
+def get_events_from_request(
+    request: SystemRequest,
+    session: sa.orm.Session,
+    event_type: str | None = None,
+    start_time: datetime.datetime | None = None,
+    stop_time: datetime.datetime | None = None,
+) -> list[Events]:
+    request_uid = request.request_uid
+    statement = (
+        sa.select(Events)
+        .filter(Events.request_uid == request_uid, Events.event_type == event_type)
+        .where(Events.timestamp > start_time, Events.timestamp < stop_time)
+    )
+    events = session.execute(statement).all()
+    return events
+
+
 def get_qos_status_from_request(
     request: SystemRequest,
 ) -> dict[str, list[tuple[str, str]]]:
@@ -451,12 +469,12 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "result": request.cache_entry.result if request.cache_entry else None,
         "created_at": request.created_at.isoformat(),
         "updated_at": request.updated_at.isoformat(),
-        "started_at": request.started_at.isoformat()
-        if request.started_at is not None
-        else None,
-        "finished_at": request.finished_at.isoformat()
-        if request.finished_at is not None
-        else None,
+        "started_at": (
+            request.started_at.isoformat() if request.started_at is not None else None
+        ),
+        "finished_at": (
+            request.finished_at.isoformat() if request.finished_at is not None else None
+        ),
         "request_kwargs": request.request_body.get("request", {}),
         "user_request": True,
         "process_id": request.process_id,
