@@ -347,13 +347,12 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
 
 
 def get_events_from_request(
-    request: SystemRequest,
+    request_uid: str,
     session: sa.orm.Session,
     event_type: str | None = None,
     start_time: datetime.datetime | None = None,
     stop_time: datetime.datetime | None = None,
 ) -> list[Events]:
-    request_uid = request.request_uid
     statement = sa.select(Events).filter(
         Events.request_uid == request_uid, Events.event_type == event_type
     )
