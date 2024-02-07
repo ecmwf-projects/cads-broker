@@ -353,9 +353,9 @@ def get_events_from_request(
     start_time: datetime.datetime | None = None,
     stop_time: datetime.datetime | None = None,
 ) -> list[Events]:
-    statement = sa.select(Events).filter(
-        Events.request_uid == request_uid, Events.event_type == event_type
-    )
+    statement = sa.select(Events).filter(Events.request_uid == request_uid)
+    if event_type is not None:
+        statement = statement.filter(Events.event_type == event_type)
     if start_time is not None:
         statement = statement.filter(Events.timestamp > start_time)
     if stop_time is not None:
