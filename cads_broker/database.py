@@ -354,12 +354,14 @@ def get_events_from_request(
     stop_time: datetime.datetime | None = None,
 ) -> list[Events]:
     request_uid = request.request_uid
-    statement = (
-        sa.select(Events)
-        .filter(Events.request_uid == request_uid, Events.event_type == event_type)
-        .where(Events.timestamp > start_time, Events.timestamp < stop_time)
+    statement = sa.select(Events).filter(
+        Events.request_uid == request_uid, Events.event_type == event_type
     )
-    events = session.execute(statement).all()
+    if start_time is not None:
+        statement = statement.filter(Events.timestamp > start_time)
+    if stop_time is not None:
+        statement = statement.filter(Events.timestamp <= stop_time)
+    events = session.scalars(statement).all()
     return events
 
 
