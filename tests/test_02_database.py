@@ -72,6 +72,21 @@ def mock_cache_entry() -> db.SystemRequest:
     return cache_entry
 
 
+def mock_event(
+    request_uid: str,
+    event_type: str = "user_visible_log",
+    message: str = "message",
+    timestamp: datetime.datetime = datetime.datetime.now(),
+) -> db.Events:
+    event = db.Events(
+        request_uid=request_uid,
+        event_type=event_type,
+        message=message,
+        timestamp=timestamp,
+    )
+    return event
+
+
 def response_as_dict(response: list[tuple]) -> dict:
     result = defaultdict(dict)
     for process_id, status, count in response:
@@ -529,6 +544,79 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         request = db.get_request(request_uid=request_uid, session=session)
         assert "1" in request.qos_status.get(rule_name, [])
         assert "2" in request.qos_status.get(rule_name, [])
+
+
+def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
+    request_uid = request.request_uid
+    test_events = [
+        {
+            "event_type": "user_visible_log",
+            "message": "log message 1",
+            "timestamp": datetime.datetime(2024, 1, 1, 8, 00, 00, 000000),
+        },
+        {
+            "event_type": "user_visible_log",
+            "message": "log message 2",
+            "timestamp": datetime.datetime(2024, 1, 2, 8, 00, 00, 000000),
+        },
+        {
+            "event_type": "user_visible_error",
+            "message": "error message 1",
+            "timestamp": datetime.datetime(2024, 1, 1, 16, 00, 00, 000000),
+        },
+        {
+            "event_type": "user_visible_error",
+            "message": "error message 2",
+            "timestamp": datetime.datetime(2024, 1, 2, 16, 00, 00, 000000),
+        },
+    ]
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request)
+        for test_event in test_events:
+            event = mock_event(
+                request_uid=request_uid,
+                event_type=test_event["event_type"],
+                message=test_event["message"],
+                timestamp=test_event["timestamp"],
+            )
+            session.add(event)
+        session.commit()
+    with session_obj() as session:
+        events = db.get_events_from_request(request_uid=request_uid, session=session)
+    assert len(events) == 4
+    for i, event in enumerate(events):
+        assert event.event_type == test_events[i]["event_type"]
+        assert event.message == test_events[i]["message"]
+        assert event.timestamp == test_events[i]["timestamp"]
+    with session_obj() as session:
+        events = db.get_events_from_request(
+            request_uid=request_uid,
+            event_type="user_visible_log",
+            session=session,
+        )
+    assert len(events) == 2
+    assert events[0].event_type == "user_visible_log"
+    assert events[1].event_type == "user_visible_log"
+    with session_obj() as session:
+        events = db.get_events_from_request(
+            request_uid=request_uid,
+            event_type="user_visible_error",
+            session=session,
+        )
+    assert len(events) == 2
+    assert events[0].event_type == "user_visible_error"
+    assert events[1].event_type == "user_visible_error"
+    with session_obj() as session:
+        events = db.get_events_from_request(
+            request_uid=request_uid,
+            start_time=datetime.datetime(2024, 1, 1, 15, 00, 00, 000000),
+            stop_time=datetime.datetime(2024, 1, 2, 9, 00, 00, 000000),
+            session=session,
+        )
+    assert len(events) == 2
 
 
 def test_get_qos_status_from_request() -> None:
