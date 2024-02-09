@@ -585,9 +585,7 @@ def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
             session.add(event)
         session.commit()
     with session_obj() as session:
-        events = db.get_events_from_request(
-            request_uid=request_uid, session=session
-        )
+        events = db.get_events_from_request(request_uid=request_uid, session=session)
     assert len(events) == 4
     for i, event in enumerate(events):
         assert event.event_type == test_events[i]["event_type"]
