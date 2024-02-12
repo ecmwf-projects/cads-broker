@@ -41,7 +41,7 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     compute_db_name: str | None = None
     pool_timeout: float = 1.0
     pool_recycle: int = 60
-    pool_size: int = 10
+    pool_size: int = 5
     max_overflow: int = 15
 
     @pydantic.field_validator(
