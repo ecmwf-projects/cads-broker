@@ -121,7 +121,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     # remove nothing, older_than_days=365 by default, and oldest is 360
     result = runner.invoke(
         entry_points.app,
-        ["remove-old-records", "--connection-string", connection_string],
+        ["remove-old-requests", "--connection-string", connection_string],
     )
     assert result.exit_code == 0
     with session_obj() as session:
@@ -132,7 +132,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     result = runner.invoke(
         entry_points.app,
         [
-            "remove-old-records",
+            "remove-old-requests",
             "--connection-string",
             connection_string,
             "--older-than-days",
@@ -151,7 +151,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     result = runner.invoke(
         entry_points.app,
         [
-            "remove-old-records",
+            "remove-old-requests",
             "--connection-string",
             connection_string,
             "--older-than-days",

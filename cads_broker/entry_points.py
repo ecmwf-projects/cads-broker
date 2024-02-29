@@ -12,7 +12,7 @@ app = typer.Typer()
 
 
 @app.command()
-def remove_old_records(
+def remove_old_requests(
     connection_string: Optional[str] = None, older_than_days: Optional[int] = 365
 ) -> None:
     """Remove records from the system_requests table older than `older_than_days`.
