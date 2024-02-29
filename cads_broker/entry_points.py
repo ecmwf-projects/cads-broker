@@ -1,4 +1,5 @@
 """Module for entry points."""
+import datetime
 import os
 from typing import Any, Optional
 
@@ -8,6 +9,34 @@ import typer
 from cads_broker import config, database, dispatcher, object_storage
 
 app = typer.Typer()
+
+
+@app.command()
+def remove_old_records(
+    connection_string: Optional[str] = None, older_than_days: Optional[int] = 365
+) -> None:
+    """Remove records from the system_requests table older than `older_than_days`.
+
+    Parameters
+    ----------
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    older_than_days: minimum age (in days) to consider a record to be removed
+    """
+    if not connection_string:
+        dbsettings = config.ensure_settings(config.dbsettings)
+        connection_string = dbsettings.connection_string
+    engine = sa.create_engine(connection_string)
+    with engine.begin() as conn:
+        result = conn.execute(
+            sa.delete(database.SystemRequest).where(
+                database.SystemRequest.finished_at
+                <= (sa.func.now() - datetime.timedelta(days=older_than_days))
+            )
+        )
+        num_deleted = result.rowcount
+    database.logger.info(
+        f"{num_deleted} old records successfully removed from the broker database."
+    )
 
 
 @app.command()
