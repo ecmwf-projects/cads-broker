@@ -203,15 +203,21 @@ class Broker:
                 )
             elif future.status == "error":
                 exception = future.exception()
-                request = db.set_request_status(
-                    future.key,
-                    job_status,
-                    error_message="".join(traceback.format_exception(exception)),
-                    error_reason=traceback.format_exception_only(exception)[0],
-                    log=log,
-                    user_visible_log=user_visible_log,
-                    session=session,
-                )
+                error_message = "".join(traceback.format_exception(exception))
+                error_reason = exception.__class__.__name__
+                if error_reason == "distributed.scheduler.KilledWorker":
+                    logger.info("worker killed: re-queueing", job_id=future.key)
+                    db.requeue_request(request_uid=future.key, session=session)
+                else:
+                    request = db.set_request_status(
+                        future.key,
+                        job_status,
+                        error_message=error_message,
+                        error_reason=error_reason,
+                        log=log,
+                        user_visible_log=user_visible_log,
+                        session=session,
+                    )
             else:
                 # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
