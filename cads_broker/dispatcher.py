@@ -106,6 +106,7 @@ class Broker:
     environment: Environment.Environment
     qos: QoS.QoS
     address: str
+    session_maker: sa.orm.sessionmaker
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
     cache = cachetools.TTLCache(
         maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
@@ -116,13 +117,12 @@ class Broker:
         repr=lambda futures: " ".join(futures.keys()),
     )
     running_requests: int = 0
-    session_maker: sa.orm.sessionmaker | None = None
 
     @classmethod
     def from_address(
         cls,
         address="scheduler:8786",
-        session_maker: sa.orm.sessionmaker = None,
+        session_maker: sa.orm.sessionmaker | None = None,
     ):
         client = distributed.Client(address)
         qos_config = QoSRules()
