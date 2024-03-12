@@ -138,15 +138,17 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None) -> sa.orm.sessio
     if session_obj:
         return session_obj
     settings = config.ensure_settings(config.dbsettings)
-    session_obj = sa.orm.sessionmaker(
-        sa.create_engine(
+    if settings.pool_size == -1:
+        engine = sa.create_engine(settings.connection_string, poolclass=sa.pool.NullPool)
+    else:
+        engine = sa.create_engine(
             settings.connection_string,
             pool_recycle=settings.pool_recycle,
             pool_size=settings.pool_size,
             pool_timeout=settings.pool_timeout,
             max_overflow=settings.max_overflow,
         )
-    )
+    session_obj = sa.orm.sessionmaker(engine)
     return session_obj
 
 
