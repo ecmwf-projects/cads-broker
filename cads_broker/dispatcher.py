@@ -256,12 +256,12 @@ class Broker:
         )
         requests_counter = 0
         for request in queue:
-            if self.qos.can_run(request, session=session_read):
-                with self.session_maker_write() as session_write:
+            with self.session_maker_write() as session_write:
+                if self.qos.can_run(request, session=session_write):
                     self.submit_request(request, session=session_write)
-                requests_counter += 1
-                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    break
+                    requests_counter += 1
+                    if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
+                        break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
