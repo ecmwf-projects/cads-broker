@@ -130,7 +130,7 @@ class Broker:
         qos_config = QoSRules()
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
-        session_maker_write = db.ensure_session_obj(session_maker_read, mode="w")
+        session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(
             client=client,
