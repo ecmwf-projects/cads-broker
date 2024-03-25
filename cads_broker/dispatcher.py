@@ -290,6 +290,7 @@ class Broker:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session)
                     self.qos.rules_hash = rules_hash
+                self.qos.environment.set_session(session)
                 self.sync_database(session=session)
                 self.running_requests = len(
                     [

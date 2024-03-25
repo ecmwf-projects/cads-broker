@@ -43,9 +43,10 @@ def register_functions():
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "user_finished_request_count",
-        lambda context, seconds: database.count_finished_requests_per_user(
+        lambda context, seconds: database.count_finished_requests_per_user_in_session(
             user_uid=context.request.user_uid,
             seconds=seconds,
+            session=context.environment.session,
         ),
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
@@ -60,6 +61,7 @@ def register_functions():
             process_id=process_id,
             entry_point=entry_point,
             portal=portal,
+            session=context.environment.session,
         ),
     )
     expressions.FunctionFactory.FunctionFactory.register_function("tagged", tagged)
