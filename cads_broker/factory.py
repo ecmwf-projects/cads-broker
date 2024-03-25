@@ -53,9 +53,9 @@ def register_functions():
         "user_request_count",
         lambda context,
         status,
+        portal=None,
         process_id=None,
-        entry_point=None,
-        portal=None: database.count_requests(
+        entry_point=None: database.count_requests(
             user_uid=context.request.user_uid,
             status=status,
             process_id=process_id,
