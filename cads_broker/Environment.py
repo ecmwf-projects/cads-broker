@@ -25,10 +25,15 @@ def locked(method):
 class Environment:
     def __init__(self):
         self.number_of_workers = None
+        self.session = None
         self.lock = threading.RLock()
         self._enabled = {}
         self._values = {}
         self._observers = []
+
+    @locked
+    def set_session(self, session):
+        self.session = session
 
     @locked
     def set(self, resource, value):
