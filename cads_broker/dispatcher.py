@@ -275,7 +275,12 @@ class Broker:
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.entry_point,
-            config=request.adaptor_properties.config,
+            config=dict(
+                request_uid=request.request_uid,
+                user_uid=request.user_uid,
+                hostname=os.getenv("CDS_PROJECT_URL"),
+                **request.adaptor_properties.config,
+            ),
             form=request.adaptor_properties.form,
             request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
