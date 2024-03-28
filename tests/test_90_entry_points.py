@@ -99,6 +99,8 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
         for request in range(5):
             request = mock_system_request(finished_at=finished_at)
             session.add(request)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
             old_requests.append(request.request_uid)
         # create 5 unfinished requests
         finished_at = None
@@ -106,18 +108,25 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
             request = mock_system_request(finished_at=finished_at)
             session.add(request)
             unfinished_requests.append(request.request_uid)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
+            old_requests.append(request.request_uid)
         # create 5 "recent" requests
         finished_at = now - datetime.timedelta(days=3)
         for request in range(5):
             request = mock_system_request(finished_at=finished_at)
             session.add(request)
             recent_requests.append(request.request_uid)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
+            old_requests.append(request.request_uid)
         session.commit()
     connection_string = session_obj.kw["bind"].url
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
         assert len(all_requests) == 15
-
+        assert len(all_events) == 15
     # remove nothing, older_than_days=365 by default, and oldest is 360
     result = runner.invoke(
         entry_points.app,
@@ -126,8 +135,9 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     assert result.exit_code == 0
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
         assert len(all_requests) == 15
-
+        assert len(all_events) == 15
     # remove 360 day old requests
     result = runner.invoke(
         entry_points.app,
@@ -142,7 +152,9 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     assert result.exit_code == 0
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
         assert len(all_requests) == 10
+        assert len(all_events) == 10
         assert set([r.request_uid for r in all_requests]) == set(recent_requests) | set(
             unfinished_requests
         )
@@ -161,5 +173,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     assert result.exit_code == 0
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
         assert len(all_requests) == 5
+        assert len(all_events) == 5
         assert set([r.request_uid for r in all_requests]) == set(unfinished_requests)
