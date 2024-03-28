@@ -46,7 +46,7 @@ class Events(BaseModel):
     event_type = sa.Column(sa.Text, index=True)
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
-        sa.ForeignKey("system_requests.request_uid"),
+        sa.ForeignKey("system_requests.request_uid", ondelete="CASCADE"),
         index=True,
     )
     message = sa.Column(sa.Text)
@@ -106,7 +106,7 @@ class SystemRequest(BaseModel):
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
     adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
-    events = sa.orm.relationship(Events, lazy="select")
+    events = sa.orm.relationship(Events, lazy="select", passive_deletes=True)
 
     @property
     def age(self):
