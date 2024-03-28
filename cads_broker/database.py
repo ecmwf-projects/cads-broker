@@ -670,6 +670,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         conn = engine.connect()
         if "system_requests" not in conn.execute(query).scalars().all():
             force = True
+        conn.close()
     if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
