@@ -61,6 +61,7 @@ class AdaptorProperties(BaseModel):
     hash = sa.Column(sa.Text, primary_key=True)
     config = sa.Column(JSONB)
     form = sa.Column(JSONB)
+    timestamp = sa.Column(sa.TIMESTAMP, default=sa.func.now())
 
 
 class SystemRequest(BaseModel):
@@ -68,12 +69,7 @@ class SystemRequest(BaseModel):
 
     __tablename__ = "system_requests"
 
-    request_id = sa.Column(sa.Integer, primary_key=True)
-    request_uid = sa.Column(
-        sa.dialects.postgresql.UUID(False),
-        index=True,
-        unique=True,
-    )
+    request_uid = sa.Column(sa.dialects.postgresql.UUID(False), primary_key=True)
     process_id = sa.Column(sa.Text, index=True)
     user_uid = sa.Column(sa.Text, index=True)
     status = sa.Column(status_enum)
@@ -102,6 +98,8 @@ class SystemRequest(BaseModel):
         ),
         {},
     )
+    # https://github.com/sqlalchemy/sqlalchemy/issues/11063#issuecomment-2008101926
+    __mapper_args__ = {"eager_defaults": False}
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")

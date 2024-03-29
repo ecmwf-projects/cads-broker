@@ -42,12 +42,25 @@ def mock_system_request(
     return system_request
 
 
-def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
-    adaptor_properties = database.AdaptorProperties(
-        hash=hash,
-        config=config,
-        form=form,
-    )
+def mock_config(
+    hash: str = "",
+    config: dict[str, Any] = {},
+    form: dict[str, Any] = {},
+    timestamp: datetime.datetime | None = None,
+):
+    if timestamp is None:
+        adaptor_properties = database.AdaptorProperties(
+            hash=hash,
+            config=config,
+            form=form,
+        )
+    else:
+        adaptor_properties = database.AdaptorProperties(
+            hash=hash,
+            config=config,
+            form=form,
+            timestamp=timestamp,
+        )
     return adaptor_properties
 
 
@@ -86,48 +99,69 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     conn.close()
 
 
-def test_remove_old_records(session_obj: sa.orm.sessionmaker):
+def prepare_db(
+    session_obj,
+    num_old_props_used_by_old,
+    num_old_props_used_by_recent,
+    num_recent_props_used_by_recent,
+    recent_days=3,
+    old_days=370,
+):
     now = sa.func.now()
-    old_requests = []
-    unfinished_requests = []
-    recent_requests = []
+    old_date = now - datetime.timedelta(days=old_days)
+    recent_date = now - datetime.timedelta(days=recent_days)
     with session_obj() as session:
-        adaptor_properties = mock_config()
-        session.add(adaptor_properties)
-        # create 5 "old" requests
-        finished_at = now - datetime.timedelta(days=360)
-        for request in range(5):
-            request = mock_system_request(finished_at=finished_at)
-            session.add(request)
-            event = database.Events(request_uid=request.request_uid)
-            session.add(event)
-            old_requests.append(request.request_uid)
-        # create 5 unfinished requests
-        finished_at = None
-        for request in range(5):
-            request = mock_system_request(finished_at=finished_at)
-            session.add(request)
-            unfinished_requests.append(request.request_uid)
-            event = database.Events(request_uid=request.request_uid)
-            session.add(event)
-            old_requests.append(request.request_uid)
-        # create 5 "recent" requests
-        finished_at = now - datetime.timedelta(days=3)
-        for request in range(5):
-            request = mock_system_request(finished_at=finished_at)
-            session.add(request)
-            recent_requests.append(request.request_uid)
-            event = database.Events(request_uid=request.request_uid)
-            session.add(event)
-            old_requests.append(request.request_uid)
+        # initialize
+        session.query(database.SystemRequest).delete()
+        session.query(database.AdaptorProperties).delete()
         session.commit()
+        # add old properties with old requests
+        for x in range(num_old_props_used_by_old):
+            old_hash = f"old_hash_{x}"
+            adaptor_properties = mock_config(hash=old_hash, timestamp=old_date)
+            session.add(adaptor_properties)
+            request = mock_system_request(
+                adaptor_properties_hash=old_hash, finished_at=old_date
+            )
+            session.add(request)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
+        # add old properties with recent requests
+        for x in range(num_old_props_used_by_recent):
+            old_hash2 = f"old_hash_{x}_with_new_request"
+            adaptor_properties = mock_config(hash=old_hash2, timestamp=old_date)
+            session.add(adaptor_properties)
+            request = mock_system_request(
+                adaptor_properties_hash=old_hash2, finished_at=recent_date
+            )
+            session.add(request)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
+        # add recent properties with recent requests
+        for x in range(num_recent_props_used_by_recent):
+            new_hash = f"new_hash_{x}"
+            adaptor_properties = mock_config(hash=new_hash, timestamp=recent_date)
+            session.add(adaptor_properties)
+            request = mock_system_request(
+                adaptor_properties_hash=new_hash, finished_at=recent_date
+            )
+            session.add(request)
+            event = database.Events(request_uid=request.request_uid)
+            session.add(event)
+        # not existing case of recent properties with old requests
+        session.commit()
+
+
+def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     connection_string = session_obj.kw["bind"].url
-    with session_obj() as session:
-        all_requests = session.query(database.SystemRequest).all()
-        all_events = session.query(database.Events).all()
-        assert len(all_requests) == 15
-        assert len(all_events) == 15
-    # remove nothing, older_than_days=365 by default, and oldest is 360
+
+    # test remove nothing, older_than_days=365 by default
+    prepare_db(
+        session_obj,
+        num_old_props_used_by_old=0,
+        num_old_props_used_by_recent=6,
+        num_recent_props_used_by_recent=5,
+    )
     result = runner.invoke(
         entry_points.app,
         ["remove-old-requests", "--connection-string", connection_string],
@@ -136,30 +170,12 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
         all_events = session.query(database.Events).all()
-        assert len(all_requests) == 15
-        assert len(all_events) == 15
-    # remove 360 day old requests
-    result = runner.invoke(
-        entry_points.app,
-        [
-            "remove-old-requests",
-            "--connection-string",
-            connection_string,
-            "--older-than-days",
-            "360",
-        ],
-    )
-    assert result.exit_code == 0
-    with session_obj() as session:
-        all_requests = session.query(database.SystemRequest).all()
-        all_events = session.query(database.Events).all()
-        assert len(all_requests) == 10
-        assert len(all_events) == 10
-        assert set([r.request_uid for r in all_requests]) == set(recent_requests) | set(
-            unfinished_requests
-        )
+        all_props = session.query(database.AdaptorProperties).all()
+        assert len(all_requests) == 11
+        assert len(all_events) == 11
+        assert len(all_props) == 11
 
-    # remove all but unfinished
+    # test remove all (most recent is 3 days old)
     result = runner.invoke(
         entry_points.app,
         [
@@ -167,13 +183,54 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
             "--connection-string",
             connection_string,
             "--older-than-days",
-            "2",
+            "1",
         ],
     )
     assert result.exit_code == 0
     with session_obj() as session:
         all_requests = session.query(database.SystemRequest).all()
         all_events = session.query(database.Events).all()
+        all_props = session.query(database.AdaptorProperties).all()
+        assert len(all_requests) == 0
+        assert len(all_events) == 0
+        assert len(all_props) == 0
+
+    # test remove only some requests (all old props have old requests)
+    prepare_db(
+        session_obj,
+        num_old_props_used_by_old=10,
+        num_old_props_used_by_recent=0,
+        num_recent_props_used_by_recent=5,
+    )
+    result = runner.invoke(
+        entry_points.app,
+        ["remove-old-requests", "--connection-string", connection_string],
+    )
+    assert result.exit_code == 0
+    with session_obj() as session:
+        all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
+        all_props = session.query(database.AdaptorProperties).all()
         assert len(all_requests) == 5
         assert len(all_events) == 5
-        assert set([r.request_uid for r in all_requests]) == set(unfinished_requests)
+        assert len(all_props) == 5
+
+    # test remove only some requests (some old props have recent requests)
+    prepare_db(
+        session_obj,
+        num_old_props_used_by_old=10,
+        num_old_props_used_by_recent=3,
+        num_recent_props_used_by_recent=5,
+    )
+    result = runner.invoke(
+        entry_points.app,
+        ["remove-old-requests", "--connection-string", connection_string],
+    )
+    assert result.exit_code == 0
+    with session_obj() as session:
+        all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
+        all_props = session.query(database.AdaptorProperties).all()
+        assert len(all_requests) == 8
+        assert len(all_events) == 8
+        assert len(all_props) == 8
