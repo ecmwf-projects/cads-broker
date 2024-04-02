@@ -123,7 +123,9 @@ class SystemRequest(BaseModel):
         return (0, 0)
 
 
-def ensure_session_obj(session_obj: sa.orm.sessionmaker | None, mode='w') -> sa.orm.sessionmaker:
+def ensure_session_obj(
+    session_obj: sa.orm.sessionmaker | None, mode="w"
+) -> sa.orm.sessionmaker:
     """If `session_obj` is None, create a new session object.
 
     Parameters
@@ -138,9 +140,9 @@ def ensure_session_obj(session_obj: sa.orm.sessionmaker | None, mode='w') -> sa.
     if session_obj:
         return session_obj
     settings = config.ensure_settings(config.dbsettings)
-    if mode == 'r':
+    if mode == "r":
         connection_string = settings.connection_string_read
-    elif mode == 'w':
+    elif mode == "w":
         connection_string = settings.connection_string
     if settings.pool_size == -1:
         engine = sa.create_engine(connection_string, poolclass=sa.pool.NullPool)

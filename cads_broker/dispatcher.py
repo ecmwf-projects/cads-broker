@@ -247,7 +247,9 @@ class Broker:
                 **logger_kwargs,
             )
 
-    def submit_requests(self, session_read: sa.orm.Session, number_of_requests: int) -> None:
+    def submit_requests(
+        self, session_read: sa.orm.Session, number_of_requests: int
+    ) -> None:
         candidates = db.get_accepted_requests(session=session_read)
         queue = sorted(
             candidates,
@@ -326,6 +328,7 @@ class Broker:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
                         self.submit_requests(
-                            session_read=session_read, number_of_requests=available_workers
+                            session_read=session_read,
+                            number_of_requests=available_workers,
                         )
             time.sleep(self.wait_time)
