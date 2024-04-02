@@ -106,7 +106,8 @@ class Broker:
     environment: Environment.Environment
     qos: QoS.QoS
     address: str
-    session_maker: sa.orm.sessionmaker
+    session_maker_read: sa.orm.sessionmaker
+    session_maker_write: sa.orm.sessionmaker
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
     cache = cachetools.TTLCache(
         maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
@@ -122,16 +123,19 @@ class Broker:
     def from_address(
         cls,
         address="scheduler:8786",
-        session_maker: sa.orm.sessionmaker | None = None,
+        session_maker_read: sa.orm.sessionmaker | None = None,
+        session_maker_write: sa.orm.sessionmaker | None = None,
     ):
         client = distributed.Client(address)
         qos_config = QoSRules()
         factory.register_functions()
-        session_maker = db.ensure_session_obj(session_maker)
+        session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
+        session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(
             client=client,
-            session_maker=session_maker,
+            session_maker_read=session_maker_read,
+            session_maker_write=session_maker_write,
             environment=qos_config.environment,
             qos=QoS.QoS(
                 qos_config.rules,
@@ -190,7 +194,7 @@ class Broker:
         user_visible_log = list(
             self.client.get_events(f"{future.key}/user_visible_log")
         )
-        with self.session_maker() as session:
+        with self.session_maker_write() as session:
             if future.status == "finished":
                 result = future.result()
                 request = db.set_request_status(
@@ -243,20 +247,23 @@ class Broker:
                 **logger_kwargs,
             )
 
-    def submit_requests(self, session: sa.orm.Session, number_of_requests: int) -> None:
-        candidates = db.get_accepted_requests(session=session)
+    def submit_requests(
+        self, session_read: sa.orm.Session, number_of_requests: int
+    ) -> None:
+        candidates = db.get_accepted_requests(session=session_read)
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(candidate, session),
+            key=lambda candidate: self.qos.priority(candidate, session_read),
             reverse=True,
         )
         requests_counter = 0
         for request in queue:
-            if self.qos.can_run(request, session=session):
-                self.submit_request(request, session=session)
-                requests_counter += 1
-                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    break
+            with self.session_maker_write() as session_write:
+                if self.qos.can_run(request, session=session_write):
+                    self.submit_request(request, session=session_write)
+                    requests_counter += 1
+                    if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
+                        break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
@@ -270,7 +277,12 @@ class Broker:
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.entry_point,
-            config=request.adaptor_properties.config,
+            config=dict(
+                request_uid=request.request_uid,
+                user_uid=request.user_uid,
+                hostname=os.getenv("CDS_PROJECT_URL"),
+                **request.adaptor_properties.config,
+            ),
             form=request.adaptor_properties.form,
             request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
@@ -285,13 +297,14 @@ class Broker:
 
     def run(self) -> None:
         while True:
-            with self.session_maker() as session:
+            with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos.reload_rules(session=session)
+                    self.qos.reload_rules(session=session_read)
                     self.qos.rules_hash = rules_hash
-                self.qos.environment.set_session(session)
-                self.sync_database(session=session)
+                self.qos.environment.set_session(session_read)
+                with self.session_maker_write() as session_write:
+                    self.sync_database(session=session_write)
                 self.running_requests = len(
                     [
                         future
@@ -301,7 +314,7 @@ class Broker:
                     ]
                 )
                 number_accepted_requests = db.count_requests(
-                    session=session, status="accepted"
+                    session=session_read, status="accepted"
                 )
                 available_workers = self.number_of_workers - self.running_requests
                 if number_accepted_requests > 0:
@@ -315,6 +328,7 @@ class Broker:
                     if available_workers > 0:
                         logger.info("broker info", queued_jobs=number_accepted_requests)
                         self.submit_requests(
-                            session=session, number_of_requests=available_workers
+                            session_read=session_read,
+                            number_of_requests=available_workers,
                         )
             time.sleep(self.wait_time)

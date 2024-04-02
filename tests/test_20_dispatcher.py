@@ -54,7 +54,8 @@ def test_broker_sync_database(
         environment=environment,
         qos=qos,
         address="scheduler-address",
-        session_maker=session_obj,
+        session_maker_read=session_obj,
+        session_maker_write=session_obj,
     )
 
     in_futures_request_uid = str(uuid.uuid4())

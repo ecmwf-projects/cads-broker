@@ -43,7 +43,7 @@ def register_functions():
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "user_finished_request_count",
-        lambda context, seconds: database.count_finished_requests_per_user_in_session(
+        lambda context, seconds: database.count_finished_requests_per_user(
             user_uid=context.request.user_uid,
             seconds=seconds,
             session=context.environment.session,
