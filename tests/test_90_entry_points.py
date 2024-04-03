@@ -135,7 +135,7 @@ def prepare_db(
         # not existing case of recent properties with old requests
 
 
-def test_remove_old_records(session_obj: sa.orm.sessionmaker):
+def test_requests_cleaner(session_obj: sa.orm.sessionmaker):
     connection_string = session_obj.kw["bind"].url
 
     # test remove nothing, older_than_days=365 by default
@@ -146,7 +146,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     )
     result = runner.invoke(
         entry_points.app,
-        ["remove-old-requests", "--connection-string", connection_string],
+        ["requests-cleaner", "--connection-string", connection_string],
     )
     assert result.exit_code == 0
     with session_obj() as session:
@@ -161,7 +161,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     result = runner.invoke(
         entry_points.app,
         [
-            "remove-old-requests",
+            "requests-cleaner",
             "--connection-string",
             connection_string,
             "--older-than-days",
@@ -185,7 +185,7 @@ def test_remove_old_records(session_obj: sa.orm.sessionmaker):
     )
     result = runner.invoke(
         entry_points.app,
-        ["remove-old-requests", "--connection-string", connection_string],
+        ["requests-cleaner", "--connection-string", connection_string],
     )
     assert result.exit_code == 0
     with session_obj() as session:
