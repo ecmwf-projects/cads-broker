@@ -505,27 +505,24 @@ def generate_adaptor_properties_hash(
     ).hexdigest()
 
 
-def get_adaptor_properties(
-    adaptor_properties_hash: str,
-    session: sa.orm.Session,
-) -> AdaptorProperties | None:
-    try:
-        statement = sa.select(AdaptorProperties.hash).where(
-            AdaptorProperties.hash == adaptor_properties_hash
-        )
-        return session.execute(statement).one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        return None
-
-
-def add_adaptor_properties(
+def ensure_adaptor_properties(
     hash: str,
     config: dict[str, Any],
     form: dict[str, Any],
     session: sa.orm.Session,
-):
-    adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
-    session.add(adaptor_properties)
+) -> None:
+    """Create adaptor properties (if not exists) or update its timestamp."""
+    try:
+        statement = (
+            AdaptorProperties.__table__.update()
+            .returning(AdaptorProperties.hash)
+            .where(AdaptorProperties.__table__.c.hash == hash)
+            .values(timestamp=datetime.datetime.now())
+        )
+        session.execute(statement).one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
+        session.add(adaptor_properties)
 
 
 def add_event(
@@ -557,18 +554,12 @@ def create_request(
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Create a request."""
-    if (
-        get_adaptor_properties(
-            adaptor_properties_hash=adaptor_properties_hash, session=session
-        )
-        is None
-    ):
-        add_adaptor_properties(
-            hash=adaptor_properties_hash,
-            config=adaptor_config,
-            form=adaptor_form,
-            session=session,
-        )
+    ensure_adaptor_properties(
+        hash=adaptor_properties_hash,
+        config=adaptor_config,
+        form=adaptor_form,
+        session=session,
+    )
     metadata["resources"] = resources
     metadata["qos_tags"] = qos_tags
     request = SystemRequest(

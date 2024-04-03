@@ -784,8 +784,33 @@ def test_create_request(session_obj: sa.orm.sessionmaker) -> None:
             db.SystemRequest.request_uid == request_dict["request_uid"]
         )
         request = session.scalars(statement).one()
+        adaptor_properties = request.adaptor_properties
+        assert adaptor_properties.hash == "adaptor_properties_hash"
+        initial_timestamp = adaptor_properties.timestamp
     assert request.request_uid == request_dict["request_uid"]
     assert request.user_uid == request_dict["user_uid"]
+    # create again a new request using the same adaptor properties: timestamp updated
+    with session_obj() as session:
+        request_dict = db.create_request(
+            user_uid="abc456",
+            setup_code="",
+            entry_point="sum",
+            request={},
+            metadata={},
+            process_id="submit-workflow",
+            session=session,
+            portal="c3s",
+            adaptor_config={"dummy_config": {"foo": "bar"}},
+            adaptor_form={},
+            adaptor_properties_hash="adaptor_properties_hash",
+        )
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.request_uid == request_dict["request_uid"]
+        )
+        request = session.scalars(statement).one()
+        adaptor_properties = request.adaptor_properties
+        assert adaptor_properties.hash == "adaptor_properties_hash"
+        adaptor_properties.timestamp > initial_timestamp
 
 
 def test_get_request(session_obj: sa.orm.sessionmaker) -> None:

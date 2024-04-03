@@ -26,57 +26,40 @@ def remove_old_requests(
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     engine = sa.create_engine(connection_string)
+    time_delta = datetime.datetime.now() - datetime.timedelta(days=older_than_days)
     # clean system requests and (via cascading delete) events
     with engine.begin() as conn:
         database.logger.info("deleting old system_requests and events...")
         stmt = sa.delete(database.SystemRequest).where(
-            database.SystemRequest.finished_at
-            <= (sa.func.now() - datetime.timedelta(days=older_than_days))
+            database.SystemRequest.created_at <= time_delta
         )
         result = conn.execute(stmt)
         conn.commit()
         num_requests_deleted = result.rowcount
+        database.logger.info(
+            f"{num_requests_deleted} old system requests "
+            f"successfully removed from the broker database."
+        )
     # clean adaptor_properties
     with engine.begin() as conn:
         try:
-            database.logger.info(
-                "deleting old adaptor_properties (trying in a block)..."
-            )
+            database.logger.info("deleting old adaptor_properties...")
             stmt_ap_delete = sa.delete(database.AdaptorProperties).where(
-                database.AdaptorProperties.timestamp
-                <= (sa.func.now() - datetime.timedelta(days=older_than_days))
+                database.AdaptorProperties.timestamp <= time_delta
             )
             result = conn.execute(stmt_ap_delete)
             conn.commit()
             num_ap_deleted = result.rowcount
             database.logger.info(
-                f"{num_requests_deleted + num_ap_deleted} old records "
+                f"{num_ap_deleted} old adaptor properties "
                 f"successfully removed from the broker database."
             )
             return
         except sa.exc.IntegrityError:
-            # some requests still use some old adaptor_properties: do not return and continue
-            pass
-    database.logger.info("deleting old adaptor_properties...")
-    num_ap_deleted = 0
-    session_obj = sa.orm.sessionmaker(engine)
-    with session_obj.begin() as session:
-        stmt = sa.select(database.AdaptorProperties).where(
-            database.AdaptorProperties.timestamp
-            <= (sa.func.now() - datetime.timedelta(days=older_than_days))
-        )
-        for record in session.scalars(stmt):
-            try:
-                with session.begin_nested():
-                    session.delete(record)
-                    num_ap_deleted += 1
-            except sa.exc.IntegrityError:
-                pass
-    database.logger.info(
-        f"{num_requests_deleted + num_ap_deleted} old records "
-        f"successfully removed from the broker database."
-    )
-    return
+            database.logger.error(
+                "cannot remove some old records from table adaptor_properties."
+            )
+            raise
 
 
 @app.command()
