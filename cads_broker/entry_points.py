@@ -1,4 +1,5 @@
 """Module for entry points."""
+import datetime
 import os
 from typing import Any, Optional
 
@@ -8,6 +9,57 @@ import typer
 from cads_broker import config, database, dispatcher, object_storage
 
 app = typer.Typer()
+
+
+@app.command()
+def remove_old_requests(
+    connection_string: Optional[str] = None, older_than_days: Optional[int] = 365
+) -> None:
+    """Remove records from the system_requests table older than `older_than_days`.
+
+    Parameters
+    ----------
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    older_than_days: minimum age (in days) to consider a record to be removed
+    """
+    if not connection_string:
+        dbsettings = config.ensure_settings(config.dbsettings)
+        connection_string = dbsettings.connection_string
+    engine = sa.create_engine(connection_string)
+    time_delta = datetime.datetime.now() - datetime.timedelta(days=older_than_days)
+    # clean system requests and (via cascading delete) events
+    with engine.begin() as conn:
+        database.logger.info("deleting old system_requests and events...")
+        stmt = sa.delete(database.SystemRequest).where(
+            database.SystemRequest.created_at <= time_delta
+        )
+        result = conn.execute(stmt)
+        conn.commit()
+        num_requests_deleted = result.rowcount
+        database.logger.info(
+            f"{num_requests_deleted} old system requests "
+            f"successfully removed from the broker database."
+        )
+    # clean adaptor_properties
+    with engine.begin() as conn:
+        try:
+            database.logger.info("deleting old adaptor_properties...")
+            stmt_ap_delete = sa.delete(database.AdaptorProperties).where(
+                database.AdaptorProperties.timestamp <= time_delta
+            )
+            result = conn.execute(stmt_ap_delete)
+            conn.commit()
+            num_ap_deleted = result.rowcount
+            database.logger.info(
+                f"{num_ap_deleted} old adaptor properties "
+                f"successfully removed from the broker database."
+            )
+            return
+        except sa.exc.IntegrityError:
+            database.logger.error(
+                "cannot remove some old records from table adaptor_properties."
+            )
+            raise
 
 
 @app.command()

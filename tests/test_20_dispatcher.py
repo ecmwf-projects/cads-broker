@@ -1,5 +1,4 @@
 import datetime
-import random
 import uuid
 from typing import Any
 
@@ -32,7 +31,6 @@ def mock_system_request(
     adaptor_properties_hash: str = "adaptor_properties_hash",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
-        request_id=random.randrange(1, 100),
         request_uid=request_uid or str(uuid.uuid4()),
         status=status,
         created_at=created_at,

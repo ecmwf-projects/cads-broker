@@ -46,7 +46,7 @@ class Events(BaseModel):
     event_type = sa.Column(sa.Text, index=True)
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
-        sa.ForeignKey("system_requests.request_uid"),
+        sa.ForeignKey("system_requests.request_uid", ondelete="CASCADE"),
         index=True,
     )
     message = sa.Column(sa.Text)
@@ -61,6 +61,7 @@ class AdaptorProperties(BaseModel):
     hash = sa.Column(sa.Text, primary_key=True)
     config = sa.Column(JSONB)
     form = sa.Column(JSONB)
+    timestamp = sa.Column(sa.TIMESTAMP, default=sa.func.now())
 
 
 class SystemRequest(BaseModel):
@@ -68,12 +69,7 @@ class SystemRequest(BaseModel):
 
     __tablename__ = "system_requests"
 
-    request_id = sa.Column(sa.Integer, primary_key=True)
-    request_uid = sa.Column(
-        sa.dialects.postgresql.UUID(False),
-        index=True,
-        unique=True,
-    )
+    request_uid = sa.Column(sa.dialects.postgresql.UUID(False), primary_key=True)
     process_id = sa.Column(sa.Text, index=True)
     user_uid = sa.Column(sa.Text, index=True)
     status = sa.Column(status_enum)
@@ -102,11 +98,13 @@ class SystemRequest(BaseModel):
         ),
         {},
     )
+    # https://github.com/sqlalchemy/sqlalchemy/issues/11063#issuecomment-2008101926
+    __mapper_args__ = {"eager_defaults": False}
 
     # joined is temporary
     cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
     adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
-    events = sa.orm.relationship(Events, lazy="select")
+    events = sa.orm.relationship(Events, lazy="select", passive_deletes=True)
 
     @property
     def age(self):
@@ -515,27 +513,24 @@ def generate_adaptor_properties_hash(
     ).hexdigest()
 
 
-def get_adaptor_properties(
-    adaptor_properties_hash: str,
-    session: sa.orm.Session,
-) -> AdaptorProperties | None:
-    try:
-        statement = sa.select(AdaptorProperties.hash).where(
-            AdaptorProperties.hash == adaptor_properties_hash
-        )
-        return session.execute(statement).one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        return None
-
-
-def add_adaptor_properties(
+def ensure_adaptor_properties(
     hash: str,
     config: dict[str, Any],
     form: dict[str, Any],
     session: sa.orm.Session,
-):
-    adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
-    session.add(adaptor_properties)
+) -> None:
+    """Create adaptor properties (if not exists) or update its timestamp."""
+    try:
+        statement = (
+            AdaptorProperties.__table__.update()
+            .returning(AdaptorProperties.hash)
+            .where(AdaptorProperties.__table__.c.hash == hash)
+            .values(timestamp=datetime.datetime.now())
+        )
+        session.execute(statement).one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
+        session.add(adaptor_properties)
 
 
 def add_event(
@@ -567,18 +562,12 @@ def create_request(
     request_uid: str | None = None,
 ) -> dict[str, Any]:
     """Create a request."""
-    if (
-        get_adaptor_properties(
-            adaptor_properties_hash=adaptor_properties_hash, session=session
-        )
-        is None
-    ):
-        add_adaptor_properties(
-            hash=adaptor_properties_hash,
-            config=adaptor_config,
-            form=adaptor_form,
-            session=session,
-        )
+    ensure_adaptor_properties(
+        hash=adaptor_properties_hash,
+        config=adaptor_config,
+        form=adaptor_form,
+        session=session,
+    )
     metadata["resources"] = resources
     metadata["qos_tags"] = qos_tags
     request = SystemRequest(
@@ -678,6 +667,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         conn = engine.connect()
         if "system_requests" not in conn.execute(query).scalars().all():
             force = True
+        conn.close()
     if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
