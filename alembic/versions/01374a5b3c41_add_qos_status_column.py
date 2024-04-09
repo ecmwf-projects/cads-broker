@@ -5,6 +5,7 @@ Revises: ba380b5614b8
 Create Date: 2023-09-08 12:21:35.601773
 
 """
+
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 

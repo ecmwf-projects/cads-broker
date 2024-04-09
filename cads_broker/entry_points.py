@@ -1,4 +1,5 @@
 """Module for entry points."""
+
 import datetime
 import os
 from typing import Any, Optional
