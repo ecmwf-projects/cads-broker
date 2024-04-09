@@ -8,6 +8,7 @@
 #
 
 import threading
+import time
 from functools import wraps
 
 from .. import database
@@ -93,15 +94,22 @@ class QoS:
                 limit.increment()
 
     @locked
-    def can_run(self, request, session):
+    def can_run(self, request, session, scheduler):
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
         limits = []
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
-                # performance. avoid interacting with db if limit is already there
-                if limit.get_uid(request) not in request.qos_status.get(limit.name, []):
-                    database.set_request_qos_rule(request, limit, session)
+                scheduler.enterabs(
+                    time.time(),
+                    1,
+                    database.set_request_status,
+                    kwargs={
+                        "request": request,
+                        "rule": limit,
+                        "session": session,
+                    },
+                )
                 limits.append(limit)
         session.commit()
         permissions = []
@@ -284,27 +292,52 @@ class QoS:
         return request
 
     @locked
-    def notify_start_of_request(self, request, session):
+    def notify_start_of_request(self, request, scheduler, session):
         """Notify the start of a request.
 
         Increment the limits matching that request so that other request
         sharing the same limits may be kept in the queue if a limit reaches
         its capacity.
         """
+        limits_list = []
         for limit in self.limits_for(request, session):
             limit.increment()
+            limits_list.append(limit)
+
+        scheduler.enterabs(
+            time.time(),
+            1,
+            database.add_request_qos_rules,
+            kwargs={
+                "request": request,
+                "rules": limits_list,
+                "session": session,
+            },
+        )
 
         # Keep track of the running request. This is needed by reconfigure(self)
 
     @locked
-    def notify_end_of_request(self, request, session):
+    def notify_end_of_request(self, request, session, scheduler):
         """Notify the end of a request.
 
         Decrement the limits matching that request so that other request
         sharing the same limits can run.
         """
+        limits_list = []
         for limit in self.limits_for(request, session):
             limit.decrement()
+
+        scheduler.enterabs(
+            time.time(),
+            1,
+            database.delete_request_qos_rules,
+            kwargs={
+                "request": request,
+                "rules": limits_list,
+                "session": session,
+            },
+        )
 
         # Remove requests all collections
         self.requests_properties_cache.pop(request.request_uid)

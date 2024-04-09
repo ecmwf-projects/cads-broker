@@ -2,6 +2,7 @@ import hashlib
 import io
 import operator
 import os
+import sched
 import time
 import traceback
 from typing import Any
@@ -118,6 +119,7 @@ class Broker:
         repr=lambda futures: " ".join(futures.keys()),
     )
     running_requests: int = 0
+    internal_scheduler: sched.scheduler = sched.scheduler(time.time, time.sleep)
 
     @classmethod
     def from_address(
@@ -171,7 +173,9 @@ class Broker:
             # this is to better control the status of the QoS
             if request.status == "dismissed":
                 db.delete_request(request=request, session=session)
-                self.qos.notify_end_of_request(request, session)
+                self.qos.notify_end_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
                 continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
@@ -239,7 +243,7 @@ class Broker:
                 )
                 return
             self.futures.pop(future.key)
-            self.qos.notify_end_of_request(request, session)
+            self.qos.notify_end_of_request(request, session, scheduler=self.internal_scheduler)
             logger.info(
                 "job has finished",
                 dask_status=future.status,
@@ -305,6 +309,10 @@ class Broker:
                 self.qos.environment.set_session(session_read)
                 with self.session_maker_write() as session_write:
                     self.sync_database(session=session_write)
+                    if len(self.internal_scheduler.queue) > int(
+                        os.getenv("MAX_SCHEDULER_QUEUE", 10)
+                    ):
+                        self.internal_scheduler.run()
                 self.running_requests = len(
                     [
                         future

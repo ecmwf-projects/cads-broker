@@ -537,8 +537,8 @@ def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-        db.set_request_qos_rule(request=request, rule=limit_1, session=session)
-        db.set_request_qos_rule(request=request, rule=limit_2, session=session)
+        db.add_request_qos_rule(request=request, rule=limit_1, session=session)
+        db.add_request_qos_rule(request=request, rule=limit_2, session=session)
         session.commit()
     with session_obj() as session:
         request = db.get_request(request_uid=request_uid, session=session)
