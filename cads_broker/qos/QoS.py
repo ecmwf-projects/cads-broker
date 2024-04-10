@@ -292,7 +292,7 @@ class QoS:
         return request
 
     @locked
-    def notify_start_of_request(self, request, scheduler, session):
+    def notify_start_of_request(self, request, session, scheduler):
         """Notify the start of a request.
 
         Increment the limits matching that request so that other request

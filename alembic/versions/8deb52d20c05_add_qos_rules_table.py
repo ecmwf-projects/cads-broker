@@ -20,7 +20,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "qos_rules",
-        sa.Column("uid", sa.Integer, primary_key=True),
+        sa.Column("uid", sa.Text, primary_key=True),
         sa.Column("name", sa.Text),
         sa.Column("info", sa.Text),
         sa.Column("condition", sa.Text),

@@ -42,7 +42,7 @@ class QoSRule(BaseModel):
 
     __tablename__ = "qos_rules"
 
-    uid = sa.Column(sa.Integer, primary_key=True)
+    uid = sa.Column(sa.Text, primary_key=True)
     name = sa.Column(sa.Text)
     info = sa.Column(sa.Text)
     condition = sa.Column(sa.Text)
@@ -67,7 +67,7 @@ class SystemRequestQoSRule(BaseModel):
         sa.ForeignKey("system_requests.request_uid"),
         primary_key=True,
     )
-    rule_uid = sa.Column(sa.Integer, sa.ForeignKey("qos_rules.uid"), primary_key=True)
+    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True)
 
 
 class Events(BaseModel):
@@ -141,7 +141,7 @@ class SystemRequest(BaseModel):
     adaptor_properties: sa.orm.Mapped["AdaptorProperties"] = sa.orm.relationship(
         AdaptorProperties, lazy="select"
     )
-    events: sa.orm.Mapped["Events"] = sa.orm.relationship(
+    events: sa.orm.Mapped[list["Events"]] = sa.orm.relationship(
         Events, lazy="select", passive_deletes=True
     )
     rules: sa.orm.Mapped[list["QoSRule"]] = sa.orm.relationship(
@@ -436,7 +436,7 @@ def get_qos_rule(uid: int, session: sa.orm.Session):
 
 
 def add_qos_rule(
-    uid: int,
+    uid: str,
     name: str,
     info: str,
     condition: str,
@@ -447,10 +447,10 @@ def add_qos_rule(
     """Add a QoS rule."""
     qos_rule = QoSRule(
         uid=uid,
-        name=name,
-        info=info,
-        condition=condition,
-        conclusion=conclusion,
+        name=str(name),
+        info=str(info),
+        condition=str(condition),
+        conclusion=str(conclusion),
         value=value,
     )
     session.add(qos_rule)
@@ -461,19 +461,19 @@ def add_qos_rule(
 def delete_request_qos_rules(request: SystemRequest, rules, session: sa.orm.Session):
     """Delete all QoS rules from a request."""
     for rule in rules:
-        qos_rule = get_qos_rule(rule.__hash__(), request.session)
+        qos_rule = get_qos_rule(str(rule.__hash__()), request.session)
         request.rules.remove(qos_rule)
         qos_rule.value -= 1
     session.commit()
 
 
-def add_request_qos_rule(request: SystemRequest, rules: list, session: sa.orm.Session):
+def add_request_qos_rules(request: SystemRequest, rules: list, session: sa.orm.Session):
     for rule in rules:
         try:
-            qos_rule = get_qos_rule(rule.__hash__(), request.session)
+            qos_rule = get_qos_rule(str(rule.__hash__()), session)
         except sqlalchemy.orm.exc.NoResultFound:
             qos_rule = add_qos_rule(
-                uid=rule.__hash__(),
+                uid=str(rule.__hash__()),
                 name=rule.name,
                 info=rule.info,
                 condition=rule.condition,
