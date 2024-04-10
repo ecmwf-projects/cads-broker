@@ -97,13 +97,13 @@ def delete_running_requests(
         if not skip_confirmation:
             typer.confirm(
                 f"Deleting {number_of_requests} requests. Do you want to continue?",
-                abort=False,
+                abort=True,
                 default=True,
             )
         else:
             database.logger.info(f"Deleting {number_of_requests} requests.")
         for request in requests:
-            database.logger.info(f"deleting {request.request_id}...")
+            database.logger.info(f"deleting {request.request_uid}...")
             database.set_request_status(request, "dismissed", session=session)
 
         session.commit()
