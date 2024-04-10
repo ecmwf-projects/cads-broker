@@ -104,7 +104,7 @@ def delete_running_requests(
             database.logger.info(f"Deleting {number_of_requests} requests.")
         for request in requests:
             database.logger.info(f"deleting {request.request_uid}...")
-            database.set_request_status(request, "dismissed", session=session)
+            database.set_request_status(request.request_uid, "dismissed", session=session)
 
         session.commit()
 
