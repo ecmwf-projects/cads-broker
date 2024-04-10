@@ -43,13 +43,15 @@ minversion = "6.0"
 postgresql_user = "broker"
 
 [tool.ruff]
+# Same as Black.
+indent-width = 4
+line-length = 88
+
+[tool.ruff.lint]
 ignore = [
   # pydocstyle: Missing Docstrings
   "D1"
 ]
-# Same as Black.
-indent-width = 4
-line-length = 88
 select = [
   # pyflakes
   "F",
@@ -65,7 +67,7 @@ select = [
 [tool.ruff.lint.pycodestyle]
 max-line-length = 110
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.setuptools]
