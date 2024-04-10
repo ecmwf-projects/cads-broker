@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import sqlalchemy as sa
 import typer
+from typing_extensions import Annotated
 
 from cads_broker import config, database, dispatcher, object_storage
 
@@ -61,6 +62,55 @@ def requests_cleaner(
                 "cannot remove some old records from table adaptor_properties."
             )
             raise
+
+
+@app.command()
+def delete_running_requests(
+    connection_string: Optional[str] = None,
+    minutes: float = typer.Option(0.0),
+    seconds: float = typer.Option(0.0),
+    hours: float = typer.Option(0.0),
+    days: float = typer.Option(0.0),
+    skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
+) -> None:
+    """Remove records from the system_requests table that are currently running.
+
+    Parameters
+    ----------
+    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    """
+    if not connection_string:
+        dbsettings = config.ensure_settings(config.dbsettings)
+        connection_string = dbsettings.connection_string
+    timestamp = datetime.datetime.now() - datetime.timedelta(
+        minutes=minutes, seconds=seconds, hours=hours, days=days
+    )
+    with database.ensure_session_obj(None)() as session:
+        database.logger.info(f"deleting old system_requests before {timestamp}.")
+        statement = (
+            sa.select(database.SystemRequest)
+            .where(database.SystemRequest.status == "running")
+            .where(database.SystemRequest.created_at < timestamp)
+        )
+        requests = session.scalars(statement).all()
+        number_of_requests = len(requests)
+        if not skip_confirmation:
+            typer.confirm(
+                f"Deleting {number_of_requests} requests. Do you want to continue?",
+                abort=False,
+                default=True,
+            )
+        else:
+            database.logger.info(f"Deleting {number_of_requests} requests.")
+        for request in requests:
+            database.logger.info(f"deleting {request.request_id}...")
+            database.set_request_status(request, "dismissed", session=session)
+
+        session.commit()
+
+        database.logger.info(
+            f"{number_of_requests} requests successfully removed from the broker database."
+        )
 
 
 @app.command()
