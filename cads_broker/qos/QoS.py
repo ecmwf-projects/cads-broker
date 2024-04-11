@@ -100,17 +100,18 @@ class QoS:
         limits = []
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
-                scheduler.enterabs(
-                    time.time(),
-                    1,
-                    database.set_request_status,
-                    kwargs={
-                        "request": request,
-                        "rule": limit,
-                        "session": session,
-                    },
-                )
                 limits.append(limit)
+        if len(limits):
+            scheduler.enterabs(
+                time.time(),
+                1,
+                database.add_request_qos_status,
+                kwargs={
+                    "request": request,
+                    "rules": limits,
+                    "session": session,
+                },
+            )
         session.commit()
         permissions = []
         for permission in properties.permissions:
@@ -303,18 +304,16 @@ class QoS:
         for limit in self.limits_for(request, session):
             limit.increment()
             limits_list.append(limit)
-
         scheduler.enterabs(
             time.time(),
             1,
-            database.add_request_qos_rules,
+            database.delete_request_qos_status,
             kwargs={
-                "request": request,
                 "rules": limits_list,
+                "request": request,
                 "session": session,
             },
         )
-
         # Keep track of the running request. This is needed by reconfigure(self)
 
     @locked
@@ -327,13 +326,13 @@ class QoS:
         limits_list = []
         for limit in self.limits_for(request, session):
             limit.decrement()
+            limits_list.append(limit)
 
         scheduler.enterabs(
             time.time(),
             1,
-            database.delete_request_qos_rules,
+            database.decrement_qos_rule_running,
             kwargs={
-                "request": request,
                 "rules": limits_list,
                 "session": session,
             },

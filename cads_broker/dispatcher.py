@@ -133,6 +133,8 @@ class Broker:
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
+        with session_maker_write() as session:
+            db.reset_qos_rules(session)
         rules_hash = get_rules_hash(qos_config.rules_path)
         self = cls(
             client=client,
@@ -309,10 +311,11 @@ class Broker:
                 self.qos.environment.set_session(session_read)
                 with self.session_maker_write() as session_write:
                     self.sync_database(session=session_write)
-                    if len(self.internal_scheduler.queue) > int(
-                        os.getenv("MAX_SCHEDULER_QUEUE", 10)
-                    ):
-                        self.internal_scheduler.run()
+
+                if len(self.internal_scheduler.queue) > int(
+                    os.getenv("MAX_SCHEDULER_QUEUE", 0)
+                ):
+                    self.internal_scheduler.run()
                 self.running_requests = len(
                     [
                         future
