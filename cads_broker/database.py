@@ -437,22 +437,18 @@ def get_qos_rule(uid: str, session: sa.orm.Session):
 
 
 def add_qos_rule(
-    uid: str,
-    name: str,
-    info: str,
-    condition: str,
-    conclusion: str,
+    rule,
     session: sa.orm.Session,
     queued: int = 0,
     running: int = 0,
 ):
     """Add a QoS rule."""
     qos_rule = QoSRule(
-        uid=uid,
-        name=str(name),
-        info=str(info),
-        condition=str(condition),
-        conclusion=str(conclusion),
+        uid=str(rule.__hash__()),
+        name=str(rule.name),
+        info=str(rule.info),
+        condition=str(rule.condition),
+        conclusion=str(rule.conclusion),
         queued=queued,
         running=running,
     )
@@ -467,14 +463,7 @@ def increment_qos_rule_running(rules: list, session: sa.orm.Session):
         try:
             qos_rule = get_qos_rule(str(rule.__hash__()), session)
         except sqlalchemy.orm.exc.NoResultFound:
-            qos_rule = add_qos_rule(
-                uid=str(rule.__hash__()),
-                name=rule.name,
-                info=rule.info,
-                condition=rule.condition,
-                conclusion=rule.conclusion,
-                session=session,
-            )
+            qos_rule = add_qos_rule(rule=rule, session=session)
         qos_rule.running += 1
     session.commit()
 
@@ -494,14 +483,7 @@ def delete_request_qos_status(request: SystemRequest, rules: list, session: sa.o
         try:
             qos_rule = get_qos_rule(str(rule.__hash__()), session)
         except sqlalchemy.orm.exc.NoResultFound:
-            qos_rule = add_qos_rule(
-                uid=str(rule.__hash__()),
-                name=rule.name,
-                info=rule.info,
-                condition=rule.condition,
-                conclusion=rule.conclusion,
-                session=session,
-            )
+            qos_rule = add_qos_rule(rule=rule, session=session)
         if qos_rule in request.qos_rules:
             request.qos_rules.remove(qos_rule)
             qos_rule.queued -= 1
@@ -515,14 +497,7 @@ def add_request_qos_status(request: SystemRequest, rules: list, session: sa.orm.
         try:
             qos_rule = get_qos_rule(str(rule.__hash__()), session)
         except sqlalchemy.orm.exc.NoResultFound:
-            qos_rule = add_qos_rule(
-                uid=str(rule.__hash__()),
-                name=rule.name,
-                info=rule.info,
-                condition=rule.condition,
-                conclusion=rule.conclusion,
-                session=session,
-            )
+            qos_rule = add_qos_rule(rule=rule, session=session)
         if qos_rule not in request.qos_rules:
             qos_rule.queued += 1
             request.qos_rules.append(qos_rule)
