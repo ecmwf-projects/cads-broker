@@ -36,7 +36,7 @@ def upgrade() -> None:
             sa.ForeignKey("system_requests.request_uid"),
             primary_key=True,
         ),
-        sa.Column("rule_uid", sa.Integer, sa.ForeignKey("qos_rules.uid"), primary_key=True),
+        sa.Column("rule_uid", sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True),
     )
 
 
