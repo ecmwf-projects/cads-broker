@@ -25,7 +25,8 @@ def upgrade() -> None:
         sa.Column("info", sa.Text),
         sa.Column("condition", sa.Text),
         sa.Column("conclusion", sa.Text),
-        sa.Column("value", sa.Integer),
+        sa.Column("queued", sa.Integer),
+        sa.Column("running", sa.Integer),
     )
     op.create_table(
         "system_request_qos_rule",
