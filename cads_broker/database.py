@@ -136,7 +136,7 @@ class SystemRequest(BaseModel):
     __mapper_args__ = {"eager_defaults": False}
 
     # joined is temporary
-    cache_entry: sa.orm.Mapped["CacheEntry"] = sa.orm.relationship(
+    cache_entry: sa.orm.Mapped["cacholote.database.CacheEntry"] = sa.orm.relationship(
         cacholote.database.CacheEntry, lazy="joined"
     )
     adaptor_properties: sa.orm.Mapped["AdaptorProperties"] = sa.orm.relationship(
@@ -476,7 +476,9 @@ def decrement_qos_rule_running(rules: list, session: sa.orm.Session):
     session.commit()
 
 
-def delete_request_qos_status(request: SystemRequest, rules: list, session: sa.orm.Session):
+def delete_request_qos_status(
+    request: SystemRequest, rules: list, session: sa.orm.Session
+):
     """Delete all QoS rules from a request."""
     request = get_request(request.request_uid, session)
     for rule in rules:
@@ -491,7 +493,9 @@ def delete_request_qos_status(request: SystemRequest, rules: list, session: sa.o
     session.commit()
 
 
-def add_request_qos_status(request: SystemRequest, rules: list, session: sa.orm.Session):
+def add_request_qos_status(
+    request: SystemRequest, rules: list, session: sa.orm.Session
+):
     request = get_request(request.request_uid, session)
     for rule in rules:
         try:
@@ -506,14 +510,20 @@ def add_request_qos_status(request: SystemRequest, rules: list, session: sa.orm.
 
 def get_qos_status_from_request(
     request: SystemRequest,
-) -> dict[str, list[tuple[str, str]]]:
-    ret_value: dict[str, list[str]] = {}
-    for rule_name, rules in request.qos_rules:
-        ret_value[rule_name] = []
-        for rule in rules.values():
-            ret_value[rule_name].append(
-                (rule.get("info", ""), rule.get("conclusion", ""))
-            )
+) -> dict[str, list[dict[str, str]]]:
+    ret_value: dict[str, list[dict[str, str]]] = {}
+    rules = request.qos_rules
+    for rule in rules:
+        rule_name = rule.name
+        rule_summary = {
+            "info": rule.info,
+            "queued": rule.queued,
+            "running": rule.running,
+        }
+        if rule_name not in ret_value:
+            ret_value[rule_name] = [rule_summary]
+        else:
+            ret_value[rule_name].append(rule_summary)
     return ret_value
 
 

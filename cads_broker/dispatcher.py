@@ -245,7 +245,9 @@ class Broker:
                 )
                 return
             self.futures.pop(future.key)
-            self.qos.notify_end_of_request(request, session, scheduler=self.internal_scheduler)
+            self.qos.notify_end_of_request(
+                request, session, scheduler=self.internal_scheduler
+            )
             logger.info(
                 "job has finished",
                 dask_status=future.status,
@@ -265,7 +267,9 @@ class Broker:
         requests_counter = 0
         for request in queue:
             with self.session_maker_write() as session_write:
-                if self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler):
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ):
                     self.submit_request(request, session=session_write)
                     requests_counter += 1
                     if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
@@ -277,7 +281,9 @@ class Broker:
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
-        self.qos.notify_start_of_request(request, session, scheduler=self.internal_scheduler)
+        self.qos.notify_start_of_request(
+            request, session, scheduler=self.internal_scheduler
+        )
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,

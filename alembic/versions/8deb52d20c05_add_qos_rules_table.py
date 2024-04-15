@@ -1,4 +1,4 @@
-"""add qos_rules table
+"""add qos_rules table.
 
 Revision ID: 8deb52d20c05
 Revises: 6ee20703d353
@@ -36,7 +36,9 @@ def upgrade() -> None:
             sa.ForeignKey("system_requests.request_uid"),
             primary_key=True,
         ),
-        sa.Column("rule_uid", sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True),
+        sa.Column(
+            "rule_uid", sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True
+        ),
     )
 
 
