@@ -620,27 +620,37 @@ def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_get_qos_status_from_request() -> None:
-    test_qos_status = {
-        "qos_status": {
-            "rule_name_1": {
-                "rule_key_1_1": {
-                    "condition": "condition_1_1",
-                    "info": "info_1_1",
-                    "conclusion": "conclusion_1_1",
-                },
-                "rule_key_1_2": {
-                    "condition": "condition_1_2",
-                    "info": "info_1_2",
-                    "conclusion": "conclusion_1_2",
-                },
-            },
-            "rule_name_2": {"rule_key_2_1": {}},
-        }
+    test_qos_rules = {
+        "qos_rules": [
+            db.QoSRule(
+                name="rule_name_1",
+                info="info_1_1",
+                queued="queued_1_1",
+                running="running_1_1",
+            ),
+            db.QoSRule(
+                name="rule_name_1",
+                info="info_1_2",
+                queued="queued_1_2",
+                running="running_1_2",
+            ),
+            db.QoSRule(
+                name="rule_name_2",
+                info="info_2_1",
+                queued="queued_2_1",
+                running="running_2_1",
+            ),
+        ]
     }
-    test_request = db.SystemRequest(**test_qos_status)
+    test_request = db.SystemRequest(**test_qos_rules)
     exp_qos_status = {
-        "rule_name_1": [("info_1_1", "conclusion_1_1"), ("info_1_2", "conclusion_1_2")],
-        "rule_name_2": [("", "")],
+        "rule_name_1": [
+            {"info": "info_1_1", "queued": "queued_1_1", "running": "running_1_1"},
+            {"info": "info_1_2", "queued": "queued_1_2", "running": "running_1_2"},
+        ],
+        "rule_name_2": [
+            {"info": "info_2_1", "queued": "queued_2_1", "running": "running_2_1"}
+        ],
     }
     res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus
