@@ -446,7 +446,7 @@ def add_qos_rule(
     qos_rule = QoSRule(
         uid=str(rule.__hash__()),
         name=str(rule.name),
-        info=rule.info,
+        info=str(rule.info),
         condition=str(rule.condition),
         conclusion=str(rule.conclusion),
         queued=queued,
