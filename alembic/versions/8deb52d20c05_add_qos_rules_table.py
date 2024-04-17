@@ -25,6 +25,7 @@ def upgrade() -> None:
         sa.Column("info", sa.Text),
         sa.Column("condition", sa.Text),
         sa.Column("conclusion", sa.Text),
+        sa.Column("conclusion_value", sa.Text),
         sa.Column("queued", sa.Integer),
         sa.Column("running", sa.Integer),
     )

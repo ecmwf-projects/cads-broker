@@ -47,6 +47,7 @@ class QoSRule(BaseModel):
     info = sa.Column(sa.Text)
     condition = sa.Column(sa.Text)
     conclusion = sa.Column(sa.Text)
+    conclusion_value = sa.Column(sa.Text)
     queued = sa.Column(sa.Integer)
     running = sa.Column(sa.Integer)
 
@@ -449,6 +450,8 @@ def add_qos_rule(
         info=str(rule.info),
         condition=str(rule.condition),
         conclusion=str(rule.conclusion),
+        # conclusion_value may change over time, this case is not handled
+        conclusion_value=str(rule.evaluate(request=None)),
         queued=queued,
         running=running,
     )
