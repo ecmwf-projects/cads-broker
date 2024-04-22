@@ -522,6 +522,7 @@ def get_qos_status_from_request(
             "info": rule.info,
             "queued": rule.queued,
             "running": rule.running,
+            "conclusion": rule.conclusion_value,
         }
         if rule_name not in ret_value:
             ret_value[rule_name] = [rule_summary]
