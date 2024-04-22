@@ -14,18 +14,14 @@ from cads_broker import database as db
 
 
 class MockRule:
-    def __init__(self, name, uid, conclusion, info, condition):
+    def __init__(self, name, conclusion, info, condition):
         self.name = name
-        self.uid = uid
         self.conclusion = conclusion
         self.info = info
         self.condition = condition
 
-    def get_uid(self, request):
-        return self.uid
-
     def evaluate(self, request):
-        return self.uid
+        return 10
 
 
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
@@ -512,38 +508,127 @@ def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
         )
 
 
-def test_set_request_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
-    adaptor_properties = mock_config()
-    request = mock_system_request(
-        status="accepted", adaptor_properties_hash=adaptor_properties.hash
-    )
-    request_uid = request.request_uid
-    rule_name = "limit"
-    limit_1 = MockRule(
-        name=rule_name,
-        uid="1",
-        condition="condition",
-        conclusion="condition",
-        info="info",
-    )
-    limit_2 = MockRule(
-        name=rule_name,
-        uid="2",
-        condition="condition",
-        conclusion="condition",
-        info="info",
-    )
+def test_add_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
+    rule = MockRule("rule_name", "conclusion", "info", "condition")
     with session_obj() as session:
+        db.add_qos_rule(rule, session=session)
+    with session_obj() as session:
+        assert db.get_qos_rule(str(rule.__hash__()), session=session).name == rule.name
+
+
+def test_increment_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
+    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
+    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
+    with session_obj() as session:
+        db.add_qos_rule(rule1, session=session)
+    with session_obj() as session:
+        db.increment_qos_rule_running([rule1, rule2], session=session)
+    with session_obj() as session:
+        assert db.get_qos_rule(str(rule1.__hash__()), session=session).running == 1
+        assert db.get_qos_rule(str(rule2.__hash__()), session=session).running == 1
+
+
+def test_add_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
+    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
+    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
+    request_uid = request.request_uid
+    with session_obj() as session:
+        db.add_qos_rule(rule1, queued=5, session=session)
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-        db.set_request_qos_rule(request=request, rule=limit_1, session=session)
-        db.set_request_qos_rule(request=request, rule=limit_2, session=session)
+    with session_obj() as session:
+        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+    with session_obj() as session:
+        request = db.get_request(request_uid, session=session)
+        assert db.get_qos_status_from_request(request) == {
+            "name1": [
+                {"info": "info1", "queued": 5 + 1, "running": 0, "conclusion": "10"}
+            ],
+            "name2": [{"info": "info2", "queued": 1, "running": 0, "conclusion": "10"}],
+        }
+
+
+def test_delete_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
+    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
+    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
+    request_uid = request.request_uid
+    rule1_queued = 5
+    rule1_running = 2
+    rule2_queued = 3
+    rule2_running = 4
+    with session_obj() as session:
+        db.add_qos_rule(
+            rule1, queued=rule1_queued, running=rule1_running, session=session
+        )
+        db.add_qos_rule(
+            rule2, queued=rule2_queued, running=rule2_running, session=session
+        )
+        session.add(adaptor_properties)
+        session.add(request)
         session.commit()
     with session_obj() as session:
-        request = db.get_request(request_uid=request_uid, session=session)
-        assert "1" in request.qos_status.get(rule_name, [])
-        assert "2" in request.qos_status.get(rule_name, [])
+        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+    with session_obj() as session:
+        db.delete_request_qos_status(request_uid, [rule1, rule2], session=session)
+    with session_obj() as session:
+        rule1 = db.get_qos_rule(str(rule1.__hash__()), session=session)
+        rule2 = db.get_qos_rule(str(rule2.__hash__()), session=session)
+        assert rule1.queued == rule1_queued
+        assert rule1.running == rule1_running + 1
+        assert rule2.queued == rule2_queued
+        assert rule2.running == rule2_running + 1
+
+
+def test_decrement_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
+    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
+    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
+    rule1_queued = 5
+    rule1_running = 2
+    rule2_queued = 3
+    rule2_running = 4
+    with session_obj() as session:
+        db.add_qos_rule(
+            rule1, queued=rule1_queued, running=rule1_running, session=session
+        )
+        db.add_qos_rule(
+            rule2, queued=rule2_queued, running=rule2_running, session=session
+        )
+    with session_obj() as session:
+        db.decrement_qos_rule_running([rule1, rule2], session=session)
+
+    with session_obj() as session:
+        assert (
+            db.get_qos_rule(str(rule1.__hash__()), session=session).running
+            == rule1_running - 1
+        )
+        assert (
+            db.get_qos_rule(str(rule2.__hash__()), session=session).running
+            == rule2_running - 1
+        )
+
+
+def test_reset_qos_rules(session_obj: sa.orm.sessionmaker) -> None:
+    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
+    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
+    adaptor_properties = mock_config()
+    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
+    request_uid = request.request_uid
+    with session_obj() as session:
+        db.add_qos_rule(rule1, session=session)
+        db.add_qos_rule(rule2, session=session)
+        session.add(adaptor_properties)
+        session.add(request)
+        session.commit()
+    with session_obj() as session:
+        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+        db.reset_qos_rules(session=session)
+        request = db.get_request(request_uid, session=session)
+        assert db.get_qos_status_from_request(request) == {}
 
 
 def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
@@ -620,27 +705,52 @@ def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_get_qos_status_from_request() -> None:
-    test_qos_status = {
-        "qos_status": {
-            "rule_name_1": {
-                "rule_key_1_1": {
-                    "condition": "condition_1_1",
-                    "info": "info_1_1",
-                    "conclusion": "conclusion_1_1",
-                },
-                "rule_key_1_2": {
-                    "condition": "condition_1_2",
-                    "info": "info_1_2",
-                    "conclusion": "conclusion_1_2",
-                },
-            },
-            "rule_name_2": {"rule_key_2_1": {}},
-        }
+    test_qos_rules = {
+        "qos_rules": [
+            db.QoSRule(
+                name="rule_name_1",
+                info="info_1_1",
+                queued="queued_1_1",
+                running="running_1_1",
+            ),
+            db.QoSRule(
+                name="rule_name_1",
+                info="info_1_2",
+                queued="queued_1_2",
+                running="running_1_2",
+            ),
+            db.QoSRule(
+                name="rule_name_2",
+                info="info_2_1",
+                queued="queued_2_1",
+                running="running_2_1",
+            ),
+        ]
     }
-    test_request = db.SystemRequest(**test_qos_status)
+    test_request = db.SystemRequest(**test_qos_rules)
     exp_qos_status = {
-        "rule_name_1": [("info_1_1", "conclusion_1_1"), ("info_1_2", "conclusion_1_2")],
-        "rule_name_2": [("", "")],
+        "rule_name_1": [
+            {
+                "info": "info_1_1",
+                "queued": "queued_1_1",
+                "running": "running_1_1",
+                "conclusion": None,
+            },
+            {
+                "info": "info_1_2",
+                "queued": "queued_1_2",
+                "running": "running_1_2",
+                "conclusion": None,
+            },
+        ],
+        "rule_name_2": [
+            {
+                "info": "info_2_1",
+                "queued": "queued_2_1",
+                "running": "running_2_1",
+                "conclusion": None,
+            },
+        ],
     }
     res_qos_staus = db.get_qos_status_from_request(test_request)
     assert exp_qos_status == res_qos_staus

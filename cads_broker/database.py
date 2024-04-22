@@ -37,6 +37,41 @@ class InvalidRequestID(Exception):
     pass
 
 
+class QoSRule(BaseModel):
+    """QoS Rule ORM model."""
+
+    __tablename__ = "qos_rules"
+
+    uid = sa.Column(sa.Text, primary_key=True)
+    name = sa.Column(sa.Text)
+    info = sa.Column(sa.Text)
+    condition = sa.Column(sa.Text)
+    conclusion = sa.Column(sa.Text)
+    conclusion_value = sa.Column(sa.Text)
+    queued = sa.Column(sa.Integer)
+    running = sa.Column(sa.Integer)
+
+    system_requests: sa.orm.Mapped[list["SystemRequest"]] = sa.orm.relationship(
+        "SystemRequest",
+        secondary="system_request_qos_rule",
+        back_populates="qos_rules",
+        uselist=True,
+    )
+
+
+class SystemRequestQoSRule(BaseModel):
+    """Association table for SystemRequest and QoSRule."""
+
+    __tablename__ = "system_request_qos_rule"
+
+    request_uid = sa.Column(
+        sa.dialects.postgresql.UUID(False),
+        sa.ForeignKey("system_requests.request_uid"),
+        primary_key=True,
+    )
+    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True)
+
+
 class Events(BaseModel):
     """Events ORM model."""
 
@@ -102,9 +137,21 @@ class SystemRequest(BaseModel):
     __mapper_args__ = {"eager_defaults": False}
 
     # joined is temporary
-    cache_entry = sa.orm.relationship(cacholote.database.CacheEntry, lazy="joined")
-    adaptor_properties = sa.orm.relationship(AdaptorProperties, lazy="select")
-    events = sa.orm.relationship(Events, lazy="select", passive_deletes=True)
+    cache_entry: sa.orm.Mapped["cacholote.database.CacheEntry"] = sa.orm.relationship(
+        cacholote.database.CacheEntry, lazy="joined"
+    )
+    adaptor_properties: sa.orm.Mapped["AdaptorProperties"] = sa.orm.relationship(
+        AdaptorProperties, lazy="select"
+    )
+    events: sa.orm.Mapped[list["Events"]] = sa.orm.relationship(
+        Events, lazy="select", passive_deletes=True
+    )
+    qos_rules: sa.orm.Mapped[list["QoSRule"]] = sa.orm.relationship(
+        "QoSRule",
+        secondary="system_request_qos_rule",
+        back_populates="system_requests",
+        uselist=True,
+    )
 
     @property
     def age(self):
@@ -376,40 +423,108 @@ def get_events_from_request(
     return events
 
 
-def get_qos_status_from_request(
-    request: SystemRequest,
-) -> dict[str, list[tuple[str, str]]]:
-    ret_value: dict[str, list[str]] = {}
-    for rule_name, rules in request.qos_status.items():
-        ret_value[rule_name] = []
-        for rule in rules.values():
-            ret_value[rule_name].append(
-                (rule.get("info", ""), rule.get("conclusion", ""))
-            )
-    return ret_value
+def reset_qos_rules(session: sa.orm.Session):
+    """Delete all QoS rules."""
+    for rule in session.scalars(sa.select(QoSRule)):
+        rule.system_requests = []
+        session.delete(rule)
+    session.commit()
 
 
-def set_request_qos_rule(
-    request: SystemRequest,
+def get_qos_rule(uid: str, session: sa.orm.Session):
+    """Get a QoS rule."""
+    statement = sa.select(QoSRule).where(QoSRule.uid == uid)
+    return session.scalars(statement).one()
+
+
+def add_qos_rule(
     rule,
     session: sa.orm.Session,
+    queued: int = 0,
+    running: int = 0,
 ):
-    qos_status = request.qos_status
-    old_rules = qos_status.get(rule.name, {})
-    rule_uid = rule.get_uid(request)
-    if rule_uid in old_rules:
-        return
-    old_rules[rule_uid] = {
-        "conclusion": str(rule.evaluate(request)),
-        "info": str(rule.info).replace('"', ""),
-        "condition": str(rule.condition),
-    }
-    qos_status[rule.name] = old_rules
-    session.execute(
-        sa.update(SystemRequest)
-        .filter_by(request_uid=request.request_uid)
-        .values(qos_status=qos_status)
+    """Add a QoS rule."""
+    qos_rule = QoSRule(
+        uid=str(rule.__hash__()),
+        name=str(rule.name),
+        info=str(rule.info),
+        condition=str(rule.condition),
+        conclusion=str(rule.conclusion),
+        # conclusion_value may change over time, this case is not handled
+        conclusion_value=str(rule.evaluate(request=None)),
+        queued=queued,
+        running=running,
     )
+    session.add(qos_rule)
+    session.commit()
+    return qos_rule
+
+
+def increment_qos_rule_running(rules: list, session: sa.orm.Session):
+    """Increment the running counter of a QoS rule."""
+    for rule in rules:
+        try:
+            qos_rule = get_qos_rule(str(rule.__hash__()), session)
+        except sqlalchemy.orm.exc.NoResultFound:
+            qos_rule = add_qos_rule(rule=rule, session=session)
+        qos_rule.running += 1
+    session.commit()
+
+
+def decrement_qos_rule_running(rules: list, session: sa.orm.Session):
+    """Increment the running counter of a QoS rule."""
+    for rule in rules:
+        qos_rule = get_qos_rule(str(rule.__hash__()), session)
+        qos_rule.running -= 1
+    session.commit()
+
+
+def delete_request_qos_status(request_uid: str, rules: list, session: sa.orm.Session):
+    """Delete all QoS rules from a request."""
+    request = get_request(request_uid, session)
+    for rule in rules:
+        try:
+            qos_rule = get_qos_rule(str(rule.__hash__()), session)
+        except sqlalchemy.orm.exc.NoResultFound:
+            qos_rule = add_qos_rule(rule=rule, session=session)
+        if qos_rule in request.qos_rules:
+            request.qos_rules.remove(qos_rule)
+            qos_rule.queued -= 1
+        qos_rule.running += 1
+    session.commit()
+
+
+def add_request_qos_status(request_uid: str, rules: list, session: sa.orm.Session):
+    request = get_request(request_uid, session)
+    for rule in rules:
+        try:
+            qos_rule = get_qos_rule(str(rule.__hash__()), session)
+        except sqlalchemy.orm.exc.NoResultFound:
+            qos_rule = add_qos_rule(rule=rule, session=session)
+        if qos_rule not in request.qos_rules:
+            qos_rule.queued += 1
+            request.qos_rules.append(qos_rule)
+    session.commit()
+
+
+def get_qos_status_from_request(
+    request: SystemRequest,
+) -> dict[str, list[dict[str, str]]]:
+    ret_value: dict[str, list[dict[str, str]]] = {}
+    rules = request.qos_rules
+    for rule in rules:
+        rule_name = rule.name
+        rule_summary = {
+            "info": rule.info,
+            "queued": rule.queued,
+            "running": rule.running,
+            "conclusion": rule.conclusion_value,
+        }
+        if rule_name not in ret_value:
+            ret_value[rule_name] = [rule_summary]
+        else:
+            ret_value[rule_name].append(rule_summary)
+    return ret_value
 
 
 def requeue_request(
@@ -428,7 +543,7 @@ def requeue_request(
         request.request_metadata = metadata
         request.status = "accepted"
         session.commit()
-        logger.info("--------- requeueing request", **logger_kwargs(request=request))
+        logger.info("requeueing request", **logger_kwargs(request=request))
         return request
     else:
         return
