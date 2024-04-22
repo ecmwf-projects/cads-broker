@@ -544,8 +544,10 @@ def test_add_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
     with session_obj() as session:
         request = db.get_request(request_uid, session=session)
         assert db.get_qos_status_from_request(request) == {
-            "name1": [{"info": "info1", "queued": 5 + 1, "running": 0}],
-            "name2": [{"info": "info2", "queued": 1, "running": 0}],
+            "name1": [
+                {"info": "info1", "queued": 5 + 1, "running": 0, "conclusion": "10"}
+            ],
+            "name2": [{"info": "info2", "queued": 1, "running": 0, "conclusion": "10"}],
         }
 
 
@@ -560,8 +562,12 @@ def test_delete_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
     rule2_queued = 3
     rule2_running = 4
     with session_obj() as session:
-        db.add_qos_rule(rule1, queued=rule1_queued, running=rule1_running, session=session)
-        db.add_qos_rule(rule2, queued=rule2_queued, running=rule2_running, session=session)
+        db.add_qos_rule(
+            rule1, queued=rule1_queued, running=rule1_running, session=session
+        )
+        db.add_qos_rule(
+            rule2, queued=rule2_queued, running=rule2_running, session=session
+        )
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
@@ -586,14 +592,24 @@ def test_decrement_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
     rule2_queued = 3
     rule2_running = 4
     with session_obj() as session:
-        db.add_qos_rule(rule1, queued=rule1_queued, running=rule1_running, session=session)
-        db.add_qos_rule(rule2, queued=rule2_queued, running=rule2_running, session=session)
+        db.add_qos_rule(
+            rule1, queued=rule1_queued, running=rule1_running, session=session
+        )
+        db.add_qos_rule(
+            rule2, queued=rule2_queued, running=rule2_running, session=session
+        )
     with session_obj() as session:
         db.decrement_qos_rule_running([rule1, rule2], session=session)
 
     with session_obj() as session:
-        assert db.get_qos_rule(str(rule1.__hash__()), session=session).running == rule1_running - 1
-        assert db.get_qos_rule(str(rule2.__hash__()), session=session).running == rule2_running - 1
+        assert (
+            db.get_qos_rule(str(rule1.__hash__()), session=session).running
+            == rule1_running - 1
+        )
+        assert (
+            db.get_qos_rule(str(rule2.__hash__()), session=session).running
+            == rule2_running - 1
+        )
 
 
 def test_reset_qos_rules(session_obj: sa.orm.sessionmaker) -> None:
@@ -613,7 +629,7 @@ def test_reset_qos_rules(session_obj: sa.orm.sessionmaker) -> None:
         db.reset_qos_rules(session=session)
         request = db.get_request(request_uid, session=session)
         assert db.get_qos_status_from_request(request) == {}
-    
+
 
 def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
     adaptor_properties = mock_config()
@@ -714,11 +730,26 @@ def test_get_qos_status_from_request() -> None:
     test_request = db.SystemRequest(**test_qos_rules)
     exp_qos_status = {
         "rule_name_1": [
-            {"info": "info_1_1", "queued": "queued_1_1", "running": "running_1_1"},
-            {"info": "info_1_2", "queued": "queued_1_2", "running": "running_1_2"},
+            {
+                "info": "info_1_1",
+                "queued": "queued_1_1",
+                "running": "running_1_1",
+                "conclusion": None,
+            },
+            {
+                "info": "info_1_2",
+                "queued": "queued_1_2",
+                "running": "running_1_2",
+                "conclusion": None,
+            },
         ],
         "rule_name_2": [
-            {"info": "info_2_1", "queued": "queued_2_1", "running": "running_2_1"}
+            {
+                "info": "info_2_1",
+                "queued": "queued_2_1",
+                "running": "running_2_1",
+                "conclusion": None,
+            },
         ],
     }
     res_qos_staus = db.get_qos_status_from_request(test_request)

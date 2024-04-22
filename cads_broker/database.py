@@ -479,9 +479,7 @@ def decrement_qos_rule_running(rules: list, session: sa.orm.Session):
     session.commit()
 
 
-def delete_request_qos_status(
-    request_uid: str, rules: list, session: sa.orm.Session
-):
+def delete_request_qos_status(request_uid: str, rules: list, session: sa.orm.Session):
     """Delete all QoS rules from a request."""
     request = get_request(request_uid, session)
     for rule in rules:
@@ -496,9 +494,7 @@ def delete_request_qos_status(
     session.commit()
 
 
-def add_request_qos_status(
-    request_uid: str, rules: list, session: sa.orm.Session
-):
+def add_request_qos_status(request_uid: str, rules: list, session: sa.orm.Session):
     request = get_request(request_uid, session)
     for rule in rules:
         try:
