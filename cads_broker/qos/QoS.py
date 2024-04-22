@@ -107,7 +107,7 @@ class QoS:
                 1,
                 database.add_request_qos_status,
                 kwargs={
-                    "request": request,
+                    "request_uid": request.request_uid,
                     "rules": limits,
                     "session": session,
                 },
@@ -310,7 +310,7 @@ class QoS:
             database.delete_request_qos_status,
             kwargs={
                 "rules": limits_list,
-                "request": request,
+                "request_uid": request.request_uid,
                 "session": session,
             },
         )
