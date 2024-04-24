@@ -613,6 +613,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
             if event.event_type == "worker_name"
         ],
         "origin": request.origin,
+        "portal": request.portal,
         "entry_point": request.entry_point,
         **request.response_error,
     }
