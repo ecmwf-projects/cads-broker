@@ -178,6 +178,8 @@ class Broker:
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
+                if future := self.futures.get(request.request_uid):
+                    future.cancel()
                 continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
