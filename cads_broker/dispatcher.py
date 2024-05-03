@@ -194,6 +194,9 @@ class Broker:
                     "Request not found: re-queueing", job_id={request.request_uid}
                 )
                 db.requeue_request(request_uid=request.request_uid, session=session)
+                self.qos.notify_end_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
