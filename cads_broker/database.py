@@ -475,7 +475,7 @@ def decrement_qos_rule_running(rules: list, session: sa.orm.Session):
     """Increment the running counter of a QoS rule."""
     for rule in rules:
         qos_rule = get_qos_rule(str(rule.__hash__()), session)
-        qos_rule.running -= 1
+        qos_rule.running = max(0, qos_rule.running - 1)
     session.commit()
 
 
@@ -489,7 +489,7 @@ def delete_request_qos_status(request_uid: str, rules: list, session: sa.orm.Ses
             qos_rule = add_qos_rule(rule=rule, session=session)
         if qos_rule in request.qos_rules:
             request.qos_rules.remove(qos_rule)
-            qos_rule.queued -= 1
+            qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
     session.commit()
 
