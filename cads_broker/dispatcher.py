@@ -110,7 +110,7 @@ class Broker:
     session_maker_read: sa.orm.sessionmaker
     session_maker_write: sa.orm.sessionmaker
     wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
-    cache = cachetools.TTLCache(
+    ttl_cache = cachetools.TTLCache(
         maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
     )
 
@@ -158,9 +158,7 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    @cachetools.cachedmethod(  # type: ignore
-        cache=cache,
-    )
+    @cachetools.cachedmethod(lambda self: self.ttl_cache)
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
