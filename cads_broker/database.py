@@ -474,8 +474,13 @@ def increment_qos_rule_running(rules: list, session: sa.orm.Session):
 def decrement_qos_rule_running(rules: list, session: sa.orm.Session):
     """Increment the running counter of a QoS rule."""
     for rule in rules:
-        qos_rule = get_qos_rule(str(rule.__hash__()), session)
-        qos_rule.running = max(0, qos_rule.running - 1)
+        try:
+            qos_rule = get_qos_rule(str(rule.__hash__()), session)
+            qos_rule.running = max(0, qos_rule.running - 1)
+        except sqlalchemy.orm.exc.NoResultFound:
+            # this happend when a request is finished after a broker restart.
+            # the rule is not in the database anymore because it has been reset.
+            continue
     session.commit()
 
 
