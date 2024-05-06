@@ -246,8 +246,7 @@ class Broker:
                     job_status={future.status},
                     job_id=request.request_uid,
                 )
-                return
-            self.futures.pop(future.key)
+            self.futures.pop(future.key, None)
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
