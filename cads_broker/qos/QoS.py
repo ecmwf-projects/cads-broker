@@ -101,7 +101,7 @@ class QoS:
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
                 limits.append(limit)
-                if str(limit.__hash__()) not in request.qos_rules:
+                if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
                     limits_to_add.append(limit)
         if len(limits_to_add):
             scheduler.append(
