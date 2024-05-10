@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import random
 import sqlite3
 import uuid
 from typing import Any, Optional
@@ -16,30 +17,44 @@ app = typer.Typer()
 
 
 @app.command()
-def add_dummy_requests(number_of_requests: int, requests_db: str) -> None:
+def add_dummy_requests(number_of_requests: int, requests_db: str, number_of_users: int = 1000) -> None:
     connection = sqlite3.connect(requests_db)
     connection.row_factory = sqlite3.Row
     cursor = connection.execute(
-        f"SELECT * FROM broker WHERE time>=0 and time < {number_of_requests}"
+        f"SELECT * FROM broker limit {number_of_requests}"
     )
-    for row in cursor:
-        with database.ensure_session_obj(None)() as session:
+    user_uids = [str(uuid.uuid4()) for _ in range(number_of_users)]
+    with database.ensure_session_obj(None)() as session:
+        for i, row in enumerate(cursor):
             if row["elapsed"] != "null":
-                database.create_request(
+                database.ensure_adaptor_properties(
+                    hash="test",
+                    config={},
+                    form={},
                     session=session,
-                    user_uid=str(uuid.uuid4()),
-                    request={
-                        "elapsed": str(datetime.timedelta(seconds=row["elapsed"])),
-                        "timestamp": str(datetime.datetime.now()),
-                    },
-                    process_id="test-adaptor-dummy",
-                    entry_point="cads_adaptors:DummyAdaptor",
-                    portal="c3s",
-                    setup_code=None,
-                    adaptor_config={},
-                    adaptor_form={},
-                    adaptor_properties_hash="test",
                 )
+                request = database.SystemRequest(
+                    request_uid=str(uuid.uuid4()),
+                    process_id="test-adaptor-dummy",
+                    user_uid=random.choice(user_uids),
+                    status="accepted",
+                    request_body={
+                        "setup_code": None,
+                        "request": {
+                            "elapsed": str(datetime.timedelta(seconds=row["elapsed"])),
+                            "timestamp": str(datetime.datetime.now()),
+                        },
+                    },
+                    request_metadata={},
+                    origin='api',
+                    portal='c3s',
+                    adaptor_properties_hash="test",
+                    entry_point="cads_adaptors:DummyAdaptor",
+                )
+                session.add(request)
+            if i % 100 == 0:
+                session.commit()
+        session.commit()
 
 
 @app.command()
