@@ -362,6 +362,7 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
+                    start = time.time()
                     accepted_requests = {
                         r.request_uid: r
                         for r in db.get_accepted_requests(session=session_write)
@@ -369,6 +370,8 @@ class Broker:
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(accepted_requests, session_write)
                     session_write.commit()
+                    stop = time.time()
+                    print("SYNC DATABASE IN ", stop - start)
 
                 self.running_requests = len(
                     [
