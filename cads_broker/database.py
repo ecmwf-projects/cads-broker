@@ -523,7 +523,7 @@ def delete_request_qos_status(
                 created_rules[qos_rule.uid] = qos_rule
         if qos_rule in request.qos_rules:
             request.qos_rules.remove(qos_rule)
-            qos_rule.queued = max(0, qos_rule.queued - 1)
+        qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
     return created_rules
 
