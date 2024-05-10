@@ -214,13 +214,13 @@ def get_running_requests(
 
 def get_accepted_requests(
     session: sa.orm.Session,
+    last_created_at: datetime.datetime | None = None,
 ):
     """Get all accepted requests."""
-    statement = (
-        sa.select(SystemRequest)
-        .where(SystemRequest.status == "accepted")
-        .order_by(SystemRequest.created_at)
-    )
+    statement = sa.select(SystemRequest)
+    if last_created_at:
+        statement = statement.where(SystemRequest.created_at >= last_created_at)
+    statement = statement.where(SystemRequest.status == "accepted").order_by(SystemRequest.created_at)
     return session.scalars(statement).all()
 
 

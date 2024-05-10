@@ -107,6 +107,40 @@ class Scheduler:
             self.queue.remove(item)
 
 
+class Queue:
+    def __init__(self) -> None:
+        self.queue_dict: dict = dict()
+        self._lock = threading.RLock()
+        self.last_created_at = None
+
+    def get(self, key: str, default=None) -> Any:
+        with self._lock:
+            return self.queue_dict.get(key, default)
+
+    def add(self, key: str, item: Any) -> None:
+        with self._lock:
+            self.queue_dict[key] = item
+
+    def add_accepted_requests(self, accepted_requests: dict) -> None:
+        with self._lock:
+            for request in accepted_requests:
+                self.queue_dict[request.request_uid] = request
+        if accepted_requests:
+            self.last_created_at = accepted_requests[-1].created_at
+
+    def values(self) -> Iterable[Any]:
+        with self._lock:
+            return self.queue_dict.values()
+
+    def pop(self, key: str) -> Any:
+        with self._lock:
+            return self.queue_dict.pop(key, None)
+
+    def len(self) -> int:
+        with self._lock:
+            return len(self.queue_dict)
+
+
 class QoSRules:
     def __init__(self) -> None:
         self.environment = Environment.Environment()
@@ -138,6 +172,7 @@ class Broker:
     )
     running_requests: int = 0
     internal_scheduler: Scheduler = Scheduler()
+    queue: Queue = Queue()
 
     @classmethod
     def from_address(
@@ -214,7 +249,7 @@ class Broker:
                     request, session, scheduler=self.internal_scheduler
                 )
 
-    def sync_qos_rules(self, accepted_requests, session_write) -> None:
+    def sync_qos_rules(self, session_write) -> None:
         start = time.time()
         qos_rules = db.get_qos_rules(session=session_write)
         print(f"PROCESSING {len(self.internal_scheduler.queue)} TASKS")
@@ -223,9 +258,7 @@ class Broker:
             # it returns a new qos rule if a new qos rule is added to database
             new_qos_rules = task["function"](
                 session=session_write,
-                request=accepted_requests.get(
-                    task["kwargs"].get("request_uid")
-                ),
+                request=self.queue.get(task["kwargs"].get("request_uid")),
                 rules_in_db=qos_rules,
                 **task["kwargs"],
             )
@@ -328,6 +361,7 @@ class Broker:
         self.qos.notify_start_of_request(
             request, session, scheduler=self.internal_scheduler
         )
+        self.queue.pop(request.request_uid)
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -364,14 +398,18 @@ class Broker:
                 with self.session_maker_write(expire_on_commit=False) as session_write:
                     start = time.time()
                     start_accepted = time.time()
-                    accepted_requests = {
-                        r.request_uid: r
-                        for r in db.get_accepted_requests(session=session_write)
-                    }
+                    self.queue.add_accepted_requests(
+                        db.get_accepted_requests(
+                            session=session_write,
+                            last_created_at=self.queue.last_created_at,
+                        )
+                    )
+                    print("QUEUE IS ", self.queue.len())
+                    print("LAST TIME IS ", self.queue.last_created_at)
                     stop_accepted = time.time()
                     print("ACCEPTED REQUESTS IN ", stop_accepted - start_accepted)
                     self.sync_database(session=session_write)
-                    self.sync_qos_rules(accepted_requests, session_write)
+                    self.sync_qos_rules(session_write)
                     session_write.commit()
                     stop = time.time()
                     print("SYNC DATABASE IN ", stop - start)
@@ -384,9 +422,9 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = len(accepted_requests)
+                queue_length = self.queue.len()
                 available_workers = self.number_of_workers - self.running_requests
-                if number_accepted_requests > 0:
+                if queue_length > 0:
                     logger.info(
                         "broker info",
                         available_workers=available_workers,
@@ -395,11 +433,11 @@ class Broker:
                         futures=len(self.futures),
                     )
                     if available_workers > 0:
-                        logger.info("broker info", queued_jobs=number_accepted_requests)
+                        logger.info("broker info", queued_jobs=queue_length)
                         with self.session_maker_write() as session_write:
                             self.submit_requests(
                                 session_write=session_write,
                                 number_of_requests=available_workers,
-                                candidates=accepted_requests.values(),
+                                candidates=self.queue.values(),
                             )
             time.sleep(self.wait_time)
