@@ -224,6 +224,18 @@ def get_accepted_requests(
     return session.scalars(statement).all()
 
 
+def count_accepted_requests_before(
+    session: sa.orm.Session,
+    last_created_at: datetime.datetime,
+) -> int:
+    """Count running requests for user_uid."""
+    statement = (
+        session.query(SystemRequest)
+        .where(SystemRequest.created_at < last_created_at)
+    )
+    return statement.count()
+
+
 def count_finished_requests_per_user_in_session(
     user_uid: str,
     session: sa.orm.Session,

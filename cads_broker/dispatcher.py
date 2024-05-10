@@ -37,6 +37,7 @@ DASK_STATUS_TO_STATUS = {
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 ONE_SECOND = datetime.timedelta(seconds=1)
 
+
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
         maxsize=1024, ttl=float(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
@@ -128,7 +129,9 @@ class Queue:
             for request in accepted_requests:
                 self.queue_dict[request.request_uid] = request
         if accepted_requests:
-            self.last_created_at = max(accepted_requests[-1].created_at, self.last_created_at)
+            self.last_created_at = max(
+                accepted_requests[-1].created_at, self.last_created_at
+            )
 
     def values(self) -> Iterable[Any]:
         with self._lock:
@@ -247,6 +250,7 @@ class Broker:
                     "Request not found: re-queueing", job_id={request.request_uid}
                 )
                 db.requeue_request(request_uid=request.request_uid, session=session)
+                self.queue.add(request.request_uid, request)
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
@@ -297,6 +301,7 @@ class Broker:
                 if error_reason == "distributed.scheduler.KilledWorker":
                     logger.info("worker killed: re-queueing", job_id=future.key)
                     db.requeue_request(request_uid=future.key, session=session)
+                    self.queue.add(request.request_uid, request)
                 else:
                     request = db.set_request_status(
                         future.key,
@@ -403,7 +408,7 @@ class Broker:
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
-                            last_created_at=self.queue.last_created_at - 10 * ONE_SECOND,
+                            last_created_at=self.queue.last_created_at
                         )
                     )
                     print("QUEUE IS ", self.queue.len())
@@ -442,4 +447,13 @@ class Broker:
                                 number_of_requests=available_workers,
                                 candidates=self.queue.values(),
                             )
+                if (queue_length := self.queue.len()) != (
+                    db_queue := db.count_accepted_requests_before(
+                        session=session_read, last_created_at=self.queue.last_created_at
+                    )
+                ):
+                    logger.info(
+                        f"Internal queue and DB queue is not in sync: {queue_length} and {db_queue}",
+                        no_jobs="sleeping",
+                    )
             time.sleep(self.wait_time)
