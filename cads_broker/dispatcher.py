@@ -215,7 +215,9 @@ class Broker:
                 )
 
     def sync_qos_rules(self, accepted_requests, session_write) -> None:
+        start = time.time()
         qos_rules = db.get_qos_rules(session=session_write)
+        print(f"PROCESSING {len(self.internal_scheduler.queue)} TASKS")
         for task in list(self.internal_scheduler.queue):
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
@@ -231,6 +233,9 @@ class Broker:
             # if a new qos rule is added, the new qos rule is added to the list of qos rules
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
+        stop = time.time()
+        print("QOS ADDED IN ", stop - start)
+        print(f"TASKS ARE NOW {len(self.internal_scheduler.queue)}")
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")

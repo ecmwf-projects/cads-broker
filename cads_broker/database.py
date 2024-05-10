@@ -151,6 +151,7 @@ class SystemRequest(BaseModel):
         secondary="system_request_qos_rule",
         back_populates="system_requests",
         uselist=True,
+        lazy="subquery",
     )
 
     @property
@@ -494,11 +495,11 @@ def decrement_qos_rule_running(
         else:
             try:
                 qos_rule = get_qos_rule(rule_uid, session)
-                qos_rule.running = max(0, qos_rule.running - 1)
             except sqlalchemy.orm.exc.NoResultFound:
                 # this happend when a request is finished after a broker restart.
                 # the rule is not in the database anymore because it has been reset.
                 continue
+        qos_rule.running = max(0, qos_rule.running - 1)
 
 
 def delete_request_qos_status(
@@ -532,9 +533,12 @@ def add_request_qos_status(
     rules: list,
     rules_in_db: dict,
     session: sa.orm.Session,
+    request_uid: str,
     **kwargs,
 ):
     created_rules: dict = {}
+    if request is None:
+        return {}
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]

@@ -2,6 +2,8 @@
 
 import datetime
 import os
+import sqlite3
+import uuid
 from typing import Any, Optional
 
 import sqlalchemy as sa
@@ -11,6 +13,33 @@ from typing_extensions import Annotated
 from cads_broker import config, database, dispatcher, object_storage
 
 app = typer.Typer()
+
+
+@app.command()
+def add_dummy_requests(number_of_requests: int, requests_db: str) -> None:
+    connection = sqlite3.connect(requests_db)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.execute(
+        f"SELECT * FROM broker WHERE time>=0 and time < {number_of_requests}"
+    )
+    for row in cursor:
+        with database.ensure_session_obj(None)() as session:
+            if row["elapsed"] != "null":
+                database.create_request(
+                    session=session,
+                    user_uid=str(uuid.uuid4()),
+                    request={
+                        "elapsed": str(datetime.timedelta(seconds=row["elapsed"])),
+                        "timestamp": str(datetime.datetime.now()),
+                    },
+                    process_id="test-adaptor-dummy",
+                    entry_point="cads_adaptors:DummyAdaptor",
+                    portal="c3s",
+                    setup_code=None,
+                    adaptor_config={},
+                    adaptor_form={},
+                    adaptor_properties_hash="test",
+                )
 
 
 @app.command()

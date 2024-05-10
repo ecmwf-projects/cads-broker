@@ -97,10 +97,13 @@ class QoS:
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
         limits = []
+        limits_to_add = []
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
                 limits.append(limit)
-        if len(limits):
+                if str(limit.__hash__()) not in request.qos_rules:
+                    limits_to_add.append(limit)
+        if len(limits_to_add):
             scheduler.append(
                 {
                     "function": database.add_request_qos_status,
