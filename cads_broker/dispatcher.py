@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import io
 import os
@@ -34,7 +35,7 @@ DASK_STATUS_TO_STATUS = {
 }
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
-
+ONE_SECOND = datetime.timedelta(seconds=1)
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
@@ -111,7 +112,7 @@ class Queue:
     def __init__(self) -> None:
         self.queue_dict: dict = dict()
         self._lock = threading.RLock()
-        self.last_created_at = None
+        self.last_created_at: datetime.datetime | None = None
 
     def get(self, key: str, default=None) -> Any:
         with self._lock:
@@ -126,7 +127,7 @@ class Queue:
             for request in accepted_requests:
                 self.queue_dict[request.request_uid] = request
         if accepted_requests:
-            self.last_created_at = accepted_requests[-1].created_at
+            self.last_created_at = max(accepted_requests[-1].created_at, self.last_created_at)
 
     def values(self) -> Iterable[Any]:
         with self._lock:
@@ -401,7 +402,7 @@ class Broker:
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
-                            last_created_at=self.queue.last_created_at,
+                            last_created_at=self.queue.last_created_at - 10 * ONE_SECOND,
                         )
                     )
                     print("QUEUE IS ", self.queue.len())
