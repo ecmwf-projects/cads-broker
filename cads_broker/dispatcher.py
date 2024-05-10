@@ -363,10 +363,13 @@ class Broker:
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
                     start = time.time()
+                    start_accepted = time.time()
                     accepted_requests = {
                         r.request_uid: r
                         for r in db.get_accepted_requests(session=session_write)
                     }
+                    stop_accepted = time.time()
+                    print("ACCEPTED REQUESTS IN ", stop_accepted - start_accepted)
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(accepted_requests, session_write)
                     session_write.commit()
