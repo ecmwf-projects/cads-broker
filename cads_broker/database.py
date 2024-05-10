@@ -232,7 +232,7 @@ def count_accepted_requests_before(
     statement = (
         session.query(SystemRequest)
         .where(SystemRequest.status == "accepted")
-        .where(SystemRequest.created_at < last_created_at)
+        .where(SystemRequest.created_at <= last_created_at)
     )
     return statement.count()
 
