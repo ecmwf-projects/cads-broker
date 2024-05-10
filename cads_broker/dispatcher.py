@@ -112,7 +112,8 @@ class Queue:
     def __init__(self) -> None:
         self.queue_dict: dict = dict()
         self._lock = threading.RLock()
-        self.last_created_at: datetime.datetime | None = None
+        # default value is before the release
+        self.last_created_at: datetime.datetime = datetime.datetime(2024, 1, 1)
 
     def get(self, key: str, default=None) -> Any:
         with self._lock:
