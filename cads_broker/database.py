@@ -231,6 +231,7 @@ def count_accepted_requests_before(
     """Count running requests for user_uid."""
     statement = (
         session.query(SystemRequest)
+        .where(SystemRequest.status == "accepted")
         .where(SystemRequest.created_at < last_created_at)
     )
     return statement.count()
