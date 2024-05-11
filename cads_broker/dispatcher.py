@@ -114,7 +114,7 @@ def perf_logger(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         stop = time.perf_counter()
-        logger.debug("performance", function=func.__name__, elapsed=stop - start)
+        logger.info("performance", function=func.__name__, elapsed=stop - start)
         return result
 
     return wrapper
