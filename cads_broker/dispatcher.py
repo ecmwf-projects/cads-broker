@@ -135,6 +135,7 @@ class Queue:
         with self._lock:
             self.queue_dict[key] = item
 
+    @perf_logger
     def add_accepted_requests(self, accepted_requests: dict) -> None:
         with self._lock:
             for request in accepted_requests:
