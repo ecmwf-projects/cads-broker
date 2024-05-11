@@ -109,6 +109,17 @@ class Scheduler:
             self.queue.remove(item)
 
 
+def perf_logger(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        stop = time.perf_counter()
+        logger.debug("performance", function=func.__name__, elapsed=stop - start)
+        return result
+
+    return wrapper
+
+
 class Queue:
     def __init__(self) -> None:
         self.queue_dict: dict = dict()
@@ -217,6 +228,7 @@ class Broker:
         return number_of_workers
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
+    @perf_logger
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
@@ -247,7 +259,7 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 logger.info(
-                    "Request not found: re-queueing", job_id={request.request_uid}
+                    "request not found: re-queueing", job_id={request.request_uid}
                 )
                 db.requeue_request(request_uid=request.request_uid, session=session)
                 self.queue.add(request.request_uid, request)
@@ -255,10 +267,10 @@ class Broker:
                     request, session, scheduler=self.internal_scheduler
                 )
 
+    @perf_logger
     def sync_qos_rules(self, session_write) -> None:
-        start = time.time()
         qos_rules = db.get_qos_rules(session=session_write)
-        print(f"PROCESSING {len(self.internal_scheduler.queue)} TASKS")
+        logger.debug("performance", tasks_number=len(self.internal_scheduler.queue))
         for task in list(self.internal_scheduler.queue):
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
@@ -272,9 +284,6 @@ class Broker:
             # if a new qos rule is added, the new qos rule is added to the list of qos rules
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
-        stop = time.time()
-        print("QOS ADDED IN ", stop - start)
-        print(f"TASKS ARE NOW {len(self.internal_scheduler.queue)}")
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -394,6 +403,7 @@ class Broker:
 
     def run(self) -> None:
         while True:
+            start_loop = time.perf_counter()
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
@@ -403,23 +413,15 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
-                    start = time.time()
-                    start_accepted = time.time()
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
                             last_created_at=self.queue.last_created_at
                         )
                     )
-                    print("QUEUE IS ", self.queue.len())
-                    print("LAST TIME IS ", self.queue.last_created_at)
-                    stop_accepted = time.time()
-                    print("ACCEPTED REQUESTS IN ", stop_accepted - start_accepted)
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(session_write)
                     session_write.commit()
-                    stop = time.time()
-                    print("SYNC DATABASE IN ", stop - start)
 
                 self.running_requests = len(
                     [
@@ -453,7 +455,7 @@ class Broker:
                     )
                 ):
                     logger.info(
-                        f"Internal queue and DB queue is not in sync: {queue_length} and {db_queue}",
+                        f"internal queue and DB queue are not in sync: {queue_length} and {db_queue}",
                         no_jobs="sleeping",
                     )
-            time.sleep(self.wait_time)
+            time.sleep(max(0, self.wait_time - (time.perf_counter() - start_loop)))
