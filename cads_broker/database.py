@@ -481,7 +481,7 @@ def add_qos_rule(
 
 
 def increment_qos_rule_running(
-    rules: list, rules_in_db: dict[str, QoSRule], session: sa.orm.Session, **kwargs
+    rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
 ):
     """Increment the running counter of a QoS rule."""
     created_rules: dict = {}
@@ -499,7 +499,7 @@ def increment_qos_rule_running(
 
 
 def decrement_qos_rule_running(
-    rules: list, rules_in_db: dict[str, QoSRule], session: sa.orm.Session, **kwargs
+    rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
 ):
     """Increment the running counter of a QoS rule."""
     for rule in rules:
@@ -518,8 +518,8 @@ def decrement_qos_rule_running(
 def delete_request_qos_status(
     request_uid: str,
     rules: list,
-    rules_in_db: dict[str, QoSRule],
     session: sa.orm.Session,
+    rules_in_db: dict[str, QoSRule] = {},
     **kwargs,
 ):
     """Delete all QoS rules from a request."""
@@ -544,9 +544,8 @@ def delete_request_qos_status(
 def add_request_qos_status(
     request: SystemRequest,
     rules: list,
-    rules_in_db: dict,
     session: sa.orm.Session,
-    request_uid: str,
+    rules_in_db: dict[str, QoSRule] = {},
     **kwargs,
 ):
     created_rules: dict = {}
