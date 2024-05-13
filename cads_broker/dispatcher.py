@@ -218,7 +218,9 @@ class Broker:
                 exception = future.exception()
                 error_message = "".join(traceback.format_exception(exception))
                 error_reason = exception.__class__.__name__
-                if error_reason == "distributed.scheduler.KilledWorker":
+                if error_reason == "distributed.scheduler.KilledWorker" and os.getenv(
+                    "BROKER_REQUEUE_ON_KILLED_WORKER", False
+                ):
                     logger.info("worker killed: re-queueing", job_id=future.key)
                     db.requeue_request(request_uid=future.key, session=session)
                 else:
