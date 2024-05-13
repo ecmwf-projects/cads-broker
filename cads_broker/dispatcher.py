@@ -1,8 +1,8 @@
+import datetime
 import hashlib
 import io
-import operator
 import os
-import sched
+import threading
 import time
 import traceback
 from typing import Any
@@ -12,6 +12,7 @@ import cachetools
 import distributed
 import sqlalchemy as sa
 import structlog
+from typing_extensions import Iterable
 
 try:
     from cads_worker import worker
@@ -34,6 +35,7 @@ DASK_STATUS_TO_STATUS = {
 }
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
+ONE_SECOND = datetime.timedelta(seconds=1)
 
 
 @cachetools.cached(  # type: ignore
@@ -89,6 +91,73 @@ def get_tasks(client: distributed.Client) -> Any:
     return client.run_on_scheduler(get_tasks_on_scheduler)
 
 
+class Scheduler:
+    def __init__(self) -> None:
+        self.queue: list = list()
+        self._lock = threading.RLock()
+
+    def append(self, item: Any) -> None:
+        with self._lock:
+            self.queue.append(item)
+
+    def pop(self, index=-1) -> Any:
+        with self._lock:
+            return self.queue.pop(index)
+
+    def remove(self, item: Any) -> None:
+        with self._lock:
+            self.queue.remove(item)
+
+
+def perf_logger(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        stop = time.perf_counter()
+        logger.info("performance", function=func.__name__, elapsed=stop - start)
+        return result
+
+    return wrapper
+
+
+class Queue:
+    def __init__(self) -> None:
+        self.queue_dict: dict = dict()
+        self._lock = threading.RLock()
+        # default value is before the release
+        self.last_created_at: datetime.datetime = datetime.datetime(2024, 1, 1)
+
+    def get(self, key: str, default=None) -> Any:
+        with self._lock:
+            return self.queue_dict.get(key, default)
+
+    def add(self, key: str, item: Any) -> None:
+        with self._lock:
+            self.queue_dict[key] = item
+
+    @perf_logger
+    def add_accepted_requests(self, accepted_requests: dict) -> None:
+        with self._lock:
+            for request in accepted_requests:
+                self.queue_dict[request.request_uid] = request
+        if accepted_requests:
+            self.last_created_at = max(
+                accepted_requests[-1].created_at, self.last_created_at
+            )
+
+    def values(self) -> Iterable[Any]:
+        with self._lock:
+            return self.queue_dict.values()
+
+    def pop(self, key: str) -> Any:
+        with self._lock:
+            return self.queue_dict.pop(key, None)
+
+    def len(self) -> int:
+        with self._lock:
+            return len(self.queue_dict)
+
+
 class QoSRules:
     def __init__(self) -> None:
         self.environment = Environment.Environment()
@@ -119,7 +188,8 @@ class Broker:
         repr=lambda futures: " ".join(futures.keys()),
     )
     running_requests: int = 0
-    internal_scheduler: sched.scheduler = sched.scheduler(time.time, time.sleep)
+    internal_scheduler: Scheduler = Scheduler()
+    queue: Queue = Queue()
 
     @classmethod
     def from_address(
@@ -159,6 +229,7 @@ class Broker:
         return number_of_workers
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
+    @perf_logger
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
@@ -189,12 +260,31 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 logger.info(
-                    "Request not found: re-queueing", job_id={request.request_uid}
+                    "request not found: re-queueing", job_id={request.request_uid}
                 )
                 db.requeue_request(request_uid=request.request_uid, session=session)
+                self.queue.add(request.request_uid, request)
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
+
+    @perf_logger
+    def sync_qos_rules(self, session_write) -> None:
+        qos_rules = db.get_qos_rules(session=session_write)
+        logger.debug("performance", tasks_number=len(self.internal_scheduler.queue))
+        for task in list(self.internal_scheduler.queue):
+            # the internal scheduler is used to asynchronously add qos rules to database
+            # it returns a new qos rule if a new qos rule is added to database
+            new_qos_rules = task["function"](
+                session=session_write,
+                request=self.queue.get(task["kwargs"].get("request_uid")),
+                rules_in_db=qos_rules,
+                **task["kwargs"],
+            )
+            self.internal_scheduler.remove(task)
+            # if a new qos rule is added, the new qos rule is added to the list of qos rules
+            if new_qos_rules:
+                qos_rules.update(new_qos_rules)
 
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
@@ -223,6 +313,7 @@ class Broker:
                 ):
                     logger.info("worker killed: re-queueing", job_id=future.key)
                     db.requeue_request(request_uid=future.key, session=session)
+                    self.queue.add(request.request_uid, request)
                 else:
                     request = db.set_request_status(
                         future.key,
@@ -260,24 +351,25 @@ class Broker:
             )
 
     def submit_requests(
-        self, session_read: sa.orm.Session, number_of_requests: int
+        self,
+        session_write: sa.orm.Session,
+        number_of_requests: int,
+        candidates: Iterable[db.SystemRequest],
     ) -> None:
-        candidates = db.get_accepted_requests(session=session_read)
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_read),
+            key=lambda candidate: self.qos.priority(candidate, session_write),
             reverse=True,
         )
         requests_counter = 0
         for request in queue:
-            with self.session_maker_write() as session_write:
-                if self.qos.can_run(
-                    request, session=session_write, scheduler=self.internal_scheduler
-                ):
-                    self.submit_request(request, session=session_write)
-                    requests_counter += 1
-                    if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                        break
+            if self.qos.can_run(
+                request, session=session_write, scheduler=self.internal_scheduler
+            ):
+                self.submit_request(request, session=session_write)
+                requests_counter += 1
+                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
+                    break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
@@ -288,6 +380,7 @@ class Broker:
         self.qos.notify_start_of_request(
             request, session, scheduler=self.internal_scheduler
         )
+        self.queue.pop(request.request_uid)
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -313,19 +406,26 @@ class Broker:
 
     def run(self) -> None:
         while True:
+            start_loop = time.perf_counter()
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(session=session_read)
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
-                with self.session_maker_write() as session_write:
+                # expire_on_commit=False is used to detach the accepted requests without an error
+                # this is not a problem because accepted requests cannot be modified in this loop
+                with self.session_maker_write(expire_on_commit=False) as session_write:
+                    self.queue.add_accepted_requests(
+                        db.get_accepted_requests(
+                            session=session_write,
+                            last_created_at=self.queue.last_created_at,
+                        )
+                    )
                     self.sync_database(session=session_write)
+                    self.sync_qos_rules(session_write)
+                    session_write.commit()
 
-                if len(self.internal_scheduler.queue) > int(
-                    os.getenv("MAX_SCHEDULER_QUEUE", 0)
-                ):
-                    self.internal_scheduler.run()
                 self.running_requests = len(
                     [
                         future
@@ -334,11 +434,9 @@ class Broker:
                         not in ("successful", "failed")
                     ]
                 )
-                number_accepted_requests = db.count_requests(
-                    session=session_read, status="accepted"
-                )
+                queue_length = self.queue.len()
                 available_workers = self.number_of_workers - self.running_requests
-                if number_accepted_requests > 0:
+                if queue_length > 0:
                     logger.info(
                         "broker info",
                         available_workers=available_workers,
@@ -347,9 +445,20 @@ class Broker:
                         futures=len(self.futures),
                     )
                     if available_workers > 0:
-                        logger.info("broker info", queued_jobs=number_accepted_requests)
-                        self.submit_requests(
-                            session_read=session_read,
-                            number_of_requests=available_workers,
-                        )
-            time.sleep(self.wait_time)
+                        logger.info("broker info", queued_jobs=queue_length)
+                        with self.session_maker_write() as session_write:
+                            self.submit_requests(
+                                session_write=session_write,
+                                number_of_requests=available_workers,
+                                candidates=self.queue.values(),
+                            )
+                if (queue_length := self.queue.len()) != (
+                    db_queue := db.count_accepted_requests_before(
+                        session=session_read, last_created_at=self.queue.last_created_at
+                    )
+                ):
+                    logger.info(
+                        f"internal queue and DB queue are not in sync: {queue_length} and {db_queue}",
+                        no_jobs="sleeping",
+                    )
+            time.sleep(max(0, self.wait_time - (time.perf_counter() - start_loop)))

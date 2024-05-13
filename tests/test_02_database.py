@@ -522,10 +522,17 @@ def test_increment_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
     with session_obj() as session:
         db.add_qos_rule(rule1, session=session)
     with session_obj() as session:
-        db.increment_qos_rule_running([rule1, rule2], session=session)
+        db.increment_qos_rule_running([rule1, rule2], rules_in_db={}, session=session)
+        session.commit()
     with session_obj() as session:
         assert db.get_qos_rule(str(rule1.__hash__()), session=session).running == 1
-        assert db.get_qos_rule(str(rule2.__hash__()), session=session).running == 1
+        rule = db.get_qos_rule(str(rule2.__hash__()), session=session)
+        assert rule.running == 1
+        rules_in_db = {rule.uid: rule}
+        db.increment_qos_rule_running([rule2], rules_in_db=rules_in_db, session=session)
+        session.commit()
+    with session_obj() as session:
+        assert db.get_qos_rule(str(rule2.__hash__()), session=session).running == 2
 
 
 def test_add_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
@@ -535,12 +542,15 @@ def test_add_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
     request_uid = request.request_uid
     with session_obj() as session:
-        db.add_qos_rule(rule1, queued=5, session=session)
+        qos_rule = db.add_qos_rule(rule1, queued=5, session=session)
+        rules_in_db = {qos_rule.uid: qos_rule}
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-    with session_obj() as session:
-        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+        db.add_request_qos_status(
+            request, [rule1, rule2], rules_in_db=rules_in_db, session=session
+        )
+        session.commit()
     with session_obj() as session:
         request = db.get_request(request_uid, session=session)
         assert db.get_qos_status_from_request(request) == {
@@ -562,19 +572,23 @@ def test_delete_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
     rule2_queued = 3
     rule2_running = 4
     with session_obj() as session:
-        db.add_qos_rule(
+        rule1_db = db.add_qos_rule(
             rule1, queued=rule1_queued, running=rule1_running, session=session
         )
-        db.add_qos_rule(
+        rule2_db = db.add_qos_rule(
             rule2, queued=rule2_queued, running=rule2_running, session=session
         )
+        rules_in_db = {rule1_db.uid: rule1_db, rule2_db.uid: rule2_db}
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-    with session_obj() as session:
-        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+        db.add_request_qos_status(
+            request, [rule1, rule2], rules_in_db=rules_in_db, session=session
+        )
+        session.commit()
     with session_obj() as session:
         db.delete_request_qos_status(request_uid, [rule1, rule2], session=session)
+        session.commit()
     with session_obj() as session:
         rule1 = db.get_qos_rule(str(rule1.__hash__()), session=session)
         rule2 = db.get_qos_rule(str(rule2.__hash__()), session=session)
@@ -592,15 +606,18 @@ def test_decrement_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
     rule2_queued = 3
     rule2_running = 4
     with session_obj() as session:
-        db.add_qos_rule(
+        rule1_db = db.add_qos_rule(
             rule1, queued=rule1_queued, running=rule1_running, session=session
         )
-        db.add_qos_rule(
+        rule2_db = db.add_qos_rule(
             rule2, queued=rule2_queued, running=rule2_running, session=session
         )
-    with session_obj() as session:
-        db.decrement_qos_rule_running([rule1, rule2], session=session)
-
+        rules_in_db = {rule1_db.uid: rule1_db, rule2_db.uid: rule2_db}
+        session.commit()
+        db.decrement_qos_rule_running(
+            [rule1, rule2], rules_in_db=rules_in_db, session=session
+        )
+        session.commit()
     with session_obj() as session:
         assert (
             db.get_qos_rule(str(rule1.__hash__()), session=session).running
@@ -619,13 +636,18 @@ def test_reset_qos_rules(session_obj: sa.orm.sessionmaker) -> None:
     request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
     request_uid = request.request_uid
     with session_obj() as session:
-        db.add_qos_rule(rule1, session=session)
-        db.add_qos_rule(rule2, session=session)
+        rule1_db = db.add_qos_rule(rule1, session=session)
+        rule2_db = db.add_qos_rule(rule2, session=session)
+        rules_in_db = {rule1_db.uid: rule1_db, rule2_db.uid: rule2_db}
         session.add(adaptor_properties)
         session.add(request)
         session.commit()
-    with session_obj() as session:
-        db.add_request_qos_status(request_uid, [rule1, rule2], session=session)
+
+        db.add_request_qos_status(
+            request, [rule1, rule2], session=session, rules_in_db=rules_in_db
+        )
+        session.commit()
+
         db.reset_qos_rules(session=session)
         request = db.get_request(request_uid, session=session)
         assert db.get_qos_status_from_request(request) == {}

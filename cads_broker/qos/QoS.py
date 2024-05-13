@@ -8,7 +8,6 @@
 #
 
 import threading
-import time
 from functools import wraps
 
 from .. import database
@@ -98,19 +97,21 @@ class QoS:
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
         limits = []
+        limits_to_add = []
         for i, limit in enumerate(properties.limits):
             if limit.full(request):
                 limits.append(limit)
-        if len(limits):
-            scheduler.enterabs(
-                time.time(),
-                1,
-                database.add_request_qos_status,
-                kwargs={
-                    "request_uid": request.request_uid,
-                    "rules": limits,
-                    "session": session,
-                },
+                if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
+                    limits_to_add.append(limit)
+        if len(limits_to_add):
+            scheduler.append(
+                {
+                    "function": database.add_request_qos_status,
+                    "kwargs": {
+                        "request_uid": request.request_uid,
+                        "rules": limits,
+                    },
+                }
             )
         session.commit()
         permissions = []
@@ -304,15 +305,14 @@ class QoS:
         for limit in self.limits_for(request, session):
             limit.increment()
             limits_list.append(limit)
-        scheduler.enterabs(
-            time.time(),
-            1,
-            database.delete_request_qos_status,
-            kwargs={
-                "rules": limits_list,
-                "request_uid": request.request_uid,
-                "session": session,
-            },
+        scheduler.append(
+            {
+                "function": database.delete_request_qos_status,
+                "kwargs": {
+                    "rules": limits_list,
+                    "request_uid": request.request_uid,
+                },
+            }
         )
         # Keep track of the running request. This is needed by reconfigure(self)
 
@@ -328,14 +328,13 @@ class QoS:
             limit.decrement()
             limits_list.append(limit)
 
-        scheduler.enterabs(
-            time.time(),
-            1,
-            database.decrement_qos_rule_running,
-            kwargs={
-                "rules": limits_list,
-                "session": session,
-            },
+        scheduler.append(
+            {
+                "function": database.decrement_qos_rule_running,
+                "kwargs": {
+                    "rules": limits_list,
+                },
+            }
         )
 
         # Remove requests all collections
