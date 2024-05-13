@@ -17,12 +17,12 @@ app = typer.Typer()
 
 
 @app.command()
-def add_dummy_requests(number_of_requests: int, requests_db: str, number_of_users: int = 1000) -> None:
+def add_dummy_requests(
+    number_of_requests: int, requests_db: str, number_of_users: int = 1000
+) -> None:
     connection = sqlite3.connect(requests_db)
     connection.row_factory = sqlite3.Row
-    cursor = connection.execute(
-        f"SELECT * FROM broker limit {number_of_requests}"
-    )
+    cursor = connection.execute(f"SELECT * FROM broker limit {number_of_requests}")
     user_uids = [str(uuid.uuid4()) for _ in range(number_of_users)]
     with database.ensure_session_obj(None)() as session:
         for i, row in enumerate(cursor):
@@ -46,8 +46,8 @@ def add_dummy_requests(number_of_requests: int, requests_db: str, number_of_user
                         },
                     },
                     request_metadata={},
-                    origin='api',
-                    portal='c3s',
+                    origin="api",
+                    portal="c3s",
                     adaptor_properties_hash="test",
                     entry_point="cads_adaptors:DummyAdaptor",
                 )

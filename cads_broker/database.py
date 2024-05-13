@@ -220,7 +220,9 @@ def get_accepted_requests(
     statement = sa.select(SystemRequest)
     if last_created_at:
         statement = statement.where(SystemRequest.created_at >= last_created_at)
-    statement = statement.where(SystemRequest.status == "accepted").order_by(SystemRequest.created_at)
+    statement = statement.where(SystemRequest.status == "accepted").order_by(
+        SystemRequest.created_at
+    )
     return session.scalars(statement).all()
 
 
