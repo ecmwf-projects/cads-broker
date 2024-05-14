@@ -358,7 +358,9 @@ class Broker:
     ) -> None:
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_write, self.internal_scheduler),
+            key=lambda candidate: self.qos.priority(
+                candidate, session_write, self.internal_scheduler
+            ),
             reverse=True,
         )
         requests_counter = 0
@@ -410,7 +412,9 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos.reload_rules(session=session_read, scheduler=self.internal_scheduler)
+                    self.qos.reload_rules(
+                        session=session_read, scheduler=self.internal_scheduler
+                    )
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
@@ -427,11 +431,14 @@ class Broker:
                     session_write.commit()
                     if (queue_length := self.queue.len()) != (
                         db_queue := db.count_accepted_requests_before(
-                            session=session_write, last_created_at=self.queue.last_created_at
+                            session=session_write,
+                            last_created_at=self.queue.last_created_at,
                         )
                     ):
                         logger.info(
-                            "not in sync", internal_queue={queue_length}, db_queue={db_queue},
+                            "not in sync",
+                            internal_queue={queue_length},
+                            db_queue={db_queue},
                         )
 
                 self.running_requests = len(
