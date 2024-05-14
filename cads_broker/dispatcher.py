@@ -271,7 +271,7 @@ class Broker:
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
         qos_rules = db.get_qos_rules(session=session_write)
-        logger.debug("performance", tasks_number=len(self.internal_scheduler.queue))
+        logger.info("performance", tasks_number=len(self.internal_scheduler.queue))
         for task in list(self.internal_scheduler.queue):
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
@@ -425,6 +425,14 @@ class Broker:
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(session_write)
                     session_write.commit()
+                    if (queue_length := self.queue.len()) != (
+                        db_queue := db.count_accepted_requests_before(
+                            session=session_write, last_created_at=self.queue.last_created_at
+                        )
+                    ):
+                        logger.info(
+                            "not in sync", internal_queue={queue_length}, db_queue={db_queue},
+                        )
 
                 self.running_requests = len(
                     [
@@ -452,13 +460,4 @@ class Broker:
                                 number_of_requests=available_workers,
                                 candidates=self.queue.values(),
                             )
-                if (queue_length := self.queue.len()) != (
-                    db_queue := db.count_accepted_requests_before(
-                        session=session_read, last_created_at=self.queue.last_created_at
-                    )
-                ):
-                    logger.info(
-                        f"internal queue and DB queue are not in sync: {queue_length} and {db_queue}",
-                        no_jobs="sleeping",
-                    )
             time.sleep(max(0, self.wait_time - (time.perf_counter() - start_loop)))

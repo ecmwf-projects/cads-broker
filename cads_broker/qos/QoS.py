@@ -95,24 +95,11 @@ class QoS:
     @locked
     def can_run(self, request, session, scheduler):
         """Check if a request can run."""
-        properties = self._properties(request=request, session=session)
+        properties = self._properties(request=request, session=session, scheduler=scheduler)
         limits = []
-        limits_to_add = []
-        for i, limit in enumerate(properties.limits):
+        for limit in enumerate(properties.limits):
             if limit.full(request):
                 limits.append(limit)
-                if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
-                    limits_to_add.append(limit)
-        if len(limits_to_add):
-            scheduler.append(
-                {
-                    "function": database.add_request_qos_status,
-                    "kwargs": {
-                        "request_uid": request.request_uid,
-                        "rules": limits,
-                    },
-                }
-            )
         permissions = []
         for permission in properties.permissions:
             if not permission.evaluate(request):
@@ -120,7 +107,7 @@ class QoS:
         return not len(limits) and not len(permissions)
 
     @locked
-    def _properties(self, request, session):
+    def _properties(self, request, session, scheduler):
         """Return the Properties object associated with a request.
 
         If it does not exists it is created.
@@ -159,6 +146,17 @@ class QoS:
         if limit is not None:
             properties.limits.append(limit)
 
+        if len(properties.limits) > 0:
+            scheduler.append(
+                {
+                    "function": database.add_request_qos_status,
+                    "kwargs": {
+                        "request_uid": request.request_uid,
+                        "rules": properties.limits,
+                    },
+                }
+            )
+
         # Add priorities and compute starting priority
         priority = 0
         for rule in self.rules.priorities:
@@ -175,35 +173,35 @@ class QoS:
         return properties
 
     @locked
-    def priority(self, request, session):
+    def priority(self, request, session, scheduler):
         """Compute the priority of a request."""
         # The priority of a request increases with time
-        return self._properties(request, session).starting_priority + request.age
+        return self._properties(request, session, scheduler).starting_priority + request.age
 
     def dump(self, out=print):
         self.rules.dump(out)
 
     @locked
-    def status(self, requests, session, out=print):
+    def status(self, requests, session, scheduler, out=print):
         out()
         out("===================================================================")
         out("REQUESTS")
         out("===================================================================")
 
         for request in requests:
-            self._status(request, session, out)
+            self._status(request, session, scheduler, out)
 
         out()
         out("===================================================================")
 
-    def _status(self, request, session, out):
+    def _status(self, request, session, scheduler, out):
         out()
         out("===================================================================")
         out("QoS info for:")
         out(request, request.status)
         out("Priority: {}".format(self.priority(request, session)))
         out("Limits rules:")
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request, session, scheduler):
             out(
                 "    {} ({}/{}) {}".format(
                     limit,
@@ -214,36 +212,36 @@ class QoS:
             )
 
         out("Priorities rules:")
-        for priority in self.priorities_for(request, session):
+        for priority in self.priorities_for(request, session, scheduler):
             out("    {}".format(priority))
 
         out("Permissions rules:")
-        for permission in self.permissions_for(request, session):
+        for permission in self.permissions_for(request, session, scheduler):
             out("    {}".format(permission))
 
     @locked
-    def limits_for(self, request, session):
+    def limits_for(self, request, session, scheduler):
         """Return the limit rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).limits
+        return self._properties(request, session, scheduler).limits
 
     @locked
-    def permissions_for(self, request, session):
+    def permissions_for(self, request, session, scheduler):
         """Return the permission rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).permissions
+        return self._properties(request, session, scheduler).permissions
 
     @locked
-    def priorities_for(self, request, session):
+    def priorities_for(self, request, session, scheduler):
         """Return the priority rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).priorities
+        return self._properties(request, session, scheduler).priorities
 
     @locked
     def user_limit(self, request):
