@@ -65,17 +65,17 @@ class QoS:
         self.rules.dump()
 
     @locked
-    def reload_rules(self, session):
+    def reload_rules(self, session, scheduler):
         """Allow a 'hot' reloading of the rules.
 
         For example, a thread could be monitoring the time stamp of the rules
         file and call this method.
         """
         self.read_rules()
-        self.reconfigure(session=session)
+        self.reconfigure(session=session, scheduler=scheduler)
 
     @locked
-    def reconfigure(self, session):
+    def reconfigure(self, session, scheduler):
         """Reset the status of the QoS.
 
         This method must be called if the rule_set is changed.
@@ -89,7 +89,7 @@ class QoS:
         # Re-register the active tasks
         for request in database.get_running_requests(session=session):
             # Recompute the limits
-            for limit in self.limits_for(request, session):
+            for limit in self.limits_for(request, session, scheduler):
                 limit.increment()
 
     @locked
@@ -299,7 +299,7 @@ class QoS:
         its capacity.
         """
         limits_list = []
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request, session, scheduler):
             limit.increment()
             limits_list.append(limit)
         scheduler.append(
@@ -321,7 +321,7 @@ class QoS:
         sharing the same limits can run.
         """
         limits_list = []
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request, session, scheduler):
             limit.decrement()
             limits_list.append(limit)
 
