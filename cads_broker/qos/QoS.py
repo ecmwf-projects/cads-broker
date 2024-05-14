@@ -113,7 +113,6 @@ class QoS:
                     },
                 }
             )
-        session.commit()
         permissions = []
         for permission in properties.permissions:
             if not permission.evaluate(request):
