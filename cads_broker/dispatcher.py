@@ -358,7 +358,7 @@ class Broker:
     ) -> None:
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_write),
+            key=lambda candidate: self.qos.priority(candidate, session_write, self.internal_scheduler),
             reverse=True,
         )
         requests_counter = 0
