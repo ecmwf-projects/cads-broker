@@ -97,7 +97,7 @@ class QoS:
         """Check if a request can run."""
         properties = self._properties(request=request, session=session, scheduler=scheduler)
         limits = []
-        for limit in enumerate(properties.limits):
+        for limit in properties.limits:
             if limit.full(request):
                 limits.append(limit)
         permissions = []
