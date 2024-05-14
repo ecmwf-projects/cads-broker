@@ -358,7 +358,9 @@ class Broker:
     ) -> None:
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_write),
+            key=lambda candidate: self.qos.priority(
+                candidate, session_write, self.internal_scheduler
+            ),
             reverse=True,
         )
         requests_counter = 0
@@ -410,7 +412,9 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos.reload_rules(session=session_read)
+                    self.qos.reload_rules(
+                        session=session_read, scheduler=self.internal_scheduler
+                    )
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
@@ -425,6 +429,17 @@ class Broker:
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(session_write)
                     session_write.commit()
+                    if (queue_length := self.queue.len()) != (
+                        db_queue := db.count_accepted_requests_before(
+                            session=session_write,
+                            last_created_at=self.queue.last_created_at,
+                        )
+                    ):
+                        logger.info(
+                            "not in sync",
+                            internal_queue={queue_length},
+                            db_queue={db_queue},
+                        )
 
                 self.running_requests = len(
                     [
@@ -452,13 +467,4 @@ class Broker:
                                 number_of_requests=available_workers,
                                 candidates=self.queue.values(),
                             )
-                if (queue_length := self.queue.len()) != (
-                    db_queue := db.count_accepted_requests_before(
-                        session=session_read, last_created_at=self.queue.last_created_at
-                    )
-                ):
-                    logger.info(
-                        f"internal queue and DB queue are not in sync: {queue_length} and {db_queue}",
-                        no_jobs="sleeping",
-                    )
             time.sleep(max(0, self.wait_time - (time.perf_counter() - start_loop)))
