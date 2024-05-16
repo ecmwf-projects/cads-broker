@@ -139,12 +139,14 @@ def delete_requests(
         minutes=minutes, seconds=seconds, hours=hours, days=days
     )
     with database.ensure_session_obj(None)() as session:
-        database.logger.info(f"Setting status to 'dismissed' for {status} system_requests before {timestamp}.")
+        database.logger.info(
+            f"Setting status to 'dismissed' for {status} system_requests before {timestamp}."
+        )
         statement = (
             sa.update(database.SystemRequest)
             .where(database.SystemRequest.status == status)
             .where(database.SystemRequest.created_at < timestamp)
-            .values(status='dismissed')
+            .values(status="dismissed")
         )
         number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:
@@ -156,7 +158,10 @@ def delete_requests(
                 typer.echo("Operation cancelled.")
                 return
         session.commit()
-        typer.echo(f"Status set to 'dismissed' for {number_of_requests} requests in the broker database.")
+        typer.echo(
+            f"Status set to 'dismissed' for {number_of_requests} requests in the broker database."
+        )
+
 
 @app.command()
 def info(connection_string: Optional[str] = None) -> None:
