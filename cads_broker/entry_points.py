@@ -5,6 +5,7 @@ import os
 import random
 import sqlite3
 import uuid
+from enum import Enum
 from typing import Any, Optional
 
 import sqlalchemy as sa
@@ -108,8 +109,16 @@ def requests_cleaner(
             raise
 
 
+class RequestStatus(str, Enum):
+    """Enum for request status."""
+
+    running = "running"
+    accepted = "accepted"
+
+
 @app.command()
-def delete_running_requests(
+def delete_requests(
+    status: RequestStatus = RequestStatus.running,
     connection_string: Optional[str] = None,
     minutes: float = typer.Option(0.0),
     seconds: float = typer.Option(0.0),
@@ -117,7 +126,7 @@ def delete_running_requests(
     days: float = typer.Option(0.0),
     skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
-    """Remove records from the system_requests table that are currently running.
+    """Remove records from the system_requests table that are in the specified status.
 
     Parameters
     ----------
@@ -133,7 +142,7 @@ def delete_running_requests(
         database.logger.info(f"deleting old system_requests before {timestamp}.")
         statement = (
             sa.select(database.SystemRequest)
-            .where(database.SystemRequest.status == "running")
+            .where(database.SystemRequest.status == status)
             .where(database.SystemRequest.created_at < timestamp)
         )
         requests = session.scalars(statement).all()
