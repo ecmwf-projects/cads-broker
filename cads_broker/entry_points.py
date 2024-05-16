@@ -19,7 +19,7 @@ app = typer.Typer()
 
 @app.command()
 def add_dummy_requests(
-    number_of_requests: int, requests_db: str, number_of_users: int = 1000
+    requests_db: str, number_of_requests: int = 1000, number_of_users: int = 100
 ) -> None:
     connection = sqlite3.connect(requests_db)
     connection.row_factory = sqlite3.Row
@@ -158,8 +158,7 @@ def delete_requests(
         typer.echo(
             f"Status set to 'dismissed' for {number_of_requests} requests in the broker database."
         )
-        if status == RequestStatus.accepted:
-            typer.echo("Please restart the broker.")
+        typer.echo("Please restart the broker.")
 
 
 @app.command()
