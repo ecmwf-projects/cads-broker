@@ -139,33 +139,23 @@ def delete_requests(
         minutes=minutes, seconds=seconds, hours=hours, days=days
     )
     with database.ensure_session_obj(None)() as session:
-        database.logger.info(f"deleting old system_requests before {timestamp}.")
+        database.logger.info(f"deleting {status} system_requests before {timestamp}.")
         statement = (
-            sa.select(database.SystemRequest)
+            sa.delete(database.SystemRequest)
             .where(database.SystemRequest.status == status)
             .where(database.SystemRequest.created_at < timestamp)
         )
-        requests = session.scalars(statement).all()
-        number_of_requests = len(requests)
+        number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:
-            typer.confirm(
-                f"Deleting {number_of_requests} requests. Do you want to continue?",
+            if not typer.confirm(
+                f"Deleting {number_of_requests} {status} requests. Do you want to continue?",
                 abort=True,
                 default=True,
-            )
-        else:
-            database.logger.info(f"Deleting {number_of_requests} requests.")
-        for request in requests:
-            database.logger.info(f"deleting {request.request_uid}...")
-            database.set_request_status(
-                request.request_uid, "dismissed", session=session
-            )
-
+            ):
+                typer.echo("Operation cancelled.")
+                return
         session.commit()
-
-        database.logger.info(
-            f"{number_of_requests} requests successfully removed from the broker database."
-        )
+        typer.echo(f"{number_of_requests} requests successfully removed from the broker database.")
 
 
 @app.command()
