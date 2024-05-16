@@ -125,7 +125,11 @@ class Queue:
         self.queue_dict: dict = dict()
         self._lock = threading.RLock()
         # default value is before the release
-        self.last_created_at: datetime.datetime = datetime.datetime(2024, 1, 1)
+        self.last_created_at: datetime.datetime
+        self.set_default_last_created_at()
+
+    def set_default_last_created_at(self) -> None:
+        self.last_created_at = datetime.datetime(2024, 1, 1)
 
     def get(self, key: str, default=None) -> Any:
         with self._lock:
@@ -156,6 +160,11 @@ class Queue:
     def len(self) -> int:
         with self._lock:
             return len(self.queue_dict)
+
+    def reset(self) -> None:
+        with self._lock:
+            self.queue_dict = dict()
+            self.set_default_last_created_at()
 
 
 class QoSRules:
@@ -435,11 +444,13 @@ class Broker:
                             last_created_at=self.queue.last_created_at,
                         )
                     ):
+                        # if the internal queue is not in sync with the database, re-sync it
                         logger.info(
-                            "not in sync",
+                            "re-syncing internal queue",
                             internal_queue={queue_length},
                             db_queue={db_queue},
                         )
+                        self.queue.reset()
 
                 self.running_requests = len(
                     [
