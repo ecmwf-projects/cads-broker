@@ -158,6 +158,8 @@ def delete_requests(
         typer.echo(
             f"Status set to 'dismissed' for {number_of_requests} requests in the broker database."
         )
+        if status == RequestStatus.accepted:
+            typer.echo("Please restart the broker.")
 
 
 @app.command()
