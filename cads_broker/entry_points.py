@@ -120,13 +120,13 @@ class RequestStatus(str, Enum):
 def delete_requests(
     status: RequestStatus = RequestStatus.running,
     connection_string: Optional[str] = None,
-    minutes: float = typer.Option(0.0),
-    seconds: float = typer.Option(0.0),
-    hours: float = typer.Option(0.0),
-    days: float = typer.Option(0.0),
+    minutes: float = 0,
+    seconds: float = 0,
+    hours: float = 0,
+    days: float = 0,
     skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
-    """Remove records from the system_requests table that are in the specified status.
+    """Set the status of records in the system_requests table to 'dismissed' if they are in the specified status.
 
     Parameters
     ----------
@@ -139,24 +139,24 @@ def delete_requests(
         minutes=minutes, seconds=seconds, hours=hours, days=days
     )
     with database.ensure_session_obj(None)() as session:
-        database.logger.info(f"deleting {status} system_requests before {timestamp}.")
+        database.logger.info(f"Setting status to 'dismissed' for {status} system_requests before {timestamp}.")
         statement = (
-            sa.delete(database.SystemRequest)
+            sa.update(database.SystemRequest)
             .where(database.SystemRequest.status == status)
             .where(database.SystemRequest.created_at < timestamp)
+            .values(status='dismissed')
         )
         number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:
             if not typer.confirm(
-                f"Deleting {number_of_requests} {status} requests. Do you want to continue?",
+                f"Setting status to 'dismissed' for {number_of_requests} {status} requests. Do you want to continue?",
                 abort=True,
                 default=True,
             ):
                 typer.echo("Operation cancelled.")
                 return
         session.commit()
-        typer.echo(f"{number_of_requests} requests successfully removed from the broker database.")
-
+        typer.echo(f"Status set to 'dismissed' for {number_of_requests} requests in the broker database.")
 
 @app.command()
 def info(connection_string: Optional[str] = None) -> None:
