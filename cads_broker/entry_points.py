@@ -139,9 +139,6 @@ def delete_requests(
         minutes=minutes, seconds=seconds, hours=hours, days=days
     )
     with database.ensure_session_obj(None)() as session:
-        database.logger.info(
-            f"Setting status to 'dismissed' for {status} system_requests before {timestamp}."
-        )
         statement = (
             sa.update(database.SystemRequest)
             .where(database.SystemRequest.status == status)
