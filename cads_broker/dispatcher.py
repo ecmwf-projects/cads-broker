@@ -368,7 +368,7 @@ class Broker:
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(
-                candidate, session_write, self.internal_scheduler
+                candidate, session_write
             ),
             reverse=True,
         )
@@ -422,7 +422,7 @@ class Broker:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
                     self.qos.reload_rules(
-                        session=session_read, scheduler=self.internal_scheduler
+                        session=session_read
                     )
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
