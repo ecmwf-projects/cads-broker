@@ -298,10 +298,6 @@ class Broker:
     def on_future_done(self, future: distributed.Future) -> None:
         job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
         logger_kwargs: dict[str, Any] = {}
-        log = list(self.client.get_events(f"{future.key}/log"))
-        user_visible_log = list(
-            self.client.get_events(f"{future.key}/user_visible_log")
-        )
         with self.session_maker_write() as session:
             if future.status == "finished":
                 result = future.result()
@@ -310,27 +306,53 @@ class Broker:
                     job_status,
                     cache_id=result,
                     session=session,
-                    log=log,
-                    user_visible_log=user_visible_log,
                 )
             elif future.status == "error":
                 exception = future.exception()
                 error_message = "".join(traceback.format_exception(exception))
                 error_reason = exception.__class__.__name__
-                if error_reason == "distributed.scheduler.KilledWorker" and os.getenv(
-                    "BROKER_REQUEUE_ON_KILLED_WORKER", False
-                ):
-                    logger.info("worker killed: re-queueing", job_id=future.key)
-                    db.requeue_request(request_uid=future.key, session=session)
-                    self.queue.add(request.request_uid, request)
+                request = db.get_request(future.key, session=session)
+                requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER", False)
+                if error_reason == "KilledWorker":
+                    worker_restart_events = self.client.get_events(
+                        "worker-restart-memory"
+                    )
+                    # get info on worker and pid of the killed request
+                    _, worker_pid_event = self.client.get_events(future.key)[0]
+                    if worker_restart_events:
+                        for event in worker_restart_events:
+                            _, job = event
+                            if (
+                                job["worker"] == worker_pid_event["worker"]
+                                and job["pid"] == worker_pid_event["pid"]
+                            ):
+                                db.add_event(
+                                    event_type="killed_worker",
+                                    request_uid=future.key,
+                                    message="Worker has been killed by the Nanny due to memory usage. " \
+                                        f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
+                                    session=session,
+                                )
+                                request = db.set_request_status(
+                                    future.key,
+                                    "failed",
+                                    error_message=error_message,
+                                    error_reason=error_reason,
+                                    session=session,
+                                )
+                                requeue = False
+                    if requeue and request.request_metadata.get(
+                        "resubmit", 0
+                    ) < os.getenv("BROKER_REQUEUE_LIMIT", 3):
+                        logger.info("worker killed: re-queueing", job_id=future.key)
+                        db.requeue_request(request_uid=future.key, session=session)
+                        self.queue.add(future.key, request)
                 else:
                     request = db.set_request_status(
                         future.key,
                         job_status,
                         error_message=error_message,
                         error_reason=error_reason,
-                        log=log,
-                        user_visible_log=user_visible_log,
                         session=session,
                     )
             else:
@@ -340,9 +362,8 @@ class Broker:
                     job_status,
                     session=session,
                     resubmit=True,
-                    log=log,
-                    user_visible_log=user_visible_log,
                 )
+                self.queue.add(future.key, request)
                 logger.warning(
                     "unknown dask status, re-queing",
                     job_status={future.status},
@@ -367,9 +388,7 @@ class Broker:
     ) -> None:
         queue = sorted(
             candidates,
-            key=lambda candidate: self.qos.priority(
-                candidate, session_write
-            ),
+            key=lambda candidate: self.qos.priority(candidate, session_write),
             reverse=True,
         )
         requests_counter = 0
@@ -421,9 +440,7 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos.reload_rules(
-                        session=session_read
-                    )
+                    self.qos.reload_rules(session=session_read)
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
