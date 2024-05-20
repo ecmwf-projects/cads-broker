@@ -268,14 +268,19 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 # FIXME: check if request status has changed
-                logger.info(
-                    "request not found: re-queueing", job_id={request.request_uid}
-                )
-                db.requeue_request(request_uid=request.request_uid, session=session)
-                self.queue.add(request.request_uid, request)
-                self.qos.notify_end_of_request(
-                    request, session, scheduler=self.internal_scheduler
-                )
+                if os.getenv(
+                    "BROKER_REQUEUE_ON_KILLED_WORKER", False
+                ) and request.request_metadata.get("resubmit", 0) < os.getenv(
+                    "BROKER_REQUEUE_LIMIT", 3
+                ):
+                    logger.info(
+                        "request not found: re-queueing", job_id={request.request_uid}
+                    )
+                    db.requeue_request(request_uid=request.request_uid, session=session)
+                    self.queue.add(request.request_uid, request)
+                    self.qos.notify_end_of_request(
+                        request, session, scheduler=self.internal_scheduler
+                    )
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
@@ -329,8 +334,8 @@ class Broker:
                                 db.add_event(
                                     event_type="killed_worker",
                                     request_uid=future.key,
-                                    message="Worker has been killed by the Nanny due to memory usage. " \
-                                        f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
+                                    message="Worker has been killed by the Nanny due to memory usage. "
+                                    f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
                                     session=session,
                                 )
                                 request = db.set_request_status(
