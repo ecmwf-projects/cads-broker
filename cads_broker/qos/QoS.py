@@ -95,9 +95,7 @@ class QoS:
     @locked
     def can_run(self, request, session, scheduler):
         """Check if a request can run."""
-        properties = self._properties(
-            request=request, session=session
-        )
+        properties = self._properties(request=request, session=session)
         limits = []
         new_limits = []
         for limit in properties.limits:
@@ -180,10 +178,7 @@ class QoS:
     def priority(self, request, session):
         """Compute the priority of a request."""
         # The priority of a request increases with time
-        return (
-            self._properties(request, session).starting_priority
-            + request.age
-        )
+        return self._properties(request, session).starting_priority + request.age
 
     def dump(self, out=print):
         self.rules.dump(out)
