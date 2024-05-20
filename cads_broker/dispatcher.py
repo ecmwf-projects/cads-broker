@@ -269,7 +269,7 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 if os.getenv(
-                    "BROKER_REQUEUE_ON_KILLED_WORKER", False
+                    "BROKER_REQUEUE_ON_LOST_REQUESTS", False
                 ) and request.request_metadata.get("resubmit", 0) < os.getenv(
                     "BROKER_REQUEUE_LIMIT", 3
                 ):
@@ -328,7 +328,7 @@ class Broker:
                 error_message = "".join(traceback.format_exception(exception))
                 error_reason = exception.__class__.__name__
                 request = db.get_request(future.key, session=session)
-                requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER", False)
+                requeue = os.getenv("BROKER_REQUEUE_ON_LOST_REQUESTS", False)
                 if error_reason == "KilledWorker":
                     worker_restart_events = self.client.get_events(
                         "worker-restart-memory"
