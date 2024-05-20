@@ -281,6 +281,17 @@ class Broker:
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
                     )
+                else:
+                    db.set_request_status(
+                        request_uid=request.request_uid,
+                        status="failed",
+                        error_message="Request not found in dask scheduler",
+                        error_reason="not_found",
+                        session=session,
+                    )
+                    self.qos.notify_end_of_request(
+                        request, session, scheduler=self.internal_scheduler
+                    )
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
