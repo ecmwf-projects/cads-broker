@@ -447,7 +447,6 @@ def update_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
     return dismissed_uids
 
 
-
 def get_events_from_request(
     request_uid: str,
     session: sa.orm.Session,
@@ -475,12 +474,14 @@ def reset_qos_rules(session: sa.orm.Session, qos):
     for request in get_running_requests(session):
         # Recompute the limits
         limits = qos.limits_for(request, session)
-        cached_rules.update(delete_request_qos_status(
-            request_uid=request.request_uid,
-            rules=limits,
-            session=session,
-            rules_in_db=cached_rules,
-        ))
+        cached_rules.update(
+            delete_request_qos_status(
+                request_uid=request.request_uid,
+                rules=limits,
+                session=session,
+                rules_in_db=cached_rules,
+            )
+        )
     session.commit()
 
 
