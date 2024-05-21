@@ -212,19 +212,20 @@ class Broker:
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
-        with session_maker_write() as session:
-            db.reset_qos_rules(session)
         rules_hash = get_rules_hash(qos_config.rules_path)
+        qos = QoS.QoS(
+                qos_config.rules,
+                qos_config.environment,
+                rules_hash=rules_hash,
+            )
+        with session_maker_write() as session:
+            db.reset_qos_rules(session, qos)
         self = cls(
             client=client,
             session_maker_read=session_maker_read,
             session_maker_write=session_maker_write,
             environment=qos_config.environment,
-            qos=QoS.QoS(
-                qos_config.rules,
-                qos_config.environment,
-                rules_hash=rules_hash,
-            ),
+            qos=qos,
             address=address,
         )
         return self
