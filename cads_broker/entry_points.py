@@ -126,7 +126,7 @@ def delete_requests(
     days: float = 0,
     skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
-    """Set the status of records in the system_requests table to 'dismissed' if they are in the specified status.
+    """Set the status of records in the system_requests table to 'dismissed'.
 
     Parameters
     ----------
@@ -148,7 +148,8 @@ def delete_requests(
         number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:
             if not typer.confirm(
-                f"Setting status to 'dismissed' for {number_of_requests} {status} requests. Do you want to continue?",
+                f"Setting status to 'dismissed' for {number_of_requests} {status} requests. "
+                "Do you want to continue?",
                 abort=True,
                 default=True,
             ):
