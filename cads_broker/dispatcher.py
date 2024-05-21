@@ -255,10 +255,9 @@ class Broker:
             self.queue.reset()
             self.qos.reload_rules(session)
             db.reset_qos_rules(session, self.qos)
+        session.commit()
 
-        statement = sa.select(db.SystemRequest).where(
-            db.SystemRequest.status.in_(("running", "dismissed"))
-        )
+        statement = sa.select(db.SystemRequest).where(db.SystemRequest.status == "running")
         dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
             # if request is in futures, go on
