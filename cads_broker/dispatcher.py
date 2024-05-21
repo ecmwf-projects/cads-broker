@@ -244,21 +244,22 @@ class Broker:
 
         If the task is not in the dask scheduler, it is re-queued.
         """
+        # the retrieve API sets the status to "dismissed", here the broker deletes the request
+        # this is to better control the status of the QoS
+        dismissed_uids = db.update_dismissed_requests(session)
+        for uid in dismissed_uids:
+            if future := self.futures.pop(uid):
+                future.cancel()
+        if dismissed_uids:
+            self.queue.reset()
+            self.qos.reload_rules(session)
+            db.reset_qos_rules(session)
+
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status.in_(("running", "dismissed"))
         )
         dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
-            # the retrieve API set the status to "dismissed", here the broker deletes the request
-            # this is to better control the status of the QoS
-            if request.status == "dismissed":
-                db.delete_request(request=request, session=session)
-                self.qos.notify_end_of_request(
-                    request, session, scheduler=self.internal_scheduler
-                )
-                if future := self.futures.get(request.request_uid):
-                    future.cancel()
-                continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue

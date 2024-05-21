@@ -14,6 +14,7 @@ import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
 from sqlalchemy.dialects.postgresql import JSONB
+from typing_extensions import Iterable
 
 import alembic.command
 import alembic.config
@@ -26,6 +27,9 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", name="status"
+)
+DISMISSED_MESSAGE = os.getenv(
+    "DISMISSED_MESSAGE", "The request has been dismissed by the system."
 )
 
 
@@ -419,6 +423,29 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
         .distinct()
         .count()
     )
+
+
+def update_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
+    stmt_dismissed = (
+        sa.update(SystemRequest)
+        .where(SystemRequest.status == "dismissed")
+        .returning(SystemRequest.request_uid)
+        .values(status="failed", response_error={"reason": "dismissed request"})
+    )
+    dismissed_uids = session.scalars(stmt_dismissed).fetchall()
+    session.execute(  # type: ignore
+        sa.insert(Events),
+        map(
+            lambda x: {
+                "request_uid": x,
+                "message": DISMISSED_MESSAGE,
+                "event_type": "user_visible_error",
+            },
+            dismissed_uids,
+        ),
+    )
+    return dismissed_uids
+
 
 
 def get_events_from_request(
