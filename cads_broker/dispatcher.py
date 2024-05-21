@@ -253,7 +253,7 @@ class Broker:
         if dismissed_uids:
             self.queue.reset()
             self.qos.reload_rules(session)
-            db.reset_qos_rules(session)
+            db.reset_qos_rules(session, self.qos)
 
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status.in_(("running", "dismissed"))
