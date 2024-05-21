@@ -24,7 +24,7 @@ def locked(method):
 
 class Environment:
     def __init__(self):
-        self.number_of_workers = None
+        self.number_of_workers = 0
         self.session = None
         self.lock = threading.RLock()
         self._enabled = {}

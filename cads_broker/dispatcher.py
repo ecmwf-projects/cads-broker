@@ -271,7 +271,7 @@ class Broker:
             else:
                 # FIXME: check if request status has changed
                 if os.getenv(
-                    "BROKER_REQUEUE_ON_LOST_REQUESTS", False
+                    "BROKER_REQUEUE_ON_LOST_REQUESTS", True
                 ) and request.request_metadata.get("resubmit", 0) < os.getenv(
                     "BROKER_REQUEUE_LIMIT", 3
                 ):
