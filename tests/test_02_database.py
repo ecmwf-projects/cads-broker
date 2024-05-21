@@ -516,25 +516,6 @@ def test_add_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
         assert db.get_qos_rule(str(rule.__hash__()), session=session).name == rule.name
 
 
-def test_increment_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
-    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
-    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
-    with session_obj() as session:
-        db.add_qos_rule(rule1, session=session)
-    with session_obj() as session:
-        db.increment_qos_rule_running([rule1, rule2], rules_in_db={}, session=session)
-        session.commit()
-    with session_obj() as session:
-        assert db.get_qos_rule(str(rule1.__hash__()), session=session).running == 1
-        rule = db.get_qos_rule(str(rule2.__hash__()), session=session)
-        assert rule.running == 1
-        rules_in_db = {rule.uid: rule}
-        db.increment_qos_rule_running([rule2], rules_in_db=rules_in_db, session=session)
-        session.commit()
-    with session_obj() as session:
-        assert db.get_qos_rule(str(rule2.__hash__()), session=session).running == 2
-
-
 def test_add_request_qos_status(session_obj: sa.orm.sessionmaker) -> None:
     rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
     rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
@@ -627,30 +608,6 @@ def test_decrement_qos_rule_running(session_obj: sa.orm.sessionmaker) -> None:
             db.get_qos_rule(str(rule2.__hash__()), session=session).running
             == rule2_running - 1
         )
-
-
-def test_reset_qos_rules(session_obj: sa.orm.sessionmaker) -> None:
-    rule1 = MockRule("name1", "conclusion1", "info1", "condition1")
-    rule2 = MockRule("name2", "conclusion2", "info2", "condition2")
-    adaptor_properties = mock_config()
-    request = mock_system_request(adaptor_properties_hash=adaptor_properties.hash)
-    request_uid = request.request_uid
-    with session_obj() as session:
-        rule1_db = db.add_qos_rule(rule1, session=session)
-        rule2_db = db.add_qos_rule(rule2, session=session)
-        rules_in_db = {rule1_db.uid: rule1_db, rule2_db.uid: rule2_db}
-        session.add(adaptor_properties)
-        session.add(request)
-        session.commit()
-
-        db.add_request_qos_status(
-            request, [rule1, rule2], session=session, rules_in_db=rules_in_db
-        )
-        session.commit()
-
-        db.reset_qos_rules(session=session)
-        request = db.get_request(request_uid, session=session)
-        assert db.get_qos_status_from_request(request) == {}
 
 
 def test_get_events_from_request(session_obj: sa.orm.sessionmaker) -> None:
