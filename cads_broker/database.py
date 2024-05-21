@@ -14,6 +14,7 @@ import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
 from sqlalchemy.dialects.postgresql import JSONB
+from typing_extensions import Iterable
 
 import alembic.command
 import alembic.config
@@ -26,6 +27,9 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", name="status"
+)
+DISMISSED_MESSAGE = os.getenv(
+    "DISMISSED_MESSAGE", "The request has been dismissed by the system."
 )
 
 
@@ -421,6 +425,28 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
+def update_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
+    stmt_dismissed = (
+        sa.update(SystemRequest)
+        .where(SystemRequest.status == "dismissed")
+        .returning(SystemRequest.request_uid)
+        .values(status="failed", response_error={"reason": "dismissed request"})
+    )
+    dismissed_uids = session.scalars(stmt_dismissed).fetchall()
+    session.execute(  # type: ignore
+        sa.insert(Events),
+        map(
+            lambda x: {
+                "request_uid": x,
+                "message": DISMISSED_MESSAGE,
+                "event_type": "user_visible_error",
+            },
+            dismissed_uids,
+        ),
+    )
+    return dismissed_uids
+
+
 def get_events_from_request(
     request_uid: str,
     session: sa.orm.Session,
@@ -439,11 +465,23 @@ def get_events_from_request(
     return events
 
 
-def reset_qos_rules(session: sa.orm.Session):
+def reset_qos_rules(session: sa.orm.Session, qos):
     """Delete all QoS rules."""
     for rule in session.scalars(sa.select(QoSRule)):
         rule.system_requests = []
         session.delete(rule)
+    cached_rules: dict[str, Any] = {}
+    for request in get_running_requests(session):
+        # Recompute the limits
+        limits = qos.limits_for(request, session)
+        cached_rules.update(
+            delete_request_qos_status(
+                request_uid=request.request_uid,
+                rules=limits,
+                session=session,
+                rules_in_db=cached_rules,
+            )
+        )
     session.commit()
 
 
@@ -480,24 +518,6 @@ def add_qos_rule(
     session.add(qos_rule)
     session.commit()
     return qos_rule
-
-
-def increment_qos_rule_running(
-    rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
-):
-    """Increment the running counter of a QoS rule."""
-    created_rules: dict = {}
-    for rule in rules:
-        if (rule_uid := str(rule.__hash__())) in rules_in_db:
-            qos_rule = rules_in_db[rule_uid]
-        else:
-            try:
-                qos_rule = get_qos_rule(rule_uid, session)
-            except sqlalchemy.orm.exc.NoResultFound:
-                qos_rule = add_qos_rule(rule=rule, session=session)
-                created_rules[qos_rule.uid] = qos_rule
-        qos_rule.running += 1
-    return created_rules
 
 
 def decrement_qos_rule_running(

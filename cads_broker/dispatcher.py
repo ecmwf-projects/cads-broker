@@ -212,19 +212,20 @@ class Broker:
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
-        with session_maker_write() as session:
-            db.reset_qos_rules(session)
         rules_hash = get_rules_hash(qos_config.rules_path)
+        qos = QoS.QoS(
+            qos_config.rules,
+            qos_config.environment,
+            rules_hash=rules_hash,
+        )
+        with session_maker_write() as session:
+            db.reset_qos_rules(session, qos)
         self = cls(
             client=client,
             session_maker_read=session_maker_read,
             session_maker_write=session_maker_write,
             environment=qos_config.environment,
-            qos=QoS.QoS(
-                qos_config.rules,
-                qos_config.environment,
-                rules_hash=rules_hash,
-            ),
+            qos=qos,
             address=address,
         )
         return self
@@ -244,21 +245,22 @@ class Broker:
 
         If the task is not in the dask scheduler, it is re-queued.
         """
+        # the retrieve API sets the status to "dismissed", here the broker deletes the request
+        # this is to better control the status of the QoS
+        dismissed_uids = db.update_dismissed_requests(session)
+        for uid in dismissed_uids:
+            if future := self.futures.pop(uid, None):
+                future.cancel()
+        if dismissed_uids:
+            self.queue.reset()
+            self.qos.reload_rules(session)
+            db.reset_qos_rules(session, self.qos)
+
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status.in_(("running", "dismissed"))
         )
         dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
-            # the retrieve API set the status to "dismissed", here the broker deletes the request
-            # this is to better control the status of the QoS
-            if request.status == "dismissed":
-                db.delete_request(request=request, session=session)
-                self.qos.notify_end_of_request(
-                    request, session, scheduler=self.internal_scheduler
-                )
-                if future := self.futures.get(request.request_uid):
-                    future.cancel()
-                continue
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
