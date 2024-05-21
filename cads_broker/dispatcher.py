@@ -412,10 +412,9 @@ class Broker:
             if self.qos.can_run(
                 request, session=session_write, scheduler=self.internal_scheduler
             ):
-                self.submit_request(request, session=session_write)
+                if requests_counter <= int(number_of_requests * WORKERS_MULTIPLIER):
+                    self.submit_request(request, session=session_write)
                 requests_counter += 1
-                if requests_counter == int(number_of_requests * WORKERS_MULTIPLIER):
-                    break
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
