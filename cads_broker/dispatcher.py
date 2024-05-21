@@ -248,7 +248,7 @@ class Broker:
         # this is to better control the status of the QoS
         dismissed_uids = db.update_dismissed_requests(session)
         for uid in dismissed_uids:
-            if future := self.futures.pop(uid):
+            if future := self.futures.pop(uid, None):
                 future.cancel()
         if dismissed_uids:
             self.queue.reset()
