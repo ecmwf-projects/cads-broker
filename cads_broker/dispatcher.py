@@ -373,7 +373,6 @@ class Broker:
                         session=session,
                     )
             elif future.status != "cancelled":
-                print("--------------------", future.status)
                 # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
