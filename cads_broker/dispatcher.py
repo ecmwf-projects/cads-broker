@@ -364,7 +364,7 @@ class Broker:
                         logger.info("worker killed: re-queueing", job_id=future.key)
                         db.requeue_request(request_uid=future.key, session=session)
                         self.queue.add(future.key, request)
-                elif future.status != "cancelled":
+                else:
                     request = db.set_request_status(
                         future.key,
                         job_status,
@@ -372,7 +372,7 @@ class Broker:
                         error_reason=error_reason,
                         session=session,
                     )
-            else:
+            elif future.status != "cancelled":
                 # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
@@ -386,6 +386,9 @@ class Broker:
                     job_status={future.status},
                     job_id=request.request_uid,
                 )
+            else:
+                # if the dask status is cancelled, the qos has already been reset by sync_database
+                return
             self.futures.pop(future.key, None)
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
