@@ -32,6 +32,7 @@ DASK_STATUS_TO_STATUS = {
     "processing": "running",
     "error": "failed",
     "finished": "successful",
+    "cancelled": "failed",
 }
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
