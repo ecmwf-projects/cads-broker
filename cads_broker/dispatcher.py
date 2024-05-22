@@ -387,6 +387,9 @@ class Broker:
                     job_status={future.status},
                     job_id=request.request_uid,
                 )
+            else:
+                # if the dask status is cancelled, the qos has already been reset by sync_database
+                return
             self.futures.pop(future.key, None)
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
