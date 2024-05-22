@@ -32,7 +32,6 @@ DASK_STATUS_TO_STATUS = {
     "processing": "running",
     "error": "failed",
     "finished": "successful",
-    "cancelled": "failed",
 }
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
@@ -365,7 +364,7 @@ class Broker:
                         logger.info("worker killed: re-queueing", job_id=future.key)
                         db.requeue_request(request_uid=future.key, session=session)
                         self.queue.add(future.key, request)
-                else:
+                elif future.status != "cancelled":
                     request = db.set_request_status(
                         future.key,
                         job_status,
