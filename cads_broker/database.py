@@ -564,15 +564,14 @@ def delete_request_qos_status(
 
 
 def add_request_qos_status(
-    request: SystemRequest,
+    request_uid: str,
     rules: list,
     session: sa.orm.Session,
     rules_in_db: dict[str, QoSRule] = {},
     **kwargs,
 ):
     created_rules: dict = {}
-    if request is None:
-        return {}
+    request = get_request(request_uid, session)
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]

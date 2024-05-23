@@ -303,7 +303,7 @@ class Broker:
             # it returns a new qos rule if a new qos rule is added to database
             new_qos_rules = task["function"](
                 session=session_write,
-                request=self.queue.get(task["kwargs"].get("request_uid")),
+                request_uid=self.queue.get(task["kwargs"].get("request_uid")),
                 rules_in_db=qos_rules,
                 **task["kwargs"],
             )
