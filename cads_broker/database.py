@@ -524,6 +524,7 @@ def decrement_qos_rule_running(
     rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
 ):
     """Increment the running counter of a QoS rule."""
+    start = time.time()
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]
@@ -535,6 +536,8 @@ def decrement_qos_rule_running(
                 # the rule is not in the database anymore because it has been reset.
                 continue
         qos_rule.running = max(0, qos_rule.running - 1)
+    logger.info("qos_performance decrement_qos_rule_running", duration=time.time() - start)
+    
 
 
 def delete_request_qos_status(
@@ -561,7 +564,7 @@ def delete_request_qos_status(
             request.qos_rules.remove(qos_rule)
         qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
-    logger.info("delete_request_qos_status", duration=time.time() - start)
+    logger.info("qos_performance delete_request_qos_status", duration=time.time() - start)
     return created_rules
 
 
@@ -573,6 +576,7 @@ def add_request_qos_status(
     **kwargs,
 ):
     created_rules: dict = {}
+    start = time.time()
     request = get_request(request_uid, session)
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
@@ -583,6 +587,7 @@ def add_request_qos_status(
         if qos_rule not in request.qos_rules:
             qos_rule.queued += 1
             request.qos_rules.append(qos_rule)
+    logger.info("qos_performance delete_request_qos_status", duration=time.time() - start)
     return created_rules
 
 
