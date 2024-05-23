@@ -583,7 +583,7 @@ def add_request_qos_status(
             qos_rule.queued += 1
             try:
                 request = get_request(request.request_uid, session)
-            except sqlalchemy.orm.exc.IntegrityError:
+            except sqlalchemy.exc.IntegrityError:
                 continue
             request.qos_rules.append(qos_rule)
     return created_rules
