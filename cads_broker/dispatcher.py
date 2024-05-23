@@ -434,7 +434,7 @@ class Broker:
             worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
-            entry_point=request.entry_point,
+            entry_point="cads_adaptors:DummyAdaptor",
             config=dict(
                 request_uid=request.request_uid,
                 user_uid=request.user_uid,
