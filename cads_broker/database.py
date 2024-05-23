@@ -581,7 +581,10 @@ def add_request_qos_status(
             created_rules[qos_rule.uid] = qos_rule
         if qos_rule not in request.qos_rules:
             qos_rule.queued += 1
-            request = get_request(request.request_uid, session)
+            try:
+                request = get_request(request.request_uid, session)
+            except sqlalchemy.orm.exc.IntegrityError:
+                continue
             request.qos_rules.append(qos_rule)
     return created_rules
 
