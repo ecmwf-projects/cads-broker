@@ -6,7 +6,7 @@ import json
 import os
 import uuid
 from typing import Any
-
+import time
 import cacholote
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -546,7 +546,7 @@ def delete_request_qos_status(
 ):
     """Delete all QoS rules from a request."""
     created_rules: dict = {}
-    logger.info("---------------> deleting qos status", request_uid=request_uid)
+    start = time.time()
     request = get_request(request_uid, session)
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
@@ -561,6 +561,7 @@ def delete_request_qos_status(
             request.qos_rules.remove(qos_rule)
         qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
+    logger.info("delete_request_qos_status", duration=time.time() - start)
     return created_rules
 
 
