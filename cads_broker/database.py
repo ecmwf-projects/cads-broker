@@ -546,6 +546,7 @@ def delete_request_qos_status(
 ):
     """Delete all QoS rules from a request."""
     created_rules: dict = {}
+    logger.info("---------------> deleting qos status", request_uid=request_uid)
     request = get_request(request_uid, session)
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
