@@ -298,7 +298,7 @@ class Broker:
     def sync_qos_rules(self, session_write) -> None:
         qos_rules = db.get_qos_rules(session=session_write)
         logger.info("performance", tasks_number=len(self.internal_scheduler.queue))
-        for task in list(self.internal_scheduler.queue):
+        for task in list(self.internal_scheduler.queue)[:1000]:
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
             request, new_qos_rules = task["function"](
