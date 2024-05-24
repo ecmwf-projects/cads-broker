@@ -587,7 +587,7 @@ def add_request_qos_status(
                 new_request.qos_rules.append(qos_rule)
             except Exception:
                 print("------------- uids", [str(rule.__hash__()) for rule in rules])
-                print("------------- rules", request.qos_rules)
+                print("------------- rules", [rule.uid for rule in request.qos_rules])
                 raise
     return new_request, created_rules
 
