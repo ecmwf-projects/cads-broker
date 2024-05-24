@@ -332,6 +332,7 @@ class QoS:
                 "function": database.decrement_qos_rule_running,
                 "kwargs": {
                     "rules": limits_list,
+                    "request_uid": request.request_uid,
                 },
             }
         )

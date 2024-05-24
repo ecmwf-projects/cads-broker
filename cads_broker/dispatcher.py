@@ -94,19 +94,19 @@ def get_tasks(client: distributed.Client) -> Any:
 class Scheduler:
     def __init__(self) -> None:
         self.queue: list = list()
+        self.index: dict[str, set] = dict()
         self._lock = threading.RLock()
 
     def append(self, item: Any) -> None:
-        with self._lock:
-            self.queue.append(item)
-
-    def pop(self, index=-1) -> Any:
-        with self._lock:
-            return self.queue.pop(index)
+        if item["kwargs"]["request_uid"] not in self.index.get(item["kwargs"]["function"].__name__, set()):
+            with self._lock:
+                self.queue.append(item)
+                self.index[item["kwargs"]["function"].__name__].add(item["kwargs"]["request_uid"])
 
     def remove(self, item: Any) -> None:
         with self._lock:
             self.queue.remove(item)
+            self.index.pop(item["kwargs"]["function"].__name__)
 
 
 def perf_logger(func):
