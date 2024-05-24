@@ -301,7 +301,7 @@ class Broker:
         for task in list(self.internal_scheduler.queue):
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
-            new_qos_rules = task["function"](
+            request, new_qos_rules = task["function"](
                 session=session_write,
                 request=self.queue.get(task["kwargs"].get("request_uid")),
                 rules_in_db=qos_rules,
@@ -309,6 +309,8 @@ class Broker:
             )
             self.internal_scheduler.remove(task)
             # if a new qos rule is added, the new qos rule is added to the list of qos rules
+            if request:
+                self.queue.add(request.request_uid, request)
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
 

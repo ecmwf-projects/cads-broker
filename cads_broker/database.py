@@ -535,6 +535,7 @@ def decrement_qos_rule_running(
                 # the rule is not in the database anymore because it has been reset.
                 continue
         qos_rule.running = max(0, qos_rule.running - 1)
+    return None, None
 
 
 def delete_request_qos_status(
@@ -560,7 +561,7 @@ def delete_request_qos_status(
             request.qos_rules.remove(qos_rule)
         qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
-    return created_rules
+    return request, created_rules
 
 
 def add_request_qos_status(
@@ -569,10 +570,11 @@ def add_request_qos_status(
     session: sa.orm.Session,
     rules_in_db: dict[str, QoSRule] = {},
     **kwargs,
-):
+) -> tuple[SystemRequest | None, dict[str, QoSRule]]:
     created_rules: dict = {}
+    new_request = None
     if request is None:
-        return {}
+        return new_request, {}
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]
@@ -581,12 +583,12 @@ def add_request_qos_status(
             created_rules[qos_rule.uid] = qos_rule
         if qos_rule not in request.qos_rules:
             qos_rule.queued += 1
+            new_request = get_request(request.request_uid, session)
             try:
-                request = get_request(request.request_uid, session)
+                new_request.qos_rules.append(qos_rule)
             except sqlalchemy.exc.IntegrityError:
                 continue
-            request.qos_rules.append(qos_rule)
-    return created_rules
+    return new_request, created_rules
 
 
 def get_qos_status_from_request(
