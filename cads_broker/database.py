@@ -584,7 +584,6 @@ def add_request_qos_status(
             qos_rule.queued += 1
             new_request = get_request(request.request_uid, session)
             new_request.qos_rules.append(qos_rule)
-            session.flush()
     return new_request, created_rules
 
 
