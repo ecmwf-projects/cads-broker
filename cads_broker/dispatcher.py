@@ -106,7 +106,7 @@ class Scheduler:
     def remove(self, item: Any) -> None:
         with self._lock:
             self.queue.remove(item)
-            self.index.pop(item["function"].__name__)
+            self.index[item["function"].__name__].remove(item["kwargs"]["request_uid"])
 
 
 def perf_logger(func):
