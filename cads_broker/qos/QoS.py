@@ -101,8 +101,8 @@ class QoS:
         for limit in properties.limits:
             if limit.full(request):
                 limits.append(limit)
-                if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
-                    new_limits.append(limit)
+                # if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
+                new_limits.append(limit)
         if len(new_limits):
             scheduler.append(
                 {
