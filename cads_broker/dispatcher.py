@@ -318,7 +318,7 @@ class Broker:
             self.internal_scheduler.remove(task)
             # if a new qos rule is added, the new qos rule is added to the list of qos rules
             if request:
-                self.queue.add(request.request_uid, request)
+                self.queue.add(task["kwargs"].get("request_uid"), request)
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
 
