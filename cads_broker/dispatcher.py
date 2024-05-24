@@ -101,7 +101,7 @@ class Scheduler:
         if item["kwargs"]["request_uid"] not in self.index.get(item["function"].__name__, set()):
             with self._lock:
                 self.queue.append(item)
-                self.index[item["function"].__name__].add(item["kwargs"]["request_uid"])
+                self.index.setdefault(item["function"].__name__, set()).add(item["kwargs"]["request_uid"])
 
     def remove(self, item: Any) -> None:
         with self._lock:
