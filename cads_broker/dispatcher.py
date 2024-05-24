@@ -98,10 +98,14 @@ class Scheduler:
         self._lock = threading.RLock()
 
     def append(self, item: Any) -> None:
-        if item["kwargs"]["request_uid"] not in self.index.get(item["function"].__name__, set()):
+        if item["kwargs"]["request_uid"] not in self.index.get(
+            item["function"].__name__, set()
+        ):
             with self._lock:
                 self.queue.append(item)
-                self.index.setdefault(item["function"].__name__, set()).add(item["kwargs"]["request_uid"])
+                self.index.setdefault(item["function"].__name__, set()).add(
+                    item["kwargs"]["request_uid"]
+                )
 
     def remove(self, item: Any) -> None:
         with self._lock:
@@ -257,7 +261,9 @@ class Broker:
             db.reset_qos_rules(session, self.qos)
         session.commit()
 
-        statement = sa.select(db.SystemRequest).where(db.SystemRequest.status == "running")
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.status == "running"
+        )
         dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
             # if request is in futures, go on
@@ -298,7 +304,9 @@ class Broker:
     def sync_qos_rules(self, session_write) -> None:
         qos_rules = db.get_qos_rules(session=session_write)
         logger.info("performance", tasks_number=len(self.internal_scheduler.queue))
-        for task in list(self.internal_scheduler.queue)[:int(os.getenv("MAX_INTERNAL_QUEUE_TASKS", 500))]:
+        for task in list(self.internal_scheduler.queue)[
+            : int(os.getenv("BROKER_MAX_INTERNAL_SCHEDULER_TASKS", 500))
+        ]:
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
             request, new_qos_rules = task["function"](
