@@ -472,7 +472,7 @@ class Broker:
                 **request.adaptor_properties.config,
             ),
             form=request.adaptor_properties.form,
-            request=request.request_body,
+            request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
