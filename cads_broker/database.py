@@ -522,7 +522,7 @@ def add_qos_rule(
 def decrement_qos_rule_running(
     rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
 ):
-    """Increment the running counter of a QoS rule."""
+    """Decrement the running counter of a QoS rule."""
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]
@@ -533,7 +533,9 @@ def decrement_qos_rule_running(
                 # this happend when a request is finished after a broker restart.
                 # the rule is not in the database anymore because it has been reset.
                 continue
+        logger.info(f"----------------- decrementing {qos_rule.info}: {qos_rule.running}")
         qos_rule.running = max(0, qos_rule.running - 1)
+        logger.info(f"----------------- decremented {qos_rule.info}: {qos_rule.running}")
     return None, None
 
 
