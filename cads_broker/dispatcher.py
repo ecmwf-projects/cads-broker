@@ -264,13 +264,9 @@ class Broker:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status == "running"
         )
-        dask_tasks = get_tasks(self.client)
         for request in session.scalars(statement):
             # if request is in futures, go on
             if request.request_uid in self.futures:
-                continue
-            # if request is in the scheduler, go on
-            elif request.request_uid in dask_tasks:
                 continue
             # if it doesn't find the request: re-queue it
             else:
