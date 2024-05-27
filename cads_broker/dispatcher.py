@@ -316,7 +316,12 @@ class Broker:
             db.SystemRequest.status == "running"
         )
         scheduler_tasks = get_tasks_from_scheduler(self.client)
-        for request in session.scalars(statement):
+        requests = session.scalars(statement).all()
+        logger.info(
+            f"Running requests: db {len(requests)}, " \
+            f"scheduler {len(scheduler_tasks)}, futures {len(self.futures)}"
+        )
+        for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
