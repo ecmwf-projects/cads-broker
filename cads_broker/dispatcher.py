@@ -370,7 +370,8 @@ class Broker:
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
         qos_rules = db.get_qos_rules(session=session_write)
-        logger.info("performance", tasks_number=len(self.internal_scheduler.queue))
+        if tasks_number := len(self.internal_scheduler.queue):
+            logger.info("performance", tasks_number=tasks_number)
         for task in list(self.internal_scheduler.queue)[
             : int(os.getenv("BROKER_MAX_INTERNAL_SCHEDULER_TASKS", 500))
         ]:
