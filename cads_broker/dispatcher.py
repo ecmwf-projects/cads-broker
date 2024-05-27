@@ -242,6 +242,7 @@ class Broker:
     @property
     def number_of_workers(self):
         if self.client.scheduler is None:
+            logger.info("Reconnecting to dask scheduler...")
             self.client = distributed.Client(self.address)
         number_of_workers = get_number_of_workers(client=self.client)
         self.environment.number_of_workers = number_of_workers
