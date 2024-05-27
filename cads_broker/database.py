@@ -631,6 +631,14 @@ def requeue_request(
         return
 
 
+def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Session):
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    request.cache_id = cache_id
+    session.commit()
+    return request
+
+
 def set_request_status(
     request_uid: str,
     status: str,
@@ -653,13 +661,14 @@ def set_request_status(
         request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
-        request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
         request.qos_status = {}
+    if cache_id is not None:
+        request.cache_id = cache_id
     # FIXME: logs can't be live updated
     request.status = status
     session.commit()
