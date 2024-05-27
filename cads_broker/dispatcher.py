@@ -74,7 +74,7 @@ def get_rules_hash(rules_path: str):
     ),
     info=True,
 )
-def get_tasks(client: distributed.Client) -> Any:
+def get_tasks_from_scheduler(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
         scheduler_state_to_status = {
             "waiting": "running",  # Waiting status in dask is the same as running status in broker
@@ -315,13 +315,12 @@ class Broker:
         statement = sa.select(db.SystemRequest).where(
             db.SystemRequest.status == "running"
         )
-        tasks = get_tasks(self.client)
+        scheduler_tasks = get_tasks_from_scheduler(self.client)
         for request in session.scalars(statement):
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
-            elif request.request_uid in tasks:
-                task = tasks[request.request_uid]
+            elif task := scheduler_tasks.get(request.request_uid, None):
                 if (state := task["state"]) in ("memory", "finished"):
                     # if the task is in memory and it is not in the futures
                     # it means that the task has been lost by the broker (broker has been restarted)
