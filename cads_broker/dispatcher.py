@@ -396,13 +396,7 @@ class Broker:
         with self.session_maker_write() as session:
             if future.status == "finished":
                 # the result is updated in the database by the worker
-                result = future.result()
-                request = db.set_request_status(
-                    future.key,
-                    job_status,
-                    cache_id=result,
-                    session=session,
-                )
+                pass
             elif future.status == "error":
                 exception = future.exception()
                 request = self.set_request_error_status(

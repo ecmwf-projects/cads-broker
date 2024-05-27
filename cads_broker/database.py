@@ -636,8 +636,6 @@ def set_request_status(
     cache_id: int | None = None,
     error_message: str | None = None,
     error_reason: str | None = None,
-    log: list[tuple[int, str]] = [],
-    user_visible_log: list[tuple[int, str]] = [],
     resubmit: bool | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
@@ -661,8 +659,6 @@ def set_request_status(
         request.started_at = sa.func.now()
         request.qos_status = {}
     # FIXME: logs can't be live updated
-    request.response_log = json.dumps(log)
-    request.response_user_visible_log = json.dumps(user_visible_log)
     request.status = status
     session.commit()
     return request
