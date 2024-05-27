@@ -460,8 +460,6 @@ class Broker:
             request, session, scheduler=self.internal_scheduler
         )
         self.queue.pop(request.request_uid)
-        request_body = request.request_body
-        request_body["elapsed"] = "0:00:30.204614"
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
@@ -474,7 +472,7 @@ class Broker:
                 **request.adaptor_properties.config,
             ),
             form=request.adaptor_properties.form,
-            request=request_body,
+            request=request.request_body,
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
