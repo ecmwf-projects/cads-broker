@@ -76,14 +76,6 @@ def get_rules_hash(rules_path: str):
 )
 def get_tasks_from_scheduler(client: distributed.Client) -> Any:
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
-        scheduler_state_to_status = {
-            "waiting": "running",  # Waiting status in dask is the same as running status in broker
-            "processing": "running",
-            "erred": "failed",
-            "finished": "successful",
-            "no-worker": "accepted",  # if the job is no-worker should be re-submitted
-            "memory": "memory",  # the scheduler didn't submit on_future_done
-        }
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
             tasks[task_id] = {
@@ -321,12 +313,14 @@ class Broker:
         if len(scheduler_tasks) == 0 and len(self.futures):
             logger.info(f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures.")
             self.futures = {}
+        logger.info(f"Futures not in scheduler: {set(self.futures.keys()) - set(scheduler_tasks.keys())}")
+        logger.info(f"Scheduler tasks not in futures: {set(scheduler_tasks.keys()) - set(self.futures.keys())}")
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
             elif task := scheduler_tasks.get(request.request_uid, None):
-                if (state := task["state"]) in ("memory", "finished"):
+                if (state := task["state"]) == "memory":
                     # if the task is in memory and it is not in the futures
                     # it means that the task has been lost by the broker (broker has been restarted)
                     # the task is successful.
@@ -430,7 +424,6 @@ class Broker:
                 )
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
-                logger.info(f"------------------------Sono nel posto sbagliato {future.key}, {future.status}")
                 return
             self.futures.pop(future.key, None)
             self.qos.notify_end_of_request(
