@@ -533,9 +533,7 @@ def decrement_qos_rule_running(
                 # this happend when a request is finished after a broker restart.
                 # the rule is not in the database anymore because it has been reset.
                 continue
-        logger.info(f"----------------- decrementing {qos_rule.info}: {qos_rule.running}")
         qos_rule.running = max(0, qos_rule.running - 1)
-        logger.info(f"----------------- decremented {qos_rule.info}: {qos_rule.running}")
     return None, None
 
 
@@ -560,6 +558,8 @@ def delete_request_qos_status(
                 created_rules[qos_rule.uid] = qos_rule
         if qos_rule.uid in [r.uid for r in request.qos_rules]:
             request.qos_rules.remove(qos_rule)
+        if qos_rule.running > 99:
+            logger.info(f"----------------- incrementing to {qos_rule.running + 1}")
         qos_rule.queued = max(0, qos_rule.queued - 1)
         qos_rule.running += 1
     return request, created_rules
