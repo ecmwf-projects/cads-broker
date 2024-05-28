@@ -466,7 +466,6 @@ class Broker:
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
-            future.release()
             # self.futures.pop(future.key, None)
             if request:
                 self.qos.notify_end_of_request(
@@ -477,6 +476,7 @@ class Broker:
                 dask_status=future.status,
                 **db.logger_kwargs(request=request),
             )
+            future.release()
         return future.key
 
     def submit_requests(
