@@ -219,8 +219,8 @@ class Broker:
             qos_config.environment,
             rules_hash=rules_hash,
         )
-        qos.reload_rules(session=session_maker_read)
         with session_maker_write() as session:
+            qos.reload_rules(session=session)
             db.reset_qos_rules(session, qos)
         self = cls(
             client=client,
