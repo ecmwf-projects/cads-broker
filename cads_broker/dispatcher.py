@@ -524,7 +524,6 @@ class Broker:
             metadata=request.request_metadata,
         )
         self.futures[request.request_uid] = future
-        # future.add_done_callback(self.on_future_done)
         logger.info(
             "submitted job to scheduler",
             **db.logger_kwargs(request=request),
