@@ -338,6 +338,11 @@ class Broker:
                         self.qos.notify_end_of_request(
                             request, session, scheduler=self.internal_scheduler
                         )
+                        logger.info(
+                            "job has finished",
+                            dask_status=task["state"],
+                            **db.logger_kwargs(request=request),
+                        )
                 elif state == "erred":
                     exception = pickle.loads(task["exception"])
                     self.set_request_error_status(
@@ -347,6 +352,11 @@ class Broker:
                     )
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
+                    )
+                    logger.info(
+                        "job has finished",
+                        dask_status=task["state"],
+                        **db.logger_kwargs(request=request),
                     )
             # if it doesn't find the request: re-queue it
             else:
