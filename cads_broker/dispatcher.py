@@ -114,7 +114,7 @@ def perf_logger(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         stop = time.perf_counter()
-        if (elapsed := stop - start) > 1:
+        if (elapsed := stop - start) > .1:
             logger.info("performance", function=func.__name__, elapsed=elapsed)
         return result
 
@@ -424,6 +424,7 @@ class Broker:
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
 
+    @perf_logger
     def sync_futures(self) -> None:
         finished_futures = []
         for future in self.futures.values():
