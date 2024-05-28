@@ -424,8 +424,16 @@ class Broker:
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
 
+    def sync_futures(self) -> None:
+        for future in self.futures.values():
+            if future.status in ("finished", "error", "cancelled"):
+                self.on_future_done(future)
+
     def on_future_done(self, future: distributed.Future) -> None:
         with self.session_maker_write() as session:
+            request = db.get_request(future.key, session=session)
+            if request.status != "running":
+                return
             if future.status == "finished":
                 # the result is updated in the database by the worker
                 request = db.set_successful_request(
@@ -536,6 +544,7 @@ class Broker:
                             last_created_at=self.queue.last_created_at,
                         )
                     )
+                    self.sync_futures()
                     self.sync_database(session=session_write)
                     self.sync_qos_rules(session_write)
                     session_write.commit()
