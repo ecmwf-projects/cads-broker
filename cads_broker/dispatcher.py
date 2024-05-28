@@ -359,11 +359,12 @@ class Broker:
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
                     )
-                    db.requeue_request(request_uid=request.request_uid, session=session)
-                    self.queue.add(request.request_uid, request)
-                    self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
-                    )
+                    request = db.requeue_request(request_uid=request.request_uid, session=session)
+                    if request:
+                        self.queue.add(request.request_uid, request)
+                        self.qos.notify_end_of_request(
+                            request, session, scheduler=self.internal_scheduler
+                        )
                 else:
                     db.set_request_status(
                         request_uid=request.request_uid,
@@ -400,8 +401,6 @@ class Broker:
                 qos_rules.update(new_qos_rules)
 
     def on_future_done(self, future: distributed.Future) -> None:
-        job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
-        logger_kwargs: dict[str, Any] = {}
         with self.session_maker_write() as session:
             if future.status == "finished":
                 # the result is updated in the database by the worker
@@ -419,7 +418,7 @@ class Broker:
                 # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
-                    job_status,
+                    "accepted",
                     session=session,
                     resubmit=True,
                 )
@@ -441,7 +440,6 @@ class Broker:
                 "job has finished",
                 dask_status=future.status,
                 **db.logger_kwargs(request=request),
-                **logger_kwargs,
             )
 
     def submit_requests(
