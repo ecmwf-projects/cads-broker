@@ -608,11 +608,9 @@ def get_qos_status_from_request(
 
 
 def requeue_request(
-    request_uid: str,
+    request: SystemRequest,
     session: sa.orm.Session,
-):
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    request = session.scalars(statement).one()
+) -> SystemRequest | None:
     if request.status == "running":
         # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
         # FIXME: use a specific column for resubmit_number
@@ -626,7 +624,7 @@ def requeue_request(
         logger.info("requeueing request", **logger_kwargs(request=request))
         return request
     else:
-        return
+        return None
 
 
 def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Session):
@@ -640,11 +638,11 @@ def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Sessio
 def set_successful_request(
     request_uid: str,
     session: sa.orm.Session,
-) -> SystemRequest:
+) -> SystemRequest | None:
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
     if request.status == "successful":
-        return
+        return None
     request.status = "successful"
     request.finished_at = sa.func.now()
     session.commit()

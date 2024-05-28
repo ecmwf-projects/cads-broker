@@ -275,7 +275,7 @@ class Broker:
                 "BROKER_REQUEUE_LIMIT", 3
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
-                db.requeue_request(request_uid=request_uid, session=session)
+                db.requeue_request(request=request, session=session)
                 self.queue.add(request_uid, request)
         else:
             request = db.set_request_status(
@@ -360,6 +360,17 @@ class Broker:
                     )
             # if it doesn't find the request: re-queue it
             else:
+                request = db.get_request(request.request_uid, session=session)
+                if request.cache_id:
+                    successful_request = db.set_successful_request(
+                        request_uid=request.request_uid,
+                        session=session,
+                    )
+                    if successful_request:
+                        self.qos.notify_end_of_request(
+                            request, session, scheduler=self.internal_scheduler
+                        )
+                        logger.info("job has finished", **db.logger_kwargs(request=successful_request))
                 # FIXME: check if request status has changed
                 if os.getenv(
                     "BROKER_REQUEUE_ON_LOST_REQUESTS", True
@@ -369,11 +380,11 @@ class Broker:
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
                     )
-                    request = db.requeue_request(
-                        request_uid=request.request_uid, session=session
+                    queued_request = db.requeue_request(
+                        request=request, session=session
                     )
-                    if request:
-                        self.queue.add(request.request_uid, request)
+                    if queued_request:
+                        self.queue.add(queued_request.request_uid, request)
                         self.qos.notify_end_of_request(
                             request, session, scheduler=self.internal_scheduler
                         )
@@ -388,6 +399,7 @@ class Broker:
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
                     )
+                    logger.info("job has finished", **db.logger_kwargs(request=request))
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
