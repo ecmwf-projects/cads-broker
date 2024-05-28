@@ -240,10 +240,12 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    def set_request_error_status(self, exception, request_uid, session):
+    def set_request_error_status(self, exception, request_uid, session) -> db.SystemRequest | None:
         error_message = "".join(traceback.format_exception(exception))
         error_reason = exception.__class__.__name__
         request = db.get_request(request_uid, session=session)
+        if request.status != "running":
+            return None
         requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER_REQUESTS", False)
         if error_reason == "KilledWorker":
             worker_restart_events = self.client.get_events("worker-restart-memory")
@@ -285,6 +287,7 @@ class Broker:
                 error_reason=error_reason,
                 session=session,
             )
+        return request
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
     @perf_logger
@@ -326,38 +329,33 @@ class Broker:
             if request.request_uid in self.futures:
                 continue
             elif task := scheduler_tasks.get(request.request_uid, None):
-                if (state := task["state"]) == "memory":
-                    # if the task is in memory and it is not in the futures
-                    # it means that the task has been lost by the broker (broker has been restarted)
-                    # the task is successful.
-                    successful_request = db.set_successful_request(
-                        request_uid=request.request_uid,
-                        session=session,
-                    )
-                    if successful_request:
+                if (state := task["state"]) in ("memory", "erred"):
+                    if state == "memory":
+                        # if the task is in memory and it is not in the futures
+                        # it means that the task has been lost by the broker (broker has been restarted)
+                        # the task is successful. If the function returns None it means that the request
+                        # has already been set to successful
+                        finished_request = db.set_successful_request(
+                            request_uid=request.request_uid,
+                            session=session,
+                        )
+                    elif state == "erred":
+                        exception = pickle.loads(task["exception"])
+                        finished_request = self.set_request_error_status(
+                            exception=exception,
+                            request_uid=request.request_uid,
+                            session=session,
+                        )
+                    # notify the qos only if the request has been set to successful or failed here.
+                    if finished_request:
                         self.qos.notify_end_of_request(
-                            successful_request, session, scheduler=self.internal_scheduler
+                            finished_request, session, scheduler=self.internal_scheduler
                         )
                         logger.info(
                             "job has finished",
                             dask_status=task["state"],
-                            **db.logger_kwargs(request=successful_request),
+                            **db.logger_kwargs(request=finished_request),
                         )
-                elif state == "erred":
-                    exception = pickle.loads(task["exception"])
-                    self.set_request_error_status(
-                        exception=exception,
-                        request_uid=request.request_uid,
-                        session=session,
-                    )
-                    self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
-                    )
-                    logger.info(
-                        "job has finished",
-                        dask_status=task["state"],
-                        **db.logger_kwargs(request=request),
-                    )
             # if it doesn't find the request: re-queue it
             else:
                 request = db.get_request(request.request_uid, session=session)
