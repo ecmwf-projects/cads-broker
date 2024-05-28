@@ -426,7 +426,7 @@ class Broker:
     @perf_logger
     def sync_futures(self) -> None:
         finished_futures = []
-        for future in self.futures.values():
+        for future in list(self.futures.values()):
             if future.status in ("finished", "error", "cancelled"):
                 finished_futures.append(self.on_future_done(future))
         for key in finished_futures:
