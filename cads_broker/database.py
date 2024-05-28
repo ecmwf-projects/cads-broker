@@ -637,6 +637,20 @@ def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Sessio
     return request
 
 
+def set_successful_request(
+    request_uid: str,
+    session: sa.orm.Session,
+) -> SystemRequest:
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    if request.status == "successful":
+        return
+    request.status = "successful"
+    request.finished_at = sa.func.now()
+    session.commit()
+    return request
+
+
 def set_request_status(
     request_uid: str,
     status: str,

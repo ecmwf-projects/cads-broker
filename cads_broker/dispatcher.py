@@ -330,14 +330,14 @@ class Broker:
                     # if the task is in memory and it is not in the futures
                     # it means that the task has been lost by the broker (broker has been restarted)
                     # the task is successful.
-                    request = db.set_request_status(
+                    request = db.set_successful_request(
                         request_uid=request.request_uid,
-                        status="successful",
                         session=session,
                     )
-                    self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
-                    )
+                    if request:
+                        self.qos.notify_end_of_request(
+                            request, session, scheduler=self.internal_scheduler
+                        )
                 elif state == "erred":
                     exception = pickle.loads(task["exception"])
                     self.set_request_error_status(
@@ -406,9 +406,8 @@ class Broker:
         with self.session_maker_write() as session:
             if future.status == "finished":
                 # the result is updated in the database by the worker
-                request = db.set_request_status(
+                request = db.set_successful_request(
                     request_uid=future.key,
-                    status="successful",
                     session=session,
                 )
             elif future.status == "error":
@@ -434,9 +433,10 @@ class Broker:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
             self.futures.pop(future.key, None)
-            self.qos.notify_end_of_request(
-                request, session, scheduler=self.internal_scheduler
-            )
+            if request:
+                self.qos.notify_end_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
             logger.info(
                 "job has finished",
                 dask_status=future.status,
