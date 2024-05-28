@@ -431,6 +431,7 @@ class Broker:
                 )
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
+                logger.info(f"------------------------Sono nel posto sbagliato {future.key}, {future.status}")
                 return
             self.futures.pop(future.key, None)
             self.qos.notify_end_of_request(
