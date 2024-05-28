@@ -431,7 +431,7 @@ class Broker:
         for key in finished_futures:
             self.futures.pop(key, None)
 
-    def on_future_done(self, future: distributed.Future) -> str:
+    def on_future_done(self, future: distributed.Future, pop=False) -> str:
         with self.session_maker_write() as session:
             request = db.get_request(future.key, session=session)
             if request.status != "running":
@@ -464,7 +464,8 @@ class Broker:
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
-            # self.futures.pop(future.key, None)
+            if pop:
+                self.futures.pop(future.key, None)
             if request:
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
@@ -524,7 +525,7 @@ class Broker:
             metadata=request.request_metadata,
         )
         self.futures[request.request_uid] = future
-        # future.add_done_callback(self.on_future_done)
+        future.add_done_callback(self.on_future_done, pop=True)
         logger.info(
             "submitted job to scheduler",
             **db.logger_kwargs(request=request),
