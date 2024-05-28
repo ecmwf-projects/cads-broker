@@ -115,7 +115,8 @@ class Limit(QoSRule):
         self.queued = set()
 
     def increment(self, request_uid):
-        self.queued.remove(request_uid)
+        if request_uid in self.queued:
+            self.queued.remove(request_uid)
         self.value += 1
 
     def decrement(self):
