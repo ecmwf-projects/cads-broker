@@ -110,14 +110,21 @@ class Limit(QoSRule):
 
     def __init__(self, environment, info, condition, conclusion):
         super().__init__(environment, info, condition, conclusion)
+        # running requests
         self.value = 0
+        self.queued = 0
 
     def increment(self):
+        if self.queued > 0:
+            self.queued -= 1
         self.value += 1
 
     def decrement(self):
         if self.value > 0:
             self.value -= 1
+
+    def queue(self):
+        self.queued += 1
 
     def capacity(self, request):
         return self.evaluate(request)
