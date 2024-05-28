@@ -507,18 +507,20 @@ class Broker:
             request, session, scheduler=self.internal_scheduler
         )
         self.queue.pop(request.request_uid)
+        config = self.client.scatter(dict(
+                request_uid=request.request_uid,
+                user_uid=request.user_uid,
+                hostname=os.getenv("CDS_PROJECT_URL"),
+                **request.adaptor_properties.config,
+        ))
+        form = self.client.scatter(request.adaptor_properties.form)
         future = self.client.submit(
             worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point="cads_adaptors:DummyAdaptor",
-            config=dict(
-                request_uid=request.request_uid,
-                user_uid=request.user_uid,
-                hostname=os.getenv("CDS_PROJECT_URL"),
-                **request.adaptor_properties.config,
-            ),
-            form=request.adaptor_properties.form,
+            config=config,
+            form=form,
             request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
