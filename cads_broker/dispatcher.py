@@ -425,9 +425,12 @@ class Broker:
                 qos_rules.update(new_qos_rules)
 
     def sync_futures(self) -> None:
+        finished_futures = []
         for future in self.futures.values():
             if future.status in ("finished", "error", "cancelled"):
-                self.on_future_done(future)
+                finished_futures.append(self.on_future_done(future))
+        for key in finished_futures:
+            self.futures.pop(key, None)
 
     def on_future_done(self, future: distributed.Future) -> None:
         with self.session_maker_write() as session:
@@ -462,7 +465,7 @@ class Broker:
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
-            self.futures.pop(future.key, None)
+            # self.futures.pop(future.key, None)
             if request:
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
@@ -472,6 +475,7 @@ class Broker:
                 dask_status=future.status,
                 **db.logger_kwargs(request=request),
             )
+        return future.key
 
     def submit_requests(
         self,
