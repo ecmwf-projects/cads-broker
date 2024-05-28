@@ -433,7 +433,7 @@ class Broker:
         for key in finished_futures:
             self.futures.pop(key, None)
 
-    def on_future_done(self, future: distributed.Future) -> None:
+    def on_future_done(self, future: distributed.Future) -> str:
         with self.session_maker_write() as session:
             request = db.get_request(future.key, session=session)
             if request.status != "running":
@@ -466,6 +466,7 @@ class Broker:
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
+            future.release()
             # self.futures.pop(future.key, None)
             if request:
                 self.qos.notify_end_of_request(
