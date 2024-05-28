@@ -169,8 +169,8 @@ class Queue:
 
 
 class QoSRules:
-    def __init__(self) -> None:
-        self.environment = Environment.Environment()
+    def __init__(self, number_of_workers) -> None:
+        self.environment = Environment.Environment(number_of_workers=number_of_workers)
         self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
@@ -209,7 +209,7 @@ class Broker:
         session_maker_write: sa.orm.sessionmaker | None = None,
     ):
         client = distributed.Client(address)
-        qos_config = QoSRules()
+        qos_config = QoSRules(get_number_of_workers(client))
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
