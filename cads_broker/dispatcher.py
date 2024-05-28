@@ -548,9 +548,9 @@ class Broker:
                             last_created_at=self.queue.last_created_at,
                         )
                     )
+                    self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
-                    self.sync_qos_rules(session_write)
                     session_write.commit()
                     if (queue_length := self.queue.len()) != (
                         db_queue := db.count_accepted_requests_before(
