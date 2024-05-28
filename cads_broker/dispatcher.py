@@ -330,6 +330,11 @@ class Broker:
                     # if the task is in memory and it is not in the futures
                     # it means that the task has been lost by the broker (broker has been restarted)
                     # the task is successful.
+                    request = db.set_request_status(
+                        request_uid=request.request_uid,
+                        status="successful",
+                        session=session,
+                    )
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
                     )
