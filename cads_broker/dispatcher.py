@@ -330,18 +330,18 @@ class Broker:
                     # if the task is in memory and it is not in the futures
                     # it means that the task has been lost by the broker (broker has been restarted)
                     # the task is successful.
-                    request = db.set_successful_request(
+                    successful_request = db.set_successful_request(
                         request_uid=request.request_uid,
                         session=session,
                     )
-                    if request:
+                    if successful_request:
                         self.qos.notify_end_of_request(
-                            request, session, scheduler=self.internal_scheduler
+                            successful_request, session, scheduler=self.internal_scheduler
                         )
                         logger.info(
                             "job has finished",
                             dask_status=task["state"],
-                            **db.logger_kwargs(request=request),
+                            **db.logger_kwargs(request=successful_request),
                         )
                 elif state == "erred":
                     exception = pickle.loads(task["exception"])
