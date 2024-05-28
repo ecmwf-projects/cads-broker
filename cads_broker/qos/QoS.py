@@ -100,7 +100,7 @@ class QoS:
         new_limits = []
         for limit in properties.limits:
             if limit.full(request):
-                limit.queue()
+                limit.queue(request.request_uid)
                 limits.append(limit)
                 if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
                     new_limits.append(limit)

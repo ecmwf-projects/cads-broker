@@ -558,7 +558,7 @@ def delete_request_qos_status(
                 created_rules[qos_rule.uid] = qos_rule
         if qos_rule.uid in [r.uid for r in request.qos_rules]:
             request.qos_rules.remove(qos_rule)
-        qos_rule.queued = rule.queued
+        qos_rule.queued = len(rule.queued)
         qos_rule.running = rule.value
     return request, created_rules
 
@@ -581,7 +581,7 @@ def add_request_qos_status(
             qos_rule = add_qos_rule(rule=rule, session=session)
             created_rules[qos_rule.uid] = qos_rule
         if qos_rule.uid not in [r.uid for r in request.qos_rules]:
-            qos_rule.queued = rule.queued
+            qos_rule.queued = len(rule.queued)
             new_request = get_request(request.request_uid, session)
             new_request.qos_rules.append(qos_rule)
     return new_request, created_rules
