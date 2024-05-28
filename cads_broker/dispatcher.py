@@ -311,10 +311,16 @@ class Broker:
         scheduler_tasks = get_tasks_from_scheduler(self.client)
         requests = session.scalars(statement).all()
         if len(scheduler_tasks) == 0 and len(self.futures):
-            logger.info(f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures.")
+            logger.info(
+                f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
+            )
             self.futures = {}
-        logger.info(f"Futures not in scheduler: {set(self.futures.keys()) - set(scheduler_tasks.keys())}")
-        logger.info(f"Scheduler tasks not in futures: {set(scheduler_tasks.keys()) - set(self.futures.keys())}")
+        logger.info(
+            f"Futures not in scheduler: {set(self.futures.keys()) - set(scheduler_tasks.keys())}"
+        )
+        logger.info(
+            f"Scheduler tasks not in futures: {[(uid, scheduler_tasks[uid]) for uid in set(scheduler_tasks.keys()) - set(self.futures.keys())]}"
+        )
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
@@ -353,7 +359,9 @@ class Broker:
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
                     )
-                    request = db.requeue_request(request_uid=request.request_uid, session=session)
+                    request = db.requeue_request(
+                        request_uid=request.request_uid, session=session
+                    )
                     if request:
                         self.queue.add(request.request_uid, request)
                         self.qos.notify_end_of_request(
