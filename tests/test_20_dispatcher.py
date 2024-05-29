@@ -3,7 +3,6 @@ import uuid
 from typing import Any
 
 import distributed
-import pytest
 import pytest_mock
 import sqlalchemy as sa
 

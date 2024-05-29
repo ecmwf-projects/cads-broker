@@ -474,14 +474,13 @@ def reset_qos_rules(session: sa.orm.Session, qos):
     for request in get_running_requests(session):
         # Recompute the limits
         limits = qos.limits_for(request, session)
-        cached_rules.update(
-            delete_request_qos_status(
-                request_uid=request.request_uid,
-                rules=limits,
-                session=session,
-                rules_in_db=cached_rules,
-            )
+        _, rules = delete_request_qos_status(
+            request_uid=request.request_uid,
+            rules=limits,
+            session=session,
+            rules_in_db=cached_rules,
         )
+        cached_rules.update(rules)
     session.commit()
 
 
@@ -523,7 +522,7 @@ def add_qos_rule(
 def decrement_qos_rule_running(
     rules: list, session: sa.orm.Session, rules_in_db: dict[str, QoSRule] = {}, **kwargs
 ):
-    """Increment the running counter of a QoS rule."""
+    """Decrement the running counter of a QoS rule."""
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]
@@ -534,7 +533,8 @@ def decrement_qos_rule_running(
                 # this happend when a request is finished after a broker restart.
                 # the rule is not in the database anymore because it has been reset.
                 continue
-        qos_rule.running = max(0, qos_rule.running - 1)
+        qos_rule.running = rule.value
+    return None, None
 
 
 def delete_request_qos_status(
@@ -556,11 +556,11 @@ def delete_request_qos_status(
             except sqlalchemy.orm.exc.NoResultFound:
                 qos_rule = add_qos_rule(rule=rule, session=session)
                 created_rules[qos_rule.uid] = qos_rule
-        if qos_rule in request.qos_rules:
+        if qos_rule.uid in [r.uid for r in request.qos_rules]:
             request.qos_rules.remove(qos_rule)
-        qos_rule.queued = max(0, qos_rule.queued - 1)
-        qos_rule.running += 1
-    return created_rules
+        qos_rule.queued = len(rule.queued)
+        qos_rule.running = rule.value
+    return request, created_rules
 
 
 def add_request_qos_status(
@@ -569,20 +569,22 @@ def add_request_qos_status(
     session: sa.orm.Session,
     rules_in_db: dict[str, QoSRule] = {},
     **kwargs,
-):
+) -> tuple[SystemRequest | None, dict[str, QoSRule]]:
     created_rules: dict = {}
+    new_request = None
     if request is None:
-        return {}
+        return new_request, {}
     for rule in rules:
         if (rule_uid := str(rule.__hash__())) in rules_in_db:
             qos_rule = rules_in_db[rule_uid]
         else:
             qos_rule = add_qos_rule(rule=rule, session=session)
             created_rules[qos_rule.uid] = qos_rule
-        if qos_rule not in request.qos_rules:
-            qos_rule.queued += 1
-            request.qos_rules.append(qos_rule)
-    return created_rules
+        if qos_rule.uid not in [r.uid for r in request.qos_rules]:
+            qos_rule.queued = len(rule.queued)
+            new_request = get_request(request.request_uid, session)
+            new_request.qos_rules.append(qos_rule)
+    return new_request, created_rules
 
 
 def get_qos_status_from_request(
@@ -606,11 +608,9 @@ def get_qos_status_from_request(
 
 
 def requeue_request(
-    request_uid: str,
+    request: SystemRequest,
     session: sa.orm.Session,
-):
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    request = session.scalars(statement).one()
+) -> SystemRequest | None:
     if request.status == "running":
         # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
         # FIXME: use a specific column for resubmit_number
@@ -624,7 +624,29 @@ def requeue_request(
         logger.info("requeueing request", **logger_kwargs(request=request))
         return request
     else:
-        return
+        return None
+
+
+def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Session):
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    request.cache_id = cache_id
+    session.commit()
+    return request
+
+
+def set_successful_request(
+    request_uid: str,
+    session: sa.orm.Session,
+) -> SystemRequest | None:
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    if request.status == "successful":
+        return None
+    request.status = "successful"
+    request.finished_at = sa.func.now()
+    session.commit()
+    return request
 
 
 def set_request_status(
@@ -634,8 +656,6 @@ def set_request_status(
     cache_id: int | None = None,
     error_message: str | None = None,
     error_reason: str | None = None,
-    log: list[tuple[int, str]] = [],
-    user_visible_log: list[tuple[int, str]] = [],
     resubmit: bool | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
@@ -651,16 +671,15 @@ def set_request_status(
         request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
-        request.cache_id = cache_id
     elif status == "failed":
         request.finished_at = sa.func.now()
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = sa.func.now()
         request.qos_status = {}
+    if cache_id is not None:
+        request.cache_id = cache_id
     # FIXME: logs can't be live updated
-    request.response_log = json.dumps(log)
-    request.response_user_visible_log = json.dumps(user_visible_log)
     request.status = status
     session.commit()
     return request

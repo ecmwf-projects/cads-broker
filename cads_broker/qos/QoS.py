@@ -90,7 +90,7 @@ class QoS:
         for request in database.get_running_requests(session=session):
             # Recompute the limits
             for limit in self.limits_for(request, session):
-                limit.increment()
+                limit.increment(request.request_uid)
 
     @locked
     def can_run(self, request, session, scheduler):
@@ -100,6 +100,7 @@ class QoS:
         new_limits = []
         for limit in properties.limits:
             if limit.full(request):
+                limit.queue(request.request_uid)
                 limits.append(limit)
                 if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
                     new_limits.append(limit)
@@ -302,7 +303,7 @@ class QoS:
         """
         limits_list = []
         for limit in self.limits_for(request, session):
-            limit.increment()
+            limit.increment(request.request_uid)
             limits_list.append(limit)
         scheduler.append(
             {
@@ -332,6 +333,7 @@ class QoS:
                 "function": database.decrement_qos_rule_running,
                 "kwargs": {
                     "rules": limits_list,
+                    "request_uid": request.request_uid,
                 },
             }
         )

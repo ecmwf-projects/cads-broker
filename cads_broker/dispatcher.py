@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import io
 import os
+import pickle
 import threading
 import time
 import traceback
@@ -73,19 +74,14 @@ def get_rules_hash(rules_path: str):
     ),
     info=True,
 )
-def get_tasks(client: distributed.Client) -> Any:
-    def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, str]:
-        scheduler_state_to_status = {
-            "waiting": "running",  # Waiting status in dask is the same as running status in broker
-            "processing": "running",
-            "erred": "failed",
-            "finished": "successful",
-            "no-worker": "accepted",  # if the job is no-worker should be re-submitted
-            "memory": "memory",  # the scheduler didn't submit on_future_done
-        }
+def get_tasks_from_scheduler(client: distributed.Client) -> Any:
+    def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
-            tasks[task_id] = scheduler_state_to_status.get(task.state, "accepted")
+            tasks[task_id] = {
+                "state": task.state,
+                "exception": task.exception,
+            }
         return tasks
 
     return client.run_on_scheduler(get_tasks_on_scheduler)
@@ -94,19 +90,23 @@ def get_tasks(client: distributed.Client) -> Any:
 class Scheduler:
     def __init__(self) -> None:
         self.queue: list = list()
+        self.index: dict[str, set] = dict()
         self._lock = threading.RLock()
 
     def append(self, item: Any) -> None:
-        with self._lock:
-            self.queue.append(item)
-
-    def pop(self, index=-1) -> Any:
-        with self._lock:
-            return self.queue.pop(index)
+        if item["kwargs"]["request_uid"] not in self.index.get(
+            item["function"].__name__, set()
+        ):
+            with self._lock:
+                self.queue.append(item)
+                self.index.setdefault(item["function"].__name__, set()).add(
+                    item["kwargs"]["request_uid"]
+                )
 
     def remove(self, item: Any) -> None:
         with self._lock:
             self.queue.remove(item)
+            self.index[item["function"].__name__].remove(item["kwargs"]["request_uid"])
 
 
 def perf_logger(func):
@@ -114,7 +114,8 @@ def perf_logger(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         stop = time.perf_counter()
-        logger.info("performance", function=func.__name__, elapsed=stop - start)
+        if (elapsed := stop - start) > 1:
+            logger.info("performance", function=func.__name__, elapsed=elapsed)
         return result
 
     return wrapper
@@ -168,8 +169,8 @@ class Queue:
 
 
 class QoSRules:
-    def __init__(self) -> None:
-        self.environment = Environment.Environment()
+    def __init__(self, number_of_workers) -> None:
+        self.environment = Environment.Environment(number_of_workers=number_of_workers)
         self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
@@ -208,7 +209,7 @@ class Broker:
         session_maker_write: sa.orm.sessionmaker | None = None,
     ):
         client = distributed.Client(address)
-        qos_config = QoSRules()
+        qos_config = QoSRules(get_number_of_workers(client))
         factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
@@ -219,6 +220,7 @@ class Broker:
             rules_hash=rules_hash,
         )
         with session_maker_write() as session:
+            qos.reload_rules(session=session)
             db.reset_qos_rules(session, qos)
         self = cls(
             client=client,
@@ -233,10 +235,62 @@ class Broker:
     @property
     def number_of_workers(self):
         if self.client.scheduler is None:
+            logger.info("Reconnecting to dask scheduler...")
             self.client = distributed.Client(self.address)
         number_of_workers = get_number_of_workers(client=self.client)
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
+
+    def set_request_error_status(
+        self, exception, request_uid, session
+    ) -> db.SystemRequest | None:
+        error_message = "".join(traceback.format_exception(exception))
+        error_reason = exception.__class__.__name__
+        request = db.get_request(request_uid, session=session)
+        if request.status != "running":
+            return None
+        requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER_REQUESTS", False)
+        if error_reason == "KilledWorker":
+            worker_restart_events = self.client.get_events("worker-restart-memory")
+            # get info on worker and pid of the killed request
+            _, worker_pid_event = self.client.get_events(request_uid)[0]
+            if worker_restart_events:
+                for event in worker_restart_events:
+                    _, job = event
+                    if (
+                        job["worker"] == worker_pid_event["worker"]
+                        and job["pid"] == worker_pid_event["pid"]
+                    ):
+                        db.add_event(
+                            event_type="killed_worker",
+                            request_uid=request_uid,
+                            message="Worker has been killed by the Nanny due to memory usage. "
+                            f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
+                            session=session,
+                        )
+                        request = db.set_request_status(
+                            request_uid,
+                            "failed",
+                            error_message=error_message,
+                            error_reason=error_reason,
+                            session=session,
+                        )
+                        requeue = False
+            if requeue and request.request_metadata.get("resubmit", 0) < os.getenv(
+                "BROKER_REQUEUE_LIMIT", 3
+            ):
+                logger.info("worker killed: re-queueing", job_id=request_uid)
+                db.requeue_request(request=request, session=session)
+                self.queue.add(request_uid, request)
+        else:
+            request = db.set_request_status(
+                request_uid,
+                "failed",
+                error_message=error_message,
+                error_reason=error_reason,
+                session=session,
+            )
+        return request
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
     @perf_logger
@@ -257,17 +311,64 @@ class Broker:
             db.reset_qos_rules(session, self.qos)
         session.commit()
 
-        statement = sa.select(db.SystemRequest).where(db.SystemRequest.status == "running")
-        dask_tasks = get_tasks(self.client)
-        for request in session.scalars(statement):
+        statement = sa.select(db.SystemRequest).where(
+            db.SystemRequest.status == "running"
+        )
+        scheduler_tasks = get_tasks_from_scheduler(self.client)
+        requests = session.scalars(statement).all()
+        if len(scheduler_tasks) == 0 and len(self.futures):
+            logger.info(
+                f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
+            )
+            self.futures = {}
+        for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 continue
-            # if request is in the scheduler, go on
-            elif request.request_uid in dask_tasks:
-                continue
+            elif task := scheduler_tasks.get(request.request_uid, None):
+                if (state := task["state"]) in ("memory", "erred"):
+                    if state == "memory":
+                        # if the task is in memory and it is not in the futures
+                        # it means that the task has been lost by the broker (broker has been restarted)
+                        # the task is successful. If the function returns None it means that the request
+                        # has already been set to successful
+                        finished_request = db.set_successful_request(
+                            request_uid=request.request_uid,
+                            session=session,
+                        )
+                    elif state == "erred":
+                        exception = pickle.loads(task["exception"])
+                        finished_request = self.set_request_error_status(
+                            exception=exception,
+                            request_uid=request.request_uid,
+                            session=session,
+                        )
+                    # notify the qos only if the request has been set to successful or failed here.
+                    if finished_request:
+                        self.qos.notify_end_of_request(
+                            finished_request, session, scheduler=self.internal_scheduler
+                        )
+                        logger.info(
+                            "job has finished",
+                            dask_status=task["state"],
+                            **db.logger_kwargs(request=finished_request),
+                        )
             # if it doesn't find the request: re-queue it
             else:
+                request = db.get_request(request.request_uid, session=session)
+                if request.cache_id:
+                    successful_request = db.set_successful_request(
+                        request_uid=request.request_uid,
+                        session=session,
+                    )
+                    if successful_request:
+                        self.qos.notify_end_of_request(
+                            request, session, scheduler=self.internal_scheduler
+                        )
+                        logger.info(
+                            "job has finished",
+                            **db.logger_kwargs(request=successful_request),
+                        )
                 # FIXME: check if request status has changed
                 if os.getenv(
                     "BROKER_REQUEUE_ON_LOST_REQUESTS", True
@@ -277,11 +378,14 @@ class Broker:
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
                     )
-                    db.requeue_request(request_uid=request.request_uid, session=session)
-                    self.queue.add(request.request_uid, request)
-                    self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
+                    queued_request = db.requeue_request(
+                        request=request, session=session
                     )
+                    if queued_request:
+                        self.queue.add(queued_request.request_uid, request)
+                        self.qos.notify_end_of_request(
+                            request, session, scheduler=self.internal_scheduler
+                        )
                 else:
                     db.set_request_status(
                         request_uid=request.request_uid,
@@ -293,15 +397,19 @@ class Broker:
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
                     )
+                    logger.info("job has finished", **db.logger_kwargs(request=request))
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
         qos_rules = db.get_qos_rules(session=session_write)
-        logger.info("performance", tasks_number=len(self.internal_scheduler.queue))
-        for task in list(self.internal_scheduler.queue):
+        if tasks_number := len(self.internal_scheduler.queue):
+            logger.info("performance", tasks_number=tasks_number)
+        for task in list(self.internal_scheduler.queue)[
+            : int(os.getenv("BROKER_MAX_INTERNAL_SCHEDULER_TASKS", 500))
+        ]:
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
-            new_qos_rules = task["function"](
+            request, new_qos_rules = task["function"](
                 session=session_write,
                 request=self.queue.get(task["kwargs"].get("request_uid")),
                 rules_in_db=qos_rules,
@@ -309,74 +417,41 @@ class Broker:
             )
             self.internal_scheduler.remove(task)
             # if a new qos rule is added, the new qos rule is added to the list of qos rules
+            if request:
+                self.queue.add(task["kwargs"].get("request_uid"), request)
             if new_qos_rules:
                 qos_rules.update(new_qos_rules)
 
-    def on_future_done(self, future: distributed.Future) -> None:
-        job_status = DASK_STATUS_TO_STATUS.get(future.status, "accepted")
-        logger_kwargs: dict[str, Any] = {}
+    @perf_logger
+    def sync_futures(self) -> None:
+        finished_futures = []
+        for future in self.futures.values():
+            if future.status in ("finished", "error", "cancelled"):
+                finished_futures.append(self.on_future_done(future))
+        for key in finished_futures:
+            self.futures.pop(key, None)
+
+    def on_future_done(self, future: distributed.Future) -> str:
         with self.session_maker_write() as session:
+            request = db.get_request(future.key, session=session)
+            if request.status != "running":
+                return
             if future.status == "finished":
-                result = future.result()
-                request = db.set_request_status(
-                    future.key,
-                    job_status,
-                    cache_id=result,
+                # the result is updated in the database by the worker
+                request = db.set_successful_request(
+                    request_uid=future.key,
                     session=session,
                 )
             elif future.status == "error":
                 exception = future.exception()
-                error_message = "".join(traceback.format_exception(exception))
-                error_reason = exception.__class__.__name__
-                request = db.get_request(future.key, session=session)
-                requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER_REQUESTS", False)
-                if error_reason == "KilledWorker":
-                    worker_restart_events = self.client.get_events(
-                        "worker-restart-memory"
-                    )
-                    # get info on worker and pid of the killed request
-                    _, worker_pid_event = self.client.get_events(future.key)[0]
-                    if worker_restart_events:
-                        for event in worker_restart_events:
-                            _, job = event
-                            if (
-                                job["worker"] == worker_pid_event["worker"]
-                                and job["pid"] == worker_pid_event["pid"]
-                            ):
-                                db.add_event(
-                                    event_type="killed_worker",
-                                    request_uid=future.key,
-                                    message="Worker has been killed by the Nanny due to memory usage. "
-                                    f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
-                                    session=session,
-                                )
-                                request = db.set_request_status(
-                                    future.key,
-                                    "failed",
-                                    error_message=error_message,
-                                    error_reason=error_reason,
-                                    session=session,
-                                )
-                                requeue = False
-                    if requeue and request.request_metadata.get(
-                        "resubmit", 0
-                    ) < os.getenv("BROKER_REQUEUE_LIMIT", 3):
-                        logger.info("worker killed: re-queueing", job_id=future.key)
-                        db.requeue_request(request_uid=future.key, session=session)
-                        self.queue.add(future.key, request)
-                else:
-                    request = db.set_request_status(
-                        future.key,
-                        job_status,
-                        error_message=error_message,
-                        error_reason=error_reason,
-                        session=session,
-                    )
+                request = self.set_request_error_status(
+                    exception=exception, request_uid=future.key, session=session
+                )
             elif future.status != "cancelled":
                 # if the dask status is unknown, re-queue it
                 request = db.set_request_status(
                     future.key,
-                    job_status,
+                    "accepted",
                     session=session,
                     resubmit=True,
                 )
@@ -389,16 +464,18 @@ class Broker:
             else:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return
-            self.futures.pop(future.key, None)
-            self.qos.notify_end_of_request(
-                request, session, scheduler=self.internal_scheduler
-            )
+            # self.futures.pop(future.key, None)
+            if request:
+                self.qos.notify_end_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
             logger.info(
                 "job has finished",
                 dask_status=future.status,
                 **db.logger_kwargs(request=request),
-                **logger_kwargs,
             )
+            future.release()
+        return future.key
 
     def submit_requests(
         self,
@@ -447,7 +524,6 @@ class Broker:
             metadata=request.request_metadata,
         )
         self.futures[request.request_uid] = future
-        future.add_done_callback(self.on_future_done)
         logger.info(
             "submitted job to scheduler",
             **db.logger_kwargs(request=request),
@@ -471,8 +547,9 @@ class Broker:
                             last_created_at=self.queue.last_created_at,
                         )
                     )
-                    self.sync_database(session=session_write)
                     self.sync_qos_rules(session_write)
+                    self.sync_futures()
+                    self.sync_database(session=session_write)
                     session_write.commit()
                     if (queue_length := self.queue.len()) != (
                         db_queue := db.count_accepted_requests_before(
