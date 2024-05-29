@@ -734,16 +734,18 @@ def ensure_adaptor_properties(
 ) -> None:
     """Create adaptor properties (if not exists) or update its timestamp."""
     try:
+        adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
+        session.add(adaptor_properties)
+        session.commit()
+    except sa.exc.IntegrityError:  # hash already present
+        session.rollback()
         statement = (
             AdaptorProperties.__table__.update()
-            .returning(AdaptorProperties.hash)
             .where(AdaptorProperties.__table__.c.hash == hash)
             .values(timestamp=datetime.datetime.now())
         )
-        session.execute(statement).one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
-        session.add(adaptor_properties)
+        session.execute(statement)
+        session.commit()
 
 
 def add_event(
