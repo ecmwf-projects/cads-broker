@@ -114,7 +114,7 @@ def perf_logger(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         stop = time.perf_counter()
-        if (elapsed := stop - start) > .1:
+        if (elapsed := stop - start) > 1:
             logger.info("performance", function=func.__name__, elapsed=elapsed)
         return result
 
@@ -241,7 +241,9 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
-    def set_request_error_status(self, exception, request_uid, session) -> db.SystemRequest | None:
+    def set_request_error_status(
+        self, exception, request_uid, session
+    ) -> db.SystemRequest | None:
         error_message = "".join(traceback.format_exception(exception))
         error_reason = exception.__class__.__name__
         request = db.get_request(request_uid, session=session)
@@ -319,12 +321,6 @@ class Broker:
                 f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
             )
             self.futures = {}
-        logger.info(
-            f"Futures not in scheduler: {set(self.futures.keys()) - set(scheduler_tasks.keys())}"
-        )
-        logger.info(
-            f"Scheduler tasks not in futures: {[(uid, scheduler_tasks[uid]) for uid in set(scheduler_tasks.keys()) - set(self.futures.keys())]}"
-        )
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
@@ -369,7 +365,10 @@ class Broker:
                         self.qos.notify_end_of_request(
                             request, session, scheduler=self.internal_scheduler
                         )
-                        logger.info("job has finished", **db.logger_kwargs(request=successful_request))
+                        logger.info(
+                            "job has finished",
+                            **db.logger_kwargs(request=successful_request),
+                        )
                 # FIXME: check if request status has changed
                 if os.getenv(
                     "BROKER_REQUEUE_ON_LOST_REQUESTS", True
