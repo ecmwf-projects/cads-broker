@@ -75,6 +75,10 @@ def get_rules_hash(rules_path: str):
     info=True,
 )
 def get_tasks_from_scheduler(client: distributed.Client) -> Any:
+    """Get the tasks from the scheduler.
+
+    This function is executed on the scheduler pod.
+    """
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -88,6 +92,11 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
 
 class Scheduler:
+    """A simple scheduler to store the tasks to update the qos_rules in the database.
+
+    It ensures that the scheduler is thread-safe.
+    """
+
     def __init__(self) -> None:
         self.queue: list = list()
         self.index: dict[str, set] = dict()
@@ -122,6 +131,12 @@ def perf_logger(func):
 
 
 class Queue:
+    """A simple queue to store the requests that have been accepted by the broker.
+
+    - It ensures that the queue is thread-safe.
+    - It stores the last created_at datetime of the requests that have been added to the queue.
+    """
+
     def __init__(self) -> None:
         self.queue_dict: dict = dict()
         self._lock = threading.RLock()
@@ -244,6 +259,13 @@ class Broker:
     def set_request_error_status(
         self, exception, request_uid, session
     ) -> db.SystemRequest | None:
+        """Set the status of the request to failed and write the error message and reason.
+
+        If the error reason is "KilledWorker":
+            - if the worker has been killed by the Nanny for memory usage, it add the event for the user
+            - if the worker is killed for unknown reasons, it re-queues the request 
+              if the requeue limit is not reached. This is configurable with the environment variable
+        """
         error_message = "".join(traceback.format_exception(exception))
         error_reason = exception.__class__.__name__
         request = db.get_request(request_uid, session=session)
@@ -303,7 +325,13 @@ class Broker:
     def sync_database(self, session: sa.orm.Session) -> None:
         """Sync the database with the current status of the dask tasks.
 
-        If the task is not in the dask scheduler, it is re-queued.
+        - If the task is in the futures list it does nothing.
+        - If the task is not in the futures list but it is in the scheduler:
+            - If the task is in memory (it is successful but it has been lost by the broker), 
+              it is set to successful.
+            - If the task is in error, it is set to failed.
+        - If the task is not in the dask scheduler, it is re-queued. 
+          This behaviour can be changed with an environment variable.
         """
         # the retrieve API sets the status to "dismissed", here the broker deletes the request
         # this is to better control the status of the QoS
@@ -407,6 +435,15 @@ class Broker:
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
+        """Sync the qos rules status with the database.
+
+        The update tasks to the qos_rules table are piled up in the internal_scheduler.
+        The internal_scheduler is used to minimize the number of updates to the database using:
+            - the same session
+            - the same qos_rules that are read from the database once and then updated at each step if needed
+            - the requests from the self.queue.
+              If a request is updated the relative self.queue entry is updated too
+        """
         qos_rules = db.get_qos_rules(session=session_write)
         if tasks_number := len(self.internal_scheduler.queue):
             logger.info("performance", tasks_number=tasks_number)
@@ -430,6 +467,13 @@ class Broker:
 
     @perf_logger
     def sync_futures(self) -> None:
+        """Check if the futures are finished, error or cancelled and update the database accordingly.
+
+        In a previous version of the broker used to call the client.add_done_callback method but
+        it appears to be unreliable. The futures are now checked in a loop and the status is updated.
+        The futures are removed from the list of futures if they are finished in a different for loop to avoid
+        "RuntimeError: dictionary changed size during iteration."
+        """
         finished_futures = []
         for future in self.futures.values():
             if future.status in ("finished", "error", "cancelled"):
@@ -489,6 +533,7 @@ class Broker:
         number_of_requests: int,
         candidates: Iterable[db.SystemRequest],
     ) -> None:
+        """Check the qos rules and submit the requests to the dask scheduler."""
         queue = sorted(
             candidates,
             key=lambda candidate: self.qos.priority(candidate, session_write),
@@ -506,6 +551,7 @@ class Broker:
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
     ) -> None:
+        """Submit the request to the dask scheduler and update the qos rules accordingly."""
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
@@ -536,6 +582,7 @@ class Broker:
         )
 
     def run(self) -> None:
+        """Run the broker loop."""
         while True:
             start_loop = time.perf_counter()
             with self.session_maker_read() as session_read:
