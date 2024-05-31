@@ -264,8 +264,14 @@ class Broker:
                         db.add_event(
                             event_type="killed_worker",
                             request_uid=request_uid,
-                            message="Worker has been killed by the Nanny due to memory usage. "
+                            message="Worker has been killed by the Nanny due to memory usage."
                             f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
+                            session=session,
+                        )
+                        db.add_event(
+                            event_type="user_visible_error",
+                            request_uid=request_uid,
+                            message="Worker has been killed due to memory usage. ",
                             session=session,
                         )
                         request = db.set_request_status(
