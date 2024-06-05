@@ -503,14 +503,15 @@ def add_qos_rule(
     running: int = 0,
 ):
     """Add a QoS rule."""
+    conclusion_value = str(rule.evaluate(request=None))
     qos_rule = QoSRule(
         uid=str(rule.__hash__()),
         name=str(rule.name),
-        info=str(rule.info),
+        info=str(rule.info).replace("$value", conclusion_value),
         condition=str(rule.condition),
         conclusion=str(rule.conclusion),
         # conclusion_value may change over time, this case is not handled
-        conclusion_value=str(rule.evaluate(request=None)),
+        conclusion_value=conclusion_value,
         queued=queued,
         running=running,
     )
