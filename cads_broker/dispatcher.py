@@ -177,6 +177,7 @@ class Queue:
         with self._lock:
             return len(self.queue_dict)
 
+    @cachetools.cachedmethod(lambda self: 60)
     def reset(self) -> None:
         with self._lock:
             self.queue_dict = dict()
