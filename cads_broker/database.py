@@ -484,6 +484,11 @@ def reset_qos_rules(session: sa.orm.Session, qos):
     session.commit()
 
 
+def count_system_request_qos_rule(session: sa.orm.Session) -> int:
+    """Count the number of rows in system_request_qos_rule."""
+    return session.query(SystemRequestQoSRule).count()
+
+
 def get_qos_rule(uid: str, session: sa.orm.Session):
     """Get a QoS rule."""
     statement = sa.select(QoSRule).where(QoSRule.uid == uid)
