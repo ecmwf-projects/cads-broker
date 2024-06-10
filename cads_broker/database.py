@@ -70,10 +70,10 @@ class SystemRequestQoSRule(BaseModel):
 
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
-        sa.ForeignKey("system_requests.request_uid"),
+        sa.ForeignKey("system_requests.request_uid", ondelete="CASCADE"),
         primary_key=True,
     )
-    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True)
+    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid", ondelete="CASCADE"), primary_key=True)
 
 
 class Events(BaseModel):
