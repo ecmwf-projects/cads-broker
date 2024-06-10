@@ -70,10 +70,12 @@ class SystemRequestQoSRule(BaseModel):
 
     request_uid = sa.Column(
         sa.dialects.postgresql.UUID(False),
-        sa.ForeignKey("system_requests.request_uid"),
+        sa.ForeignKey("system_requests.request_uid", ondelete="CASCADE"),
         primary_key=True,
     )
-    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid"), primary_key=True)
+    rule_uid = sa.Column(
+        sa.Text, sa.ForeignKey("qos_rules.uid", ondelete="CASCADE"), primary_key=True
+    )
 
 
 class Events(BaseModel):
@@ -467,9 +469,11 @@ def get_events_from_request(
 
 def reset_qos_rules(session: sa.orm.Session, qos):
     """Delete all QoS rules."""
-    for rule in session.scalars(sa.select(QoSRule)):
-        rule.system_requests = []
-        session.delete(rule)
+    session.execute(sa.text("truncate qos_rules cascade"))
+    # for rule in session.scalars(sa.select(QoSRule)):
+    #     # rule.system_requests = []
+    #     session.delete(rule)
+
     cached_rules: dict[str, Any] = {}
     for request in get_running_requests(session):
         # Recompute the limits
@@ -482,6 +486,11 @@ def reset_qos_rules(session: sa.orm.Session, qos):
         )
         cached_rules.update(rules)
     session.commit()
+
+
+def count_system_request_qos_rule(session: sa.orm.Session) -> int:
+    """Count the number of rows in system_request_qos_rule."""
+    return session.query(SystemRequestQoSRule).count()
 
 
 def get_qos_rule(uid: str, session: sa.orm.Session):
@@ -557,11 +566,10 @@ def delete_request_qos_status(
             except sqlalchemy.orm.exc.NoResultFound:
                 qos_rule = add_qos_rule(rule=rule, session=session)
                 created_rules[qos_rule.uid] = qos_rule
-        if qos_rule.uid in [r.uid for r in request.qos_rules]:
-            request.qos_rules.remove(qos_rule)
         qos_rule.queued = len(rule.queued)
         qos_rule.running = rule.value
-    return request, created_rules
+    request.qos_rules = []
+    return None, created_rules
 
 
 def add_request_qos_status(

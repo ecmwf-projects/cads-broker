@@ -79,6 +79,7 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
     This function is executed on the scheduler pod.
     """
+
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -177,6 +178,7 @@ class Queue:
         with self._lock:
             return len(self.queue_dict)
 
+    @cachetools.cachedmethod(lambda self: cachetools.TTLCache(maxsize=1024, ttl=60))
     def reset(self) -> None:
         with self._lock:
             self.queue_dict = dict()
@@ -235,8 +237,8 @@ class Broker:
             rules_hash=rules_hash,
         )
         with session_maker_write() as session:
-            qos.reload_rules(session=session)
-            db.reset_qos_rules(session, qos)
+            perf_logger(qos.reload_rules)(session=session)
+            perf_logger(db.reset_qos_rules)(session, qos)
         self = cls(
             client=client,
             session_maker_read=session_maker_read,
@@ -263,7 +265,7 @@ class Broker:
 
         If the error reason is "KilledWorker":
             - if the worker has been killed by the Nanny for memory usage, it add the event for the user
-            - if the worker is killed for unknown reasons, it re-queues the request 
+            - if the worker is killed for unknown reasons, it re-queues the request
               if the requeue limit is not reached. This is configurable with the environment variable
         """
         error_message = "".join(traceback.format_exception(exception))
@@ -327,10 +329,10 @@ class Broker:
 
         - If the task is in the futures list it does nothing.
         - If the task is not in the futures list but it is in the scheduler:
-            - If the task is in memory (it is successful but it has been lost by the broker), 
+            - If the task is in memory (it is successful but it has been lost by the broker),
               it is set to successful.
             - If the task is in error, it is set to failed.
-        - If the task is not in the dask scheduler, it is re-queued. 
+        - If the task is not in the dask scheduler, it is re-queued.
           This behaviour can be changed with an environment variable.
         """
         # the retrieve API sets the status to "dismissed", here the broker deletes the request
@@ -444,7 +446,7 @@ class Broker:
             - the requests from the self.queue.
               If a request is updated the relative self.queue entry is updated too
         """
-        qos_rules = db.get_qos_rules(session=session_write)
+        qos_rules = perf_logger(db.get_qos_rules)(session=session_write)
         if tasks_number := len(self.internal_scheduler.queue):
             logger.info("performance", tasks_number=tasks_number)
         for task in list(self.internal_scheduler.queue)[
@@ -452,7 +454,7 @@ class Broker:
         ]:
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
-            request, new_qos_rules = task["function"](
+            request, new_qos_rules = perf_logger(task["function"])(
                 session=session_write,
                 request=self.queue.get(task["kwargs"].get("request_uid")),
                 rules_in_db=qos_rules,
@@ -527,6 +529,7 @@ class Broker:
             future.release()
         return future.key
 
+    @perf_logger
     def submit_requests(
         self,
         session_write: sa.orm.Session,
@@ -568,10 +571,7 @@ class Broker:
                 request_uid=request.request_uid,
                 user_uid=request.user_uid,
                 hostname=os.getenv("CDS_PROJECT_URL"),
-                **request.adaptor_properties.config,
             ),
-            form=request.adaptor_properties.form,
-            request=request.request_body.get("request", {}),
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
