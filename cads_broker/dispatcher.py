@@ -79,6 +79,7 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
     This function is executed on the scheduler pod.
     """
+
     def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
         tasks = {}
         for task_id, task in dask_scheduler.tasks.items():
@@ -264,7 +265,7 @@ class Broker:
 
         If the error reason is "KilledWorker":
             - if the worker has been killed by the Nanny for memory usage, it add the event for the user
-            - if the worker is killed for unknown reasons, it re-queues the request 
+            - if the worker is killed for unknown reasons, it re-queues the request
               if the requeue limit is not reached. This is configurable with the environment variable
         """
         error_message = "".join(traceback.format_exception(exception))
@@ -328,10 +329,10 @@ class Broker:
 
         - If the task is in the futures list it does nothing.
         - If the task is not in the futures list but it is in the scheduler:
-            - If the task is in memory (it is successful but it has been lost by the broker), 
+            - If the task is in memory (it is successful but it has been lost by the broker),
               it is set to successful.
             - If the task is in error, it is set to failed.
-        - If the task is not in the dask scheduler, it is re-queued. 
+        - If the task is not in the dask scheduler, it is re-queued.
           This behaviour can be changed with an environment variable.
         """
         # the retrieve API sets the status to "dismissed", here the broker deletes the request

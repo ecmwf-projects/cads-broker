@@ -73,7 +73,9 @@ class SystemRequestQoSRule(BaseModel):
         sa.ForeignKey("system_requests.request_uid", ondelete="CASCADE"),
         primary_key=True,
     )
-    rule_uid = sa.Column(sa.Text, sa.ForeignKey("qos_rules.uid", ondelete="CASCADE"), primary_key=True)
+    rule_uid = sa.Column(
+        sa.Text, sa.ForeignKey("qos_rules.uid", ondelete="CASCADE"), primary_key=True
+    )
 
 
 class Events(BaseModel):
@@ -467,7 +469,7 @@ def get_events_from_request(
 
 def reset_qos_rules(session: sa.orm.Session, qos):
     """Delete all QoS rules."""
-    session.execute(sa.text('truncate qos_rules cascade'))
+    session.execute(sa.text("truncate qos_rules cascade"))
     # for rule in session.scalars(sa.select(QoSRule)):
     #     # rule.system_requests = []
     #     session.delete(rule)
