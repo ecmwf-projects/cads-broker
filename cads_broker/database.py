@@ -468,7 +468,7 @@ def get_events_from_request(
 def reset_qos_rules(session: sa.orm.Session, qos):
     """Delete all QoS rules."""
     for rule in session.scalars(sa.select(QoSRule)):
-        rule.system_requests = []
+        # rule.system_requests = []
         session.delete(rule)
     cached_rules: dict[str, Any] = {}
     for request in get_running_requests(session):
