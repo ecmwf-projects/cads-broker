@@ -445,7 +445,7 @@ class Broker:
             - the requests from the self.queue.
               If a request is updated the relative self.queue entry is updated too
         """
-        qos_rules = db.get_qos_rules(session=session_write)
+        qos_rules = perf_logger(db.get_qos_rules)(session=session_write)
         if tasks_number := len(self.internal_scheduler.queue):
             logger.info("performance", tasks_number=tasks_number)
         for task in list(self.internal_scheduler.queue)[
