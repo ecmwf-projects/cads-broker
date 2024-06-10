@@ -528,6 +528,7 @@ class Broker:
             future.release()
         return future.key
 
+    @perf_logger
     def submit_requests(
         self,
         session_write: sa.orm.Session,
