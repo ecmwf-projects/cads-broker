@@ -564,8 +564,6 @@ def delete_request_qos_status(
             except sqlalchemy.orm.exc.NoResultFound:
                 qos_rule = add_qos_rule(rule=rule, session=session)
                 created_rules[qos_rule.uid] = qos_rule
-        # if qos_rule.uid in [r.uid for r in request.qos_rules]:
-        #     request.qos_rules.remove(qos_rule)
         qos_rule.queued = len(rule.queued)
         qos_rule.running = rule.value
     request.qos_rules = []
