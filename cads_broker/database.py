@@ -569,7 +569,7 @@ def delete_request_qos_status(
         qos_rule.queued = len(rule.queued)
         qos_rule.running = rule.value
     request.qos_rules = []
-    return request, created_rules
+    return None, created_rules
 
 
 def add_request_qos_status(
