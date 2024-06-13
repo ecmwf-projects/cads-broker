@@ -13,14 +13,15 @@ import cachetools
 import distributed
 import sqlalchemy as sa
 import structlog
+from dask.typing import Key
 from typing_extensions import Iterable
 
 try:
-    from cads_worker import worker
+    import cads_worker.worker
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, factory
+from cads_broker import Environment, config, factory, utils
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -197,6 +198,34 @@ class QoSRules:
             parser.parse_rules(self.rules, self.environment)
 
 
+class TempDirNannyPlugin(distributed.NannyPlugin):
+    def setup(self, nanny: distributed.Nanny) -> None:
+        path = utils.rm_task_path(nanny, None)
+        path.mkdir()
+
+    def teardown(self, nanny: distributed.Nanny) -> None:
+        utils.rm_task_path(nanny, None)
+
+
+class TempDirsWorkerPlugin(distributed.WorkerPlugin):
+    def setup(self, worker) -> None:
+        self.worker = worker
+
+    def teardown(self, worker: distributed.Worker) -> None:
+        for key in worker.state.tasks:
+            utils.rm_task_path(worker, key)
+
+    def transition(
+        self,
+        key: Key,
+        start: distributed.worker_state_machine.TaskStateState,
+        finish: distributed.worker_state_machine.TaskStateState,
+        **kwargs: Any,
+    ) -> None:
+        if finish in ("memory", "error"):
+            utils.rm_task_path(self.worker, key)
+
+
 @attrs.define
 class Broker:
     client: distributed.Client
@@ -217,6 +246,10 @@ class Broker:
     running_requests: int = 0
     internal_scheduler: Scheduler = Scheduler()
     queue: Queue = Queue()
+
+    def __attrs_post_init__(self):
+        self.client.register_plugin(TempDirNannyPlugin())
+        self.client.register_plugin(TempDirsWorkerPlugin())
 
     @classmethod
     def from_address(
@@ -563,7 +596,7 @@ class Broker:
         )
         self.queue.pop(request.request_uid)
         future = self.client.submit(
-            worker.submit_workflow,
+            cads_worker.worker.submit_workflow,
             key=request.request_uid,
             setup_code=request.request_body.get("setup_code", ""),
             entry_point=request.entry_point,
