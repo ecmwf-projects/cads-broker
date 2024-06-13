@@ -2,9 +2,7 @@ import datetime
 import hashlib
 import io
 import os
-import pathlib
 import pickle
-import shutil
 import threading
 import time
 import traceback
@@ -23,7 +21,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, factory
+from cads_broker import Environment, config, factory, utils
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -200,31 +198,22 @@ class QoSRules:
             parser.parse_rules(self.rules, self.environment)
 
 
-def rmtree_if_exists(path: pathlib.Path, **kwargs: Any) -> None:
-    if path.exists():
-        shutil.rmtree(path, **kwargs)
-
-
 class TempDirNannyPlugin(distributed.NannyPlugin):
     def setup(self, nanny: distributed.Nanny) -> None:
-        self.tasks_path = pathlib.Path(nanny.worker_dir) / config.TASKS_SUBDIR
-        rmtree_if_exists(self.tasks_path)
-        self.tasks_path.mkdir()
+        path = utils.rm_task_path(nanny, None)
+        path.mkdir()
 
     def teardown(self, nanny: distributed.Nanny) -> None:
-        rmtree_if_exists(self.tasks_path)
+        utils.rm_task_path(nanny, None)
 
 
 class TempDirsWorkerPlugin(distributed.WorkerPlugin):
-    def setup(self, worker: distributed.Worker) -> None:
-        self.tasks_path = pathlib.Path(worker.local_directory) / config.TASKS_SUBDIR
-
-    def delete_task_working_dir(self, key: Key) -> None:
-        rmtree_if_exists(self.tasks_path / str(key))
+    def setup(self, worker) -> None:
+        self.worker = worker
 
     def teardown(self, worker: distributed.Worker) -> None:
         for key in worker.state.tasks:
-            self.delete_task_working_dir(key)
+            utils.rm_task_path(worker, key)
 
     def transition(
         self,
@@ -234,7 +223,7 @@ class TempDirsWorkerPlugin(distributed.WorkerPlugin):
         **kwargs: Any,
     ) -> None:
         if finish in ("memory", "error"):
-            self.delete_task_working_dir(key)
+            utils.rm_task_path(self.worker, key)
 
 
 @attrs.define
