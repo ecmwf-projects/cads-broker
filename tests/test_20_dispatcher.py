@@ -1,4 +1,5 @@
 import datetime
+import pathlib
 import uuid
 from typing import Any
 
@@ -120,3 +121,35 @@ def test_broker_sync_database(
         # with pytest.raises(db.NoResultFound):
         #     with session_obj() as session:
         #         db.get_request(dismissed_request_uid, session=session)
+
+
+def test_plugins(
+    mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
+) -> None:
+    environment = Environment.Environment()
+    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment, rules_hash="")
+    broker = dispatcher.Broker(
+        client=CLIENT,
+        environment=environment,
+        qos=qos,
+        address="scheduler-address",
+        session_maker_read=session_obj,
+        session_maker_write=session_obj,
+    )
+
+    def func() -> pathlib.Path:
+        worker = distributed.get_worker()
+        key = worker.get_current_task()
+        task_path = (
+            pathlib.Path(worker.local_directory) / "tasks_working_dir" / str(key)
+        )
+        task_path.mkdir()
+        return task_path
+
+    future = broker.client.submit(func)
+    task_path = future.result()
+    assert not task_path.exists()
+
+    assert task_path.parent.exists()
+    broker.client.shutdown()
+    assert not task_path.parent.exists()

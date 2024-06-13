@@ -24,6 +24,8 @@ import structlog
 
 dbsettings = None
 
+TASKS_SUBDIR = "tasks_working_dir"
+
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):
     """Postgres-specific API settings.
