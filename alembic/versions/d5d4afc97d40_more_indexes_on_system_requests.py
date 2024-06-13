@@ -1,4 +1,4 @@
-"""more indexes on system requests
+"""more indexes on system requests.
 
 Revision ID: d5d4afc97d40
 Revises: 3a1e0810f93d
@@ -10,7 +10,7 @@ import alembic
 
 # revision identifiers, used by Alembic.
 revision = "d5d4afc97d40"
-down_revision = "3a1e0810f93d"
+down_revision = "ca178571bdc5"
 branch_labels = None
 depends_on = None
 
