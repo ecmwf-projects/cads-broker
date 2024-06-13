@@ -28,6 +28,7 @@ def rm_task_path(
     key: Key | None,
     **kwargs: Any,
 ) -> pathlib.Path:
+    # This function is used by cads-worker as well.
     path = get_task_path(worker_or_nanny, key)
     if path.exists():
         shutil.rmtree(path, **kwargs)
