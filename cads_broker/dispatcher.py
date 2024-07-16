@@ -237,6 +237,7 @@ class Broker:
             rules_hash=rules_hash,
         )
         with session_maker_write() as session:
+            qos.environment.set_session(session)
             perf_logger(qos.reload_rules)(session=session)
             perf_logger(db.reset_qos_rules)(session, qos)
         self = cls(
