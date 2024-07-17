@@ -342,7 +342,9 @@ class Broker:
         for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
-                self.qos.notify_end_of_request(request, session, scheduler=self.internal_scheduler)
+                self.qos.notify_end_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
             self.queue.pop(request.request_uid, None)
         session.commit()
 
