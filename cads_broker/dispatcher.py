@@ -170,9 +170,9 @@ class Queue:
         with self._lock:
             return self.queue_dict.values()
 
-    def pop(self, key: str) -> Any:
+    def pop(self, key: str, default=None) -> Any:
         with self._lock:
-            return self.queue_dict.pop(key, None)
+            return self.queue_dict.pop(key, default)
 
     def len(self) -> int:
         with self._lock:
@@ -336,16 +336,14 @@ class Broker:
         - If the task is not in the dask scheduler, it is re-queued.
           This behaviour can be changed with an environment variable.
         """
-        # the retrieve API sets the status to "dismissed", here the broker deletes the request
-        # this is to better control the status of the QoS
-        dismissed_uids = db.update_dismissed_requests(session)
+        # the retrieve API sets the status to "dismissed",
+        # here the broker fixes the QoS and queue status accordingly
+        dismissed_uids = db.get_dismissed_requests(session)
         for uid in dismissed_uids:
             if future := self.futures.pop(uid, None):
                 future.cancel()
-        if dismissed_uids:
-            self.queue.reset()
-            self.qos.reload_rules(session)
-            db.reset_qos_rules(session, self.qos)
+                self.qos.notify_end_of_request()
+            self.queue.pop(uid, None)
         session.commit()
 
         statement = sa.select(db.SystemRequest).where(

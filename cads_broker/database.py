@@ -427,12 +427,11 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def update_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
+def get_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
     stmt_dismissed = (
-        sa.update(SystemRequest)
+        sa.query(SystemRequest)
         .where(SystemRequest.status == "dismissed")
         .returning(SystemRequest.request_uid)
-        .values(status="failed", response_error={"reason": "dismissed request"})
     )
     dismissed_uids = session.scalars(stmt_dismissed).fetchall()
     session.execute(  # type: ignore
