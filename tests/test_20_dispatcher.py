@@ -89,10 +89,10 @@ def test_broker_sync_database(
         session.commit()
 
     def mock_get_tasks() -> dict[str, str]:
-        return {in_dask_request_uid: "..."}
+        return {in_dask_request_uid: {"state": "...", "exception": None}}
 
     mocker.patch(
-        "cads_broker.dispatcher.get_tasks",
+        "cads_broker.dispatcher.get_tasks_from_scheduler",
         return_value=mock_get_tasks(),
     )
     broker.futures = {in_futures_request_uid: "..."}
@@ -114,8 +114,8 @@ def test_broker_sync_database(
             db.SystemRequest.request_uid == lost_request_uid
         )
         output_request = session.scalars(statement).first()
-        assert output_request.status == "failed"
-        assert output_request.request_metadata.get("resubmit_number") is None
+        assert output_request.status == "accepted"
+        assert output_request.request_metadata.get("resubmit_number") == 1
 
         # with pytest.raises(db.NoResultFound):
         #     with session_obj() as session:
