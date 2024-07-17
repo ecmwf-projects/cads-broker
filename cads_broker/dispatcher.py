@@ -338,12 +338,12 @@ class Broker:
         """
         # the retrieve API sets the status to "dismissed",
         # here the broker fixes the QoS and queue status accordingly
-        dismissed_uids = db.get_dismissed_requests(session)
-        for uid in dismissed_uids:
-            if future := self.futures.pop(uid, None):
+        dismissed_requests = db.get_dismissed_requests(session)
+        for request in dismissed_requests:
+            if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
-                self.qos.notify_end_of_request()
-            self.queue.pop(uid, None)
+                self.qos.notify_end_of_request(request, session, scheduler=self.internal_scheduler)
+            self.queue.pop(request.request_uid, None)
         session.commit()
 
         statement = sa.select(db.SystemRequest).where(

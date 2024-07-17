@@ -427,25 +427,12 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def get_dismissed_requests(session: sa.orm.Session) -> Iterable[str]:
+def get_dismissed_requests(session: sa.orm.Session) -> Iterable[SystemRequest]:
     stmt_dismissed = (
-        sa.query(SystemRequest)
+        sa.select(SystemRequest)
         .where(SystemRequest.status == "dismissed")
-        .returning(SystemRequest.request_uid)
     )
-    dismissed_uids = session.scalars(stmt_dismissed).fetchall()
-    session.execute(  # type: ignore
-        sa.insert(Events),
-        map(
-            lambda x: {
-                "request_uid": x,
-                "message": DISMISSED_MESSAGE,
-                "event_type": "user_visible_error",
-            },
-            dismissed_uids,
-        ),
-    )
-    return dismissed_uids
+    return session.scalars(stmt_dismissed).fetchall()
 
 
 def get_events_from_request(
