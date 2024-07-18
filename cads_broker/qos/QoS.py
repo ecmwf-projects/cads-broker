@@ -26,12 +26,13 @@ def locked(method):
 
 
 class QoS:
-    def __init__(self, rules, environment, rules_hash):
+    def __init__(self, rules, environment, rules_hash, logger):
         self.lock = threading.RLock()
 
         self.rules_hash = rules_hash
 
         self.environment = environment
+        self.logger = logger
         # The list of active requests
 
         # Cache associating Request and their Properties
@@ -53,13 +54,13 @@ class QoS:
     def read_rules(self):
         """Read the rule files and populate the rule_set."""
         # Create a parser to parse the rules file
-        parser = RulesParser(self.path)
+        parser = RulesParser(self.path, logger=self.logger)
 
         # The rules will be stored in self.rules
         self.rules = RuleSet()
 
         # Parse the rules
-        parser.parse_rules(self.rules, self.environment)
+        parser.parse_rules(self.rules, self.environment, raise_exception=False)
 
         # Print the rules
         self.rules.dump()

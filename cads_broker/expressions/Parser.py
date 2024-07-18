@@ -41,7 +41,7 @@ class Parser:
     This class must be sub-classed.
     """
 
-    def __init__(self, path, comments=True):
+    def __init__(self, path, logger, comments=True):
         if isinstance(path, str):
             self.reader = Reader(open(path))
         else:
@@ -49,6 +49,7 @@ class Parser:
         self.comments = comments
         self.eof = False
         self.line = 0
+        self.logger = logger
 
     def read(self):
         if self.eof:

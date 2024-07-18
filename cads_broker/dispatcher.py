@@ -192,9 +192,12 @@ class QoSRules:
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
         else:
-            parser = QoS.RulesParser(io.StringIO(os.getenv("DEFAULT_RULES", "")))
+            logger.info("rules file not found", rules_path=self.rules_path)
+            parser = QoS.RulesParser(
+                io.StringIO(os.getenv("DEFAULT_RULES", "")), logger=logger
+            )
             self.rules = QoS.RuleSet()
-            parser.parse_rules(self.rules, self.environment)
+            parser.parse_rules(self.rules, self.environment, raise_exception=False)
 
 
 @attrs.define
@@ -235,6 +238,7 @@ class Broker:
             qos_config.rules,
             qos_config.environment,
             rules_hash=rules_hash,
+            logger=logger,
         )
         with session_maker_write() as session:
             qos.environment.set_session(session)
