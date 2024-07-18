@@ -53,7 +53,6 @@ def add_dummy_requests(
                     entry_point="cads_adaptors:DummyAdaptor",
                 )
                 session.add(request)
-            if i % 100 == 0:
                 session.commit()
         session.commit()
 
