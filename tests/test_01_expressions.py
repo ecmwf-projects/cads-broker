@@ -1,4 +1,5 @@
 import io
+import logging
 
 from cads_broker import Environment
 from cads_broker.expressions import FunctionFactory
@@ -13,6 +14,8 @@ FunctionFactory.FunctionFactory.register_function(
     "adaptor",
     lambda context, *args: context.request.adaptor,
 )
+
+logger = logging.getLogger("test")
 
 
 class TestRequest:
@@ -30,7 +33,7 @@ environment.disable_resource("adaptor2")
 
 
 def compile(text):
-    parser = RulesParser(io.StringIO(text))
+    parser = RulesParser(io.StringIO(text), logger=logger)
     return parser.parse()
 
 

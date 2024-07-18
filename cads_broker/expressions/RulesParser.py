@@ -327,7 +327,7 @@ class RulesParser(Parser):
 
         return result
 
-    def parse_rules(self, rules, environment):
+    def parse_rules(self, rules, environment, raise_exception=True):
         """Parse the text provided in the constructor.
 
         Args:
@@ -340,22 +340,29 @@ class RulesParser(Parser):
             ParserError: [description]
         """
         while self.peek():
-            ident = self.parse_ident()
+            try:
+                ident = self.parse_ident()
 
-            if ident == "limit":
-                self.parse_global_limit(rules, environment)
-                continue
+                if ident == "limit":
+                    self.parse_global_limit(rules, environment)
+                    continue
 
-            if ident == "priority":
-                self.parse_priority(rules, environment)
-                continue
+                if ident == "priority":
+                    self.parse_priority(rules, environment)
+                    continue
 
-            if ident == "permission":
-                self.parse_permission(rules, environment)
-                continue
+                if ident == "permission":
+                    self.parse_permission(rules, environment)
+                    continue
 
-            if ident == "user":
-                self.parse_user_limit(rules, environment)
-                continue
+                if ident == "user":
+                    self.parse_user_limit(rules, environment)
+                    continue
 
-            raise ParserError(f"Unknown rule: '{ident}'", self.line + 1)
+                raise ParserError(f"Unknown rule: '{ident}'", self.line + 1)
+            except ParserError as e:
+                if raise_exception:
+                    raise e
+                else:
+                    self.logger.info(e)
+                    return

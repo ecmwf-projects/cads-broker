@@ -1,4 +1,5 @@
 import datetime
+import logging
 import uuid
 from typing import Any
 
@@ -12,6 +13,8 @@ from cads_broker.qos import QoS, Rule
 
 # create client object and connect to local cluster
 CLIENT = distributed.Client(distributed.LocalCluster())
+
+logger = logging.getLogger("test")
 
 
 def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any] = {}):
@@ -45,7 +48,9 @@ def test_broker_sync_database(
     mocker: pytest_mock.plugin.MockerFixture, session_obj: sa.orm.sessionmaker
 ) -> None:
     environment = Environment.Environment()
-    qos = QoS.QoS(rules=Rule.RuleSet(), environment=environment, rules_hash="")
+    qos = QoS.QoS(
+        rules=Rule.RuleSet(), environment=environment, rules_hash="", logger=logger
+    )
     broker = dispatcher.Broker(
         client=CLIENT,
         environment=environment,
