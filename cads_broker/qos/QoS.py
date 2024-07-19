@@ -157,9 +157,9 @@ class QoS:
                 properties.limits.append(rule)
 
         # Add per-user limits
-        limit = self.user_limit(request)
-        if limit is not None:
-            properties.limits.append(limit)
+        limits = self.user_limit(request)
+        if limits != []:
+            properties.limits.extend(limits)
 
         # Add priorities and compute starting priority
         priority = 0
@@ -252,10 +252,10 @@ class QoS:
         """Return the per-user limit for the user associated with the request."""
         user = request.user_uid
 
-        limit = self.per_user_limits.get(user)
-        if limit is not None:
-            print(user, limit)
-            return limit
+        limits = self.per_user_limits.get(user, [])
+        if limits != []:
+            print(user, limits)
+            return limits
 
         for limit in self.rules.user_limits:
             if limit.match(request):
@@ -264,10 +264,9 @@ class QoS:
                 user otherwise all users will share that limit
                 """
                 limit = limit.clone()
-                self.per_user_limits[user] = limit
-                return limit
-        return None
-        # raise Exception(f"Not rules matching user '{user}'")
+                limits.append(limit)
+        self.per_user_limits[user] = limits
+        return limits
 
     @locked
     def pick(self, queue, session):
