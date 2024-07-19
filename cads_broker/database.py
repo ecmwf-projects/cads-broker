@@ -641,6 +641,16 @@ def set_successful_request(
     return request
 
 
+def set_dismissed_request(request_uid: str, session: sa.orm.Session) -> SystemRequest:
+    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
+    request = session.scalars(statement).one()
+    request.status = "dismissed"
+    request.response_error = {"reason": "Dismissed by the user"}
+    session.commit()
+    logger.info("dismissed job by the user.", **logger_kwargs(request=request))
+    return request
+
+
 def set_request_status(
     request_uid: str,
     status: str,
