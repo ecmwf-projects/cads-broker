@@ -977,11 +977,13 @@ def test_init_database(postgresql: Connection[str]) -> None:
     # start with an empty db structure
     expected_tables_at_beginning: set[str] = set()
     assert set(conn.execute(query).scalars()) == expected_tables_at_beginning  # type: ignore
-
+    conn.close()
     # verify create structure
     db.init_database(connection_string, force=True)
+    conn = engine.connect()
     expected_tables_complete = (
         set(db.BaseModel.metadata.tables)
+        .union({"alembic_version"})
         .union({"alembic_version_cacholote"})
         .union(set(cacholote.database.Base.metadata.tables))
     )
@@ -1032,6 +1034,7 @@ def test_init_database_with_password(postgresql2: Connection[str]) -> None:
     db.init_database(connection_string, force=True)
     expected_tables_complete = (
         set(db.BaseModel.metadata.tables)
+        .union({"alembic_version"})
         .union({"alembic_version_cacholote"})
         .union(set(cacholote.database.Base.metadata.tables))
     )
