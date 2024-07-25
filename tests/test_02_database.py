@@ -982,7 +982,7 @@ def test_init_database(postgresql: Connection[str]) -> None:
     db.init_database(connection_string, force=True)
     expected_tables_complete = (
         set(db.BaseModel.metadata.tables)
-        .union({"alembic_version"})
+        .union({"alembic_version_cacholote"})
         .union(set(cacholote.database.Base.metadata.tables))
     )
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore
@@ -1032,7 +1032,7 @@ def test_init_database_with_password(postgresql2: Connection[str]) -> None:
     db.init_database(connection_string, force=True)
     expected_tables_complete = (
         set(db.BaseModel.metadata.tables)
-        .union({"alembic_version"})
+        .union({"alembic_version_cacholote"})
         .union(set(cacholote.database.Base.metadata.tables))
     )
     assert set(conn.execute(query).scalars()) == expected_tables_complete  # type: ignore

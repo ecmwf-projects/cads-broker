@@ -88,7 +88,9 @@ def test_init_db(postgresql: Connection[str], mocker) -> None:
     )
     assert set(conn.execute(query).scalars()) == set(
         database.BaseModel.metadata.tables
-    ).union({"alembic_version"}).union(set(cacholote.database.Base.metadata.tables))
+    ).union({"alembic_version_cacholote"}).union(
+        set(cacholote.database.Base.metadata.tables)
+    )
     conn.close()
 
 
