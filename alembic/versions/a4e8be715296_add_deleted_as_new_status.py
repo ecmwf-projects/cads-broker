@@ -18,7 +18,13 @@ depends_on = None
 
 
 old_status_enum = ENUM(
-    "pending", "in_progress", "completed", "failed", name="status", create_type=False
+    "accepted",
+    "running",
+    "failed",
+    "successful",
+    "dismissed",
+    name="status",
+    create_type=False,
 )
 new_status_enum = ENUM(
     "pending",
