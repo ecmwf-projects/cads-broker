@@ -46,7 +46,8 @@ def register_functions():
         lambda context,
         cost_key,
         scale_factor=1,
-        *args: context.request.request_metadata.get("costs", {}).get(cost_key, 0) * scale_factor,
+        *args: context.request.request_metadata.get("costs", {}).get(cost_key, 0)
+        * scale_factor,
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "user_finished_request_count",
