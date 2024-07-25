@@ -26,7 +26,7 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 status_enum = sa.Enum(
-    "accepted", "running", "failed", "successful", "dismissed", name="status"
+    "accepted", "running", "failed", "successful", "dismissed", "deleted", name="status"
 )
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
@@ -642,8 +642,10 @@ def set_successful_request(
 
 
 def set_dismissed_request(request_uid: str, session: sa.orm.Session) -> SystemRequest:
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    request = session.scalars(statement).one()
+    request = get_request(request_uid=request_uid, session=session)
+    metadata = dict(request.request_metadata)
+    metadata.update({"previous_status": request.status})
+    request.request_metadata = metadata
     request.status = "dismissed"
     request.response_error = {"reason": "Dismissed by the user"}
     session.commit()
