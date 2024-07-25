@@ -1,4 +1,4 @@
-"""add deleted as new status
+"""add deleted as new status.
 
 Revision ID: a4e8be715296
 Revises: d5d4afc97d40
@@ -6,10 +6,9 @@ Create Date: 2024-07-25 13:13:11.955119
 
 """
 
-from alembic import op
-import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ENUM
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a4e8be715296"
