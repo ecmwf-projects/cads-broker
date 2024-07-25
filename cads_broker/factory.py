@@ -42,6 +42,13 @@ def register_functions():
         lambda context, *args: context.request.portal,
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
+        "priority_from_cost",
+        lambda context,
+        cost_key,
+        scale_factor=1,
+        *args: context.request.request_metadata["costs"][cost_key] * scale_factor,
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
         "user_finished_request_count",
         lambda context, seconds: database.count_finished_requests_per_user(
             user_uid=context.request.user_uid,
