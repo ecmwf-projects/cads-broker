@@ -46,4 +46,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Remove the new status from the enum
+    # this doesn't work
     op.execute("ALTER TYPE status DELETE VALUE 'deleted'")
