@@ -253,9 +253,10 @@ class QoS:
         user = request.user_uid
 
         limits = self.per_user_limits.get(user, [])
-        if limits != []:
-            print(user, limits)
-            return limits
+        applied_limits = []
+        for limit in limits:
+            if limit.match(request):
+                applied_limits.append(limit)
 
         for limit in self.rules.user_limits:
             if limit.match(request):
@@ -263,10 +264,11 @@ class QoS:
                 We clone the rule because we need one instance per different
                 user otherwise all users will share that limit
                 """
-                limit = limit.clone()
-                limits.append(limit)
-        self.per_user_limits[user] = limits
-        return limits
+                if limit.get_uid(request) not in [l.get_uid(request) for l in limits]:
+                    limit = limit.clone()
+                    applied_limits.append(limit)
+                    self.per_user_limits[user] = self.per_user_limits.get(user, []) + [limit]
+        return applied_limits
 
     @locked
     def pick(self, queue, session):
