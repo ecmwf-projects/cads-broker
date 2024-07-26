@@ -346,10 +346,20 @@ class Broker:
         for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
+            if (
+                previous_status := request.request_metadata.get(
+                    "previous_status", "accepted"
+                )
+            ) == "running":
                 self.qos.notify_end_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
-            self.queue.pop(request.request_uid, None)
+            elif previous_status == "accepted":
+                self.queue.pop(request.request_uid, None)
+                self.qos.notify_dismission_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
+            request.status = "deleted"
         session.commit()
 
         statement = sa.select(db.SystemRequest).where(

@@ -26,7 +26,7 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 status_enum = sa.Enum(
-    "accepted", "running", "failed", "successful", "dismissed", name="status"
+    "accepted", "running", "failed", "successful", "dismissed", "deleted", name="status"
 )
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
@@ -642,8 +642,10 @@ def set_successful_request(
 
 
 def set_dismissed_request(request_uid: str, session: sa.orm.Session) -> SystemRequest:
-    statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
-    request = session.scalars(statement).one()
+    request = get_request(request_uid=request_uid, session=session)
+    metadata = dict(request.request_metadata)
+    metadata.update({"previous_status": request.status})
+    request.request_metadata = metadata
     request.status = "dismissed"
     request.response_error = {"reason": "Dismissed by the user"}
     session.commit()
@@ -877,10 +879,9 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         sqlalchemy_utils.create_database(engine.url)
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
-        cacholote.database.Base.metadata.drop_all(engine)
-        cacholote.database.Base.metadata.create_all(engine)
-        BaseModel.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
+        cacholote.init_database(connection_string, force)
+        BaseModel.metadata.create_all(engine)
     else:
         # check the structure is empty or incomplete
         query = sa.text(
@@ -893,11 +894,11 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     if force:
         # cleanup and create the schema
         BaseModel.metadata.drop_all(engine)
-        cacholote.database.Base.metadata.drop_all(engine)
-        cacholote.database.Base.metadata.create_all(engine)
-        BaseModel.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
+        cacholote.init_database(connection_string, force)
+        BaseModel.metadata.create_all(engine)
     else:
         # update db structure
+        cacholote.init_database(connection_string, force)
         alembic.command.upgrade(alembic_cfg, "head")
     return engine

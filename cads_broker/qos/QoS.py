@@ -296,6 +296,23 @@ class QoS:
         return request
 
     @locked
+    def notify_dismission_of_request(self, request, session, scheduler):
+        """Notify the dismission of a request."""
+        limits_list = []
+        for limit in self.limits_for(request, session):
+            limit.remove_from_queue(request.request_uid)
+            limits_list.append(limit)
+        scheduler.append(
+            {
+                "function": database.delete_request_qos_status,
+                "kwargs": {
+                    "rules": limits_list,
+                    "request_uid": request.request_uid,
+                },
+            }
+        )
+
+    @locked
     def notify_start_of_request(self, request, session, scheduler):
         """Notify the start of a request.
 
