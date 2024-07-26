@@ -899,6 +899,6 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         BaseModel.metadata.create_all(engine)
     else:
         # update db structure
-        cacholote.init_database(connection_string, force)
         alembic.command.upgrade(alembic_cfg, "head")
+        cacholote.init_database(connection_string, force)
     return engine
