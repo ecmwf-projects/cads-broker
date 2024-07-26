@@ -28,10 +28,11 @@ old_status_enum = sa.Enum(
     create_type=False,
 )
 new_status_enum = sa.Enum(
-    "pending",
-    "in_progress",
-    "completed",
+    "accepted",
+    "running",
     "failed",
+    "successful",
+    "dismissed",
     "deleted",
     name="status",
     create_type=False,
