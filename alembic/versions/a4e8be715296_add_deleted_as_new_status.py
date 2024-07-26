@@ -41,21 +41,9 @@ new_status_enum = sa.Enum(
 
 def upgrade() -> None:
     # Add the new status to the enum
-    op.alter_column(
-        "system_requests",
-        "status",
-        existing_type=old_status_enum,
-        type_=new_status_enum,
-        existing_nullable=False,
-    )
+    op.execute("ALTER TYPE status ADD VALUE 'deleted'")
 
 
 def downgrade() -> None:
     # Remove the new status from the enum
-    op.alter_column(
-        "system_requests",
-        "status",
-        existing_type=new_status_enum,
-        type_=old_status_enum,
-        existing_nullable=False,
-    )
+    op.execute("ALTER TYPE status DELETE VALUE 'deleted'")
