@@ -103,8 +103,35 @@ class QoS:
             if limit.full(request):
                 limit.queue(request.request_uid)
                 limits.append(limit)
+                # add a rule to the database if it is new
                 if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
                     new_limits.append(limit)
+        delete_limits = []
+        # loop on all the rules that limited the request before
+        # and remove the ones that are not applicable anymore
+        for limit in request.qos_rules:
+            if limit.uid not in [str(l.__hash__()) for l in properties.limits]:
+                for rule in self.rules.global_limits:
+                    # search on all the global limits
+                    if str(rule.__hash__()) == limit.uid:
+                        rule.remove_from_queue(request.request_uid)
+                        delete_limits.append(rule)
+                for rule in self.user_limit(request):
+                    # search on all the user limits
+                    if str(rule.__hash__()) == limit.uid:
+                        rule.remove_from_queue(request.request_uid)
+                        delete_limits.append(rule)
+
+        if len(delete_limits):
+            scheduler.append(
+                {
+                    "function": database.delete_request_qos_status,
+                    "kwargs": {
+                        "rules": delete_limits,
+                        "request_uid": request.request_uid,
+                    },
+                }
+            )
         if len(new_limits):
             scheduler.append(
                 {
