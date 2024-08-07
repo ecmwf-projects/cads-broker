@@ -355,7 +355,7 @@ class Broker:
             elif reason == "PermissionError":
                 request.status = "failed"
                 request.finished_at = datetime.datetime.now()
-        session.commit()
+                session.commit()
         return session
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
