@@ -335,6 +335,7 @@ class Broker:
             message=dismission_metadata.get("message", ""),
             session=session,
         )
+        print('-----------dismission_metadata.get("previous_status", "accepted")')
         if (
             previous_status := dismission_metadata.get("previous_status", "accepted")
             == "running"
@@ -353,7 +354,6 @@ class Broker:
             ) == "DismissedRequest":
                 request.status = "deleted"
             elif reason == "PermissionError":
-                print("setting to failed")
                 request.status = "failed"
                 request.finished_at = datetime.datetime.now()
                 session.commit()
