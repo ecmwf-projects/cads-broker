@@ -335,10 +335,8 @@ class Broker:
             message=dismission_metadata.get("message", ""),
             session=session,
         )
-        if (
-            previous_status := dismission_metadata.get("previous_status", "accepted")
-            == "running"
-        ):
+        previous_status = dismission_metadata.get("previous_status", "accepted")
+        if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
