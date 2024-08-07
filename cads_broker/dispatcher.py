@@ -335,7 +335,6 @@ class Broker:
             message=dismission_metadata.get("message", ""),
             session=session,
         )
-        print('-----------', dismission_metadata.get("previous_status", "accepted"))
         if (
             previous_status := dismission_metadata.get("previous_status", "accepted")
             == "running"
@@ -349,6 +348,7 @@ class Broker:
             self.qos.notify_dismission_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
+            print('-----------', dismission_metadata.get("reason", ""))
             if (
                 reason := dismission_metadata.get("reason", "DismissedRequest")
             ) == "DismissedRequest":
