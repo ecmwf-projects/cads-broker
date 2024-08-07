@@ -335,7 +335,7 @@ class Broker:
             message=dismission_metadata.get("message", ""),
             session=session,
         )
-        print('-----------dismission_metadata.get("previous_status", "accepted")')
+        print('-----------', dismission_metadata.get("previous_status", "accepted"))
         if (
             previous_status := dismission_metadata.get("previous_status", "accepted")
             == "running"
