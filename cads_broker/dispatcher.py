@@ -355,6 +355,7 @@ class Broker:
             elif reason == "PermissionError":
                 request.status = "failed"
                 request.finished_at = datetime.datetime.now()
+        return session
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
     @perf_logger
@@ -375,7 +376,7 @@ class Broker:
         for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
-            self.manage_dismissed_request(request, session)
+            session = self.manage_dismissed_request(request, session)
         session.commit()
 
         statement = sa.select(db.SystemRequest).where(
