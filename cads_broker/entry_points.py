@@ -118,11 +118,13 @@ class RequestStatus(str, Enum):
 @app.command()
 def delete_requests(
     status: RequestStatus = RequestStatus.running,
+    user_uid: Optional[str] = None,
     connection_string: Optional[str] = None,
     minutes: float = 0,
     seconds: float = 0,
     hours: float = 0,
     days: float = 0,
+    message: Optional[str] = "The request has been dismissed by the administrator.",
     skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
     """Set the status of records in the system_requests table to 'dismissed'.
@@ -142,7 +144,18 @@ def delete_requests(
             sa.update(database.SystemRequest)
             .where(database.SystemRequest.status == status)
             .where(database.SystemRequest.created_at < timestamp)
-            .values(status="dismissed")
+        )
+        if user_uid:
+            statement = statement.where(database.SystemRequest.user_uid == user_uid)
+        statement = statement.values(
+            status="dismissed",
+            request_metadata={
+                "dismission": {
+                    "reason": "DismissedRequest",
+                    "message": message,
+                    "previous_status": status,
+                }
+            },
         )
         number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:

@@ -641,13 +641,25 @@ def set_successful_request(
     return request
 
 
-def set_dismissed_request(request_uid: str, session: sa.orm.Session) -> SystemRequest:
+def set_dismissed_request(
+    request_uid: str,
+    session: sa.orm.Session,
+    message: str = "Dismissed by the user.",
+    reason: str = "DismissedRequest",
+) -> SystemRequest:
     request = get_request(request_uid=request_uid, session=session)
     metadata = dict(request.request_metadata)
-    metadata.update({"previous_status": request.status})
+    metadata.update(
+        {
+            "dismission": {
+                "previous_status": request.status,
+                "message": message,
+                "reason": reason,
+            }
+        }
+    )
     request.request_metadata = metadata
     request.status = "dismissed"
-    request.response_error = {"reason": "Dismissed by the user"}
     session.commit()
     logger.info("dismissed job by the user.", **logger_kwargs(request=request))
     return request

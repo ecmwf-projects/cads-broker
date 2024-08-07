@@ -140,14 +140,13 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
-                    database.set_request_status(
+                    database.set_dismissed_request(
                         request_uid=request.request_uid,
-                        status="failed",
                         session=session,
-                        error_message=rule.info.evaluate(
+                        message=rule.info.evaluate(
                             Context(request, self.environment)
                         ),
-                        error_reason="Permission error.",
+                        reason="PermissionError",
                     )
                     break
 
