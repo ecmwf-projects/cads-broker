@@ -353,6 +353,7 @@ class Broker:
             ) == "DismissedRequest":
                 request.status = "deleted"
             elif reason == "PermissionError":
+                print("setting to failed")
                 request.status = "failed"
                 request.finished_at = datetime.datetime.now()
                 session.commit()
