@@ -336,23 +336,21 @@ class Broker:
             session=session,
         )
         previous_status = dismission_metadata.get("previous_status", "accepted")
+        if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":
+            request.status = "failed"
+            request.finished_at = datetime.datetime.now()
+        else:
+            request.status = "deleted"
         if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
-            request.status = "deleted"
         elif previous_status == "accepted":
             self.queue.pop(request.request_uid, None)
             self.qos.notify_dismission_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
-            if (
-                reason := dismission_metadata.get("reason", "DismissedRequest")
-            ) == "DismissedRequest":
-                request.status = "deleted"
-            elif reason == "PermissionError":
-                request.status = "failed"
-                request.finished_at = datetime.datetime.now()
+        logger.info("job has finished", **db.logger_kwargs(request=request))
         return session
 
     @cachetools.cachedmethod(lambda self: self.ttl_cache)

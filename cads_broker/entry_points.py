@@ -151,7 +151,7 @@ def delete_requests(
             status="dismissed",
             request_metadata={
                 "dismission": {
-                    "reason": "DismissedRequest",
+                    "reason": "PermissionError",
                     "message": message,
                     "previous_status": status,
                 }
