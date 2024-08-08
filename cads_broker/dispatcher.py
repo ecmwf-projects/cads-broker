@@ -327,6 +327,34 @@ class Broker:
             )
         return request
 
+    def manage_dismissed_request(self, request, session):
+        dismission_metadata = request.request_metadata.get("dismission", {})
+        db.add_event(
+            event_type="user_visible_error",
+            request_uid=request.request_uid,
+            message=dismission_metadata.get("message", ""),
+            session=session,
+        )
+        previous_status = dismission_metadata.get("previous_status", "accepted")
+        if previous_status == "running":
+            self.qos.notify_end_of_request(
+                request, session, scheduler=self.internal_scheduler
+            )
+            request.status = "deleted"
+        elif previous_status == "accepted":
+            self.queue.pop(request.request_uid, None)
+            self.qos.notify_dismission_of_request(
+                request, session, scheduler=self.internal_scheduler
+            )
+            if (
+                reason := dismission_metadata.get("reason", "DismissedRequest")
+            ) == "DismissedRequest":
+                request.status = "deleted"
+            elif reason == "PermissionError":
+                request.status = "failed"
+                request.finished_at = datetime.datetime.now()
+        return session
+
     @cachetools.cachedmethod(lambda self: self.ttl_cache)
     @perf_logger
     def sync_database(self, session: sa.orm.Session) -> None:
@@ -346,20 +374,7 @@ class Broker:
         for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
-            if (
-                previous_status := request.request_metadata.get(
-                    "previous_status", "accepted"
-                )
-            ) == "running":
-                self.qos.notify_end_of_request(
-                    request, session, scheduler=self.internal_scheduler
-                )
-            elif previous_status == "accepted":
-                self.queue.pop(request.request_uid, None)
-                self.qos.notify_dismission_of_request(
-                    request, session, scheduler=self.internal_scheduler
-                )
-            request.status = "deleted"
+            session = self.manage_dismissed_request(request, session)
         session.commit()
 
         statement = sa.select(db.SystemRequest).where(

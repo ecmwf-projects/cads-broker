@@ -140,14 +140,11 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
-                    database.set_request_status(
+                    database.set_dismissed_request(
                         request_uid=request.request_uid,
-                        status="failed",
                         session=session,
-                        error_message=rule.info.evaluate(
-                            Context(request, self.environment)
-                        ),
-                        error_reason="Permission error.",
+                        message=rule.info.evaluate(Context(request, self.environment)),
+                        reason="PermissionError",
                     )
                     break
 
@@ -254,20 +251,24 @@ class QoS:
 
         limits = self.per_user_limits.get(user, [])
         applied_limits = []
-        for limit in limits:
-            if limit.match(request):
-                applied_limits.append(limit)
+        for user_limit in limits:
+            if user_limit.match(request):
+                applied_limits.append(user_limit)
 
-        for limit in self.rules.user_limits:
-            if limit.match(request):
+        for user_limit in self.rules.user_limits:
+            if user_limit.match(request):
                 """
                 We clone the rule because we need one instance per different
                 user otherwise all users will share that limit
                 """
-                if limit.get_uid(request) not in [l.get_uid(request) for l in limits]:
-                    limit = limit.clone()
-                    applied_limits.append(limit)
-                    self.per_user_limits[user] = self.per_user_limits.get(user, []) + [limit]
+                if user_limit.get_uid(request) not in [
+                    limit.get_uid(request) for limit in limits
+                ]:
+                    user_limit = user_limit.clone()
+                    applied_limits.append(user_limit)
+                    self.per_user_limits[user] = self.per_user_limits.get(user, []) + [
+                        user_limit
+                    ]
         return applied_limits
 
     @locked
