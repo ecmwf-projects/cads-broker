@@ -342,7 +342,6 @@ class Broker:
             )
             request.status = "deleted"
         elif previous_status == "accepted":
-            print('-----------', dismission_metadata.get("reason", ""))
             self.queue.pop(request.request_uid, None)
             self.qos.notify_dismission_of_request(
                 request, session, scheduler=self.internal_scheduler
