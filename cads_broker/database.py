@@ -728,6 +728,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
         "origin": request.origin,
         "portal": request.portal,
         "entry_point": request.entry_point,
+        "request_metadata": request.request_metadata,
         **request.response_error,
     }
     return kwargs
