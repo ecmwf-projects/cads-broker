@@ -395,8 +395,8 @@ class Broker:
                     if state == "memory":
                         # if the task is in memory and it is not in the futures
                         # it means that the task has been lost by the broker (broker has been restarted)
-                        # the task is successful. If the function returns None it means that the request
-                        # has already been set to successful
+                        # the task is successful. If the "set_successful_request" function returns None
+                        # it means that the request has already been set to successful
                         finished_request = db.set_successful_request(
                             request_uid=request.request_uid,
                             session=session,
@@ -418,6 +418,9 @@ class Broker:
                             dask_status=task["state"],
                             **db.logger_kwargs(request=finished_request),
                         )
+                # if the task is in processing, it means that the task is still running
+                if state == "processing":
+                    continue
             # if it doesn't find the request: re-queue it
             else:
                 request = db.get_request(request.request_uid, session=session)
@@ -434,6 +437,7 @@ class Broker:
                             "job has finished",
                             **db.logger_kwargs(request=successful_request),
                         )
+                        continue
                 # FIXME: check if request status has changed
                 if os.getenv(
                     "BROKER_REQUEUE_ON_LOST_REQUESTS", True
@@ -604,6 +608,7 @@ class Broker:
             resources=request.request_metadata.get("resources", {}),
             metadata=request.request_metadata,
         )
+        distributed.fire_and_forget(future)
         self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",
