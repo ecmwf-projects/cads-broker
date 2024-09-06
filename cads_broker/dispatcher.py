@@ -311,7 +311,7 @@ class Broker:
                             session=session,
                         )
                         requeue = False
-            if requeue and request.request_metadata.get("resubmit", 0) < os.getenv(
+            if requeue and request.request_metadata.get("resubmit_number", 0) < os.getenv(
                 "BROKER_REQUEUE_LIMIT", 3
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
@@ -441,7 +441,7 @@ class Broker:
                 # FIXME: check if request status has changed
                 if os.getenv(
                     "BROKER_REQUEUE_ON_LOST_REQUESTS", True
-                ) and request.request_metadata.get("resubmit", 0) < os.getenv(
+                ) and request.request_metadata.get("resubmit_number", 0) < os.getenv(
                     "BROKER_REQUEUE_LIMIT", 3
                 ):
                     logger.info(
