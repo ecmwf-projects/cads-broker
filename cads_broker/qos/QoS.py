@@ -97,21 +97,26 @@ class QoS:
     def can_run(self, request, session, scheduler):
         """Check if a request can run."""
         properties = self._properties(request=request, session=session)
-        limits = []
-        new_limits = []
+        rules = []
+        new_rules = []
         for limit in properties.limits:
             if limit.full(request):
                 limit.queue(request.request_uid)
-                limits.append(limit)
+                rules.append(limit)
                 if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
-                    new_limits.append(limit)
-        if len(new_limits):
+                    new_rules.append(limit)
+        for priority in properties.priorities:
+            if str(priority.__hash__()) not in [r.uid for r in request.qos_rules]:
+                rules.append(priority)
+                new_rules.append(priority)
+
+        if len(new_rules):
             scheduler.append(
                 {
                     "function": database.add_request_qos_status,
                     "kwargs": {
                         "request_uid": request.request_uid,
-                        "rules": limits,
+                        "rules": rules,
                     },
                 }
             )
@@ -119,7 +124,7 @@ class QoS:
         for permission in properties.permissions:
             if not permission.evaluate(request):
                 permissions.append(permission)
-        return not len(limits) and not len(permissions)
+        return not len(rules) and not len(permissions)
 
     @locked
     def _properties(self, request, session):

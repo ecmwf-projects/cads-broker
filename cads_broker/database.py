@@ -19,6 +19,7 @@ from typing_extensions import Iterable
 import alembic.command
 import alembic.config
 from cads_broker import config
+from cads_broker.qos import Rule
 
 BaseModel = sa.orm.declarative_base()
 
@@ -526,7 +527,8 @@ def decrement_qos_rule_running(
                 # this happend when a request is finished after a broker restart.
                 # the rule is not in the database anymore because it has been reset.
                 continue
-        qos_rule.running = rule.value
+        if isinstance(rule, Rule.Limit):
+            qos_rule.running = rule.value
     return None, None
 
 
@@ -549,8 +551,9 @@ def delete_request_qos_status(
             except sqlalchemy.orm.exc.NoResultFound:
                 qos_rule = add_qos_rule(rule=rule, session=session)
                 created_rules[qos_rule.uid] = qos_rule
-        qos_rule.queued = len(rule.queued)
-        qos_rule.running = rule.value
+        if isinstance(rule, Rule.Limit):
+            qos_rule.queued = len(rule.queued)
+            qos_rule.running = rule.value
     request.qos_rules = []
     return None, created_rules
 
@@ -573,7 +576,8 @@ def add_request_qos_status(
             qos_rule = add_qos_rule(rule=rule, session=session)
             created_rules[qos_rule.uid] = qos_rule
         if qos_rule.uid not in [r.uid for r in request.qos_rules]:
-            qos_rule.queued = len(rule.queued)
+            if isinstance(rule, Rule.Limit):
+                qos_rule.queued = len(rule.queued)
             new_request = get_request(request.request_uid, session)
             new_request.qos_rules.append(qos_rule)
     return new_request, created_rules
