@@ -37,6 +37,11 @@ DASK_STATUS_TO_STATUS = {
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 ONE_SECOND = datetime.timedelta(seconds=1)
+BROKER_CHECK_REQUEST_IN_WORKERS_TIME = (
+    float(os.getenv("BROKER_CHECK_REQUEST_IN_WORKERS_TIME", 60)) * ONE_SECOND
+)
+BROKER_REQUEUE_ON_LOST_REQUESTS = os.getenv("BROKER_REQUEUE_ON_LOST_REQUESTS", True)
+BROKER_REQUEUE_LIMIT = int(os.getenv("BROKER_REQUEUE_LIMIT", 3))
 
 
 @cachetools.cached(  # type: ignore
@@ -129,6 +134,19 @@ def perf_logger(func):
         return result
 
     return wrapper
+
+
+def requeue_request(
+    request, session, queue, qos, internal_scheduler, increase_resubmit_number=True
+):
+    queued_request = db.requeue_request(
+        request=request,
+        session=session,
+        increase_resubmit_number=increase_resubmit_number,
+    )
+    if queued_request:
+        queue.add(queued_request.request_uid, request)
+        qos.notify_end_of_request(request, session, scheduler=internal_scheduler)
 
 
 class Queue:
@@ -311,12 +329,15 @@ class Broker:
                             session=session,
                         )
                         requeue = False
-            if requeue and request.request_metadata.get("resubmit_number", 0) < os.getenv(
-                "BROKER_REQUEUE_LIMIT", 3
+            if (
+                requeue
+                and request.request_metadata.get("resubmit_number", 0)
+                < BROKER_REQUEUE_LIMIT
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
-                db.requeue_request(request=request, session=session)
-                self.queue.add(request_uid, request)
+                requeue_request(
+                    request, session, self.queue, self.qos, self.internal_scheduler
+                )
         else:
             request = db.set_request_status(
                 request_uid,
@@ -387,9 +408,28 @@ class Broker:
             )
             self.futures = {}
         for request in requests:
-            # if request is in futures, go on
+            # if request is in futures, check that it is running in a worker
             if request.request_uid in self.futures:
-                continue
+                if (
+                    request.started_at
+                    < datetime.datetime.now() - BROKER_CHECK_REQUEST_IN_WORKERS_TIME
+                ):
+                    workers_name = db.get_events_from_request(
+                        request.request_uid,
+                        session,
+                        event_type="worker_name",
+                        start_time=request.started_at,
+                    )
+                    # if it's not in a worker resubmit the request
+                    if not workers_name:
+                        requeue_request(
+                            request=request,
+                            session=session,
+                            queue=self.queue,
+                            qos=self.qos,
+                            internal_scheduler=self.internal_scheduler,
+                            increase_resubmit_number=False,
+                        )
             elif task := scheduler_tasks.get(request.request_uid, None):
                 if (state := task["state"]) in ("memory", "erred"):
                     if state == "memory":
@@ -421,9 +461,9 @@ class Broker:
                 # if the task is in processing, it means that the task is still running
                 if state == "processing":
                     continue
-            # if it doesn't find the request: re-queue it
             else:
                 request = db.get_request(request.request_uid, session=session)
+                # if the request has a result: it is successful
                 if request.cache_id:
                     successful_request = db.set_successful_request(
                         request_uid=request.request_uid,
@@ -438,23 +478,19 @@ class Broker:
                             **db.logger_kwargs(request=successful_request),
                         )
                         continue
-                # FIXME: check if request status has changed
-                if os.getenv(
-                    "BROKER_REQUEUE_ON_LOST_REQUESTS", True
-                ) and request.request_metadata.get("resubmit_number", 0) < os.getenv(
-                    "BROKER_REQUEUE_LIMIT", 3
+                # if it doesn't find the request in the futures and in the scheduler: re-queue it
+                if (
+                    BROKER_REQUEUE_ON_LOST_REQUESTS
+                    and request.request_metadata.get("resubmit_number", 0)
+                    < BROKER_REQUEUE_LIMIT
                 ):
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
                     )
-                    queued_request = db.requeue_request(
-                        request=request, session=session
+                    requeue_request(
+                        request, session, self.queue, self.qos, self.internal_scheduler
                     )
-                    if queued_request:
-                        self.queue.add(queued_request.request_uid, request)
-                        self.qos.notify_end_of_request(
-                            request, session, scheduler=self.internal_scheduler
-                        )
+                # if the request is not found in the scheduler and it has reached the requeue limit
                 else:
                     db.set_request_status(
                         request_uid=request.request_uid,
@@ -465,6 +501,12 @@ class Broker:
                     )
                     self.qos.notify_end_of_request(
                         request, session, scheduler=self.internal_scheduler
+                    )
+                    db.add_event(
+                        event_type="user_visible_error",
+                        request_uid=request.request_uid,
+                        message="Request has failed for unknown reasons. Please, re-submit the request.",
+                        session=session,
                     )
                     logger.info("job has finished", **db.logger_kwargs(request=request))
 

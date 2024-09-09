@@ -602,15 +602,17 @@ def get_qos_status_from_request(
 def requeue_request(
     request: SystemRequest,
     session: sa.orm.Session,
+    increase_resubmit_number: bool = True,
 ) -> SystemRequest | None:
     if request.status == "running":
         # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
         # FIXME: use a specific column for resubmit_number
-        metadata = dict(request.request_metadata)
-        metadata.update(
-            {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
-        )
-        request.request_metadata = metadata
+        if increase_resubmit_number:
+            metadata = dict(request.request_metadata)
+            metadata.update(
+                {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
+            )
+            request.request_metadata = metadata
         request.status = "accepted"
         session.commit()
         logger.info("requeueing request", **logger_kwargs(request=request))
