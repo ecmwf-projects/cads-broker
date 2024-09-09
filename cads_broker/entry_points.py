@@ -119,6 +119,7 @@ class RequestStatus(str, Enum):
 def delete_requests(
     status: RequestStatus = RequestStatus.running,
     user_uid: Optional[str] = None,
+    request_uid: Optional[str] = None,
     connection_string: Optional[str] = None,
     minutes: float = 0,
     seconds: float = 0,
@@ -147,6 +148,8 @@ def delete_requests(
         )
         if user_uid:
             statement = statement.where(database.SystemRequest.user_uid == user_uid)
+        if request_uid:
+            statement = statement.where(database.SystemRequest.request_uid == request_uid)
         statement = statement.values(
             status="dismissed",
             request_metadata={
