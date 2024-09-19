@@ -957,17 +957,28 @@ def test_get_cost_per_user(session_obj: sa.orm.sessionmaker) -> None:
         user_uid="user2",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
     )
+    request_5 = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+    )
+    request_6 = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user3",
+    )
     with session_obj() as session:
         session.add(adaptor_properties)
         session.add(request_1)
         session.add(request_2)
         session.add(request_3)
         session.add(request_4)
+        session.add(request_5)
+        session.add(request_6)
         session.commit()
     with session_obj() as session:
         users_cost = db.get_cost_per_user(session)
-    assert users_cost[0] == ("user1", 15 * 60 * 60)
-    assert users_cost[1] == ("user2", 30 * 60 * 60)
+    assert users_cost[0] == ("user3", 0)
+    assert users_cost[1] == ("user1", 15 * 60 * 60)
+    assert users_cost[2] == ("user2", 30 * 60 * 60)
 
 
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:

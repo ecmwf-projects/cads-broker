@@ -535,9 +535,9 @@ def get_cost_per_user(
 ) -> list[tuple[str, int]]:
     """Get the cost of the user's requests.
     """
-    statement = sa.text("select user_uid, sum(EXTRACT(EPOCH FROM (coalesce(finished_at, now()) - started_at))::integer) as cost" \
+    statement = sa.text("select user_uid, sum(EXTRACT(EPOCH FROM (coalesce(finished_at, now()) - coalesce(started_at, coalesce(finished_at, now()))))::integer) as cost" \
                         " from system_requests where (finished_at > (now() - interval '24h') " \
-                        " or status='running') group by user_uid order by cost")
+                        " or status='running') or (status='accepted') group by user_uid order by cost")
     return session.execute(statement).all()
 
 
