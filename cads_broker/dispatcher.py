@@ -570,19 +570,36 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        queue = sorted(
-            candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_write),
-            reverse=True,
-        )
-        requests_counter = 0
-        for request in queue:
-            if self.qos.can_run(
-                request, session=session_write, scheduler=self.internal_scheduler
-            ):
-                if requests_counter <= int(number_of_requests * WORKERS_MULTIPLIER):
+        if os.getenv("BROKER_EXPERIMENTAL_PRIORITY_ALGORITHM", True):
+            user_requests: dict[str, list[db.SystemRequest]] = {}
+            for request in candidates:
+                user_requests.setdefault(request.user_uid, []).append(request)
+            # all running or started_at within 24h
+            user_queue = db.get_cost_per_user(session=session_write)
+            requests_counter = 0
+            for _, user_uid in user_queue:
+                request = sorted(user_requests[user_uid], key=lambda x: x.created_at)[0]
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ):
                     self.submit_request(request, session=session_write)
-                requests_counter += 1
+                    requests_counter += 1
+                    if requests_counter >= int(number_of_requests):
+                        break
+        else:
+            queue = sorted(
+                candidates,
+                key=lambda candidate: self.qos.priority(candidate, session_write),
+                reverse=True,
+            )
+            requests_counter = 0
+            for request in queue:
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ):
+                    if requests_counter <= int(number_of_requests * WORKERS_MULTIPLIER):
+                        self.submit_request(request, session=session_write)
+                    requests_counter += 1
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session

@@ -38,6 +38,8 @@ def mock_config(hash: str = "", config: dict[str, Any] = {}, form: dict[str, Any
 def mock_system_request(
     status: str | None = "accepted",
     created_at: datetime.datetime = datetime.datetime.now(),
+    started_at: datetime.datetime | None = None,
+    finished_at: datetime.datetime | None = None,
     request_uid: str | None = None,
     process_id: str | None = "process_id",
     user_uid: str | None = None,
@@ -53,7 +55,8 @@ def mock_system_request(
         status=status,
         user_uid=user_uid,
         created_at=created_at,
-        started_at=None,
+        started_at=started_at,
+        finished_at=finished_at,
         cache_id=cache_id,
         request_body=request_body or {"request_type": "test"},
         request_metadata=request_metadata or {},
@@ -927,6 +930,44 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
         with pytest.raises(db.NoResultFound):
             request = db.get_request(str(uuid.uuid4()), session)
     assert request.request_uid == request_uid
+
+
+def test_get_cost_per_user(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request_1 = mock_system_request(
+        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=5),
+    )
+    request_2 = mock_system_request(
+        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+    )
+    request_3 = mock_system_request(
+        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+    )
+    request_4 = mock_system_request(
+        status="running", adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request_1)
+        session.add(request_2)
+        session.add(request_3)
+        session.add(request_4)
+        session.commit()
+    with session_obj() as session:
+        users_cost = db.get_cost_per_user(session)
+    assert users_cost[0] == ("user1", 15 * 60 * 60)
+    assert users_cost[1] == ("user2", 30 * 60 * 60)
 
 
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
