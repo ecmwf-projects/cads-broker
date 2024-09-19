@@ -37,6 +37,10 @@ DASK_STATUS_TO_STATUS = {
 
 WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 ONE_SECOND = datetime.timedelta(seconds=1)
+HIGH_PRIORITY_USER_UID = os.getenv(
+    "HIGH_PRIORITY_USER_UID", "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f"
+)
+BROKER_PRIORITY_ALGORITHM = os.getenv("BROKER_PRIORITY_ALGORITHM", "legacy")
 
 
 @cachetools.cached(  # type: ignore
@@ -311,9 +315,9 @@ class Broker:
                             session=session,
                         )
                         requeue = False
-            if requeue and request.request_metadata.get("resubmit_number", 0) < os.getenv(
-                "BROKER_REQUEUE_LIMIT", 3
-            ):
+            if requeue and request.request_metadata.get(
+                "resubmit_number", 0
+            ) < os.getenv("BROKER_REQUEUE_LIMIT", 3):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
                 db.requeue_request(request=request, session=session)
                 self.queue.add(request_uid, request)
@@ -570,17 +574,23 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        if os.getenv("BROKER_EXPERIMENTAL_PRIORITY_ALGORITHM", True):
+        if "BROKER_PRIORITY_ALGORITHM" == "processing_time":
             user_requests: dict[str, list[db.SystemRequest]] = {}
             for request in candidates:
                 user_requests.setdefault(request.user_uid, []).append(request)
-            # all running or started_at within 24h
-            user_queue = db.get_cost_per_user(session=session_write)
+            # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
+            users_queue = [
+                (HIGH_PRIORITY_USER_UID, 0)
+            ] + db.get_users_queue_from_processing_time(session=session_write)
             requests_counter = 0
-            for user_uid, _ in user_queue:
+            for user_uid, _ in users_queue:
                 if user_uid not in user_requests:
                     continue
-                request = sorted(user_requests[user_uid], key=lambda x: x.created_at)[0]
+                request = sorted(
+                    user_requests[user_uid],
+                    key=lambda candidate: self.qos.priority(candidate, session_write),
+                    reverse=True,
+                )[0]
                 if self.qos.can_run(
                     request, session=session_write, scheduler=self.internal_scheduler
                 ):

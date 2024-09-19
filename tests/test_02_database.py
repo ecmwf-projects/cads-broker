@@ -932,7 +932,7 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
     assert request.request_uid == request_uid
 
 
-def test_get_cost_per_user(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
     adaptor_properties = mock_config()
     request_1 = mock_system_request(
         status="successful", adaptor_properties_hash=adaptor_properties.hash,
@@ -975,7 +975,7 @@ def test_get_cost_per_user(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_6)
         session.commit()
     with session_obj() as session:
-        users_cost = db.get_cost_per_user(session)
+        users_cost = db.get_users_queue_from_processing_time(session)
     assert users_cost[0] == ("user3", 0)
     assert users_cost[1] == ("user1", 15 * 60 * 60)
     assert users_cost[2] == ("user2", 30 * 60 * 60)

@@ -530,14 +530,14 @@ def decrement_qos_rule_running(
     return None, None
 
 
-def get_cost_per_user(
+def get_users_queue_from_processing_time(
     session: sa.orm.Session,
 ) -> list[tuple[str, int]]:
-    """Get the cost of the user's requests.
-    """
-    statement = sa.text("select user_uid, sum(EXTRACT(EPOCH FROM (coalesce(finished_at, now()) - coalesce(started_at, coalesce(finished_at, now()))))::integer) as cost" \
-                        " from system_requests where (finished_at > (now() - interval '24h') " \
-                        " or status='running') or (status='accepted') group by user_uid order by cost")
+    """Build the queue of the users from the processing time."""
+    statement = sa.text("select user_uid, sum(EXTRACT(EPOCH FROM (coalesce(finished_at, now()) -" \
+                        " coalesce(started_at, coalesce(finished_at, now()))))::integer) as cost" \
+                        " from system_requests where finished_at > (now() - interval '24h') " \
+                        " or status='running' or status='accepted' group by user_uid order by cost")
     return session.execute(statement).all()
 
 
