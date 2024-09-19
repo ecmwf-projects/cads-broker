@@ -578,6 +578,8 @@ class Broker:
             user_queue = db.get_cost_per_user(session=session_write)
             requests_counter = 0
             for user_uid, _ in user_queue:
+                if user_uid not in user_requests:
+                    continue
                 request = sorted(user_requests[user_uid], key=lambda x: x.created_at)[0]
                 if self.qos.can_run(
                     request, session=session_write, scheduler=self.internal_scheduler
