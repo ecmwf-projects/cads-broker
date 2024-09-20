@@ -541,16 +541,22 @@ def get_users_queue_from_processing_time(
         SystemRequest.finished_at, interval_stop
     ) - sa.sql.func.greatest(SystemRequest.started_at, interval_start)
     user_cumulative_processing_time = sa.sql.func.sum(request_processing_time)
-    user_cost = sa.sql.func.extract("epoch", user_cumulative_processing_time)
+    user_cost = sa.sql.func.extract("epoch", user_cumulative_processing_time).label(
+        "user_cost"
+    )
     interval_clause = sa.sql.and_(
         SystemRequest.finished_at >= interval_start,
         SystemRequest.finished_at < interval_stop,
+        SystemRequest.status != "deleted",
     )
-    where_clause = sa.sql.or_(
-        interval_clause, SystemRequest.status in ["running", "accepted"]
-    )
+    where_clause = sa.sql.or_(interval_clause, SystemRequest.status == "running")
 
-    statement = sa.sql.select(SystemRequest.user_uid, user_cost).where(where_clause)
+    statement = (
+        sa.sql.select(SystemRequest.user_uid, user_cost)
+        .where(where_clause)
+        .group_by(SystemRequest.user_uid)
+        .order_by("user_cost")
+    )
 
     return session.execute(statement).all()
 
