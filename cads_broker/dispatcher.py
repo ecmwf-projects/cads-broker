@@ -582,7 +582,7 @@ class Broker:
             # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
             interval_stop = datetime.datetime.now()
             users_queue = {
-                HIGH_PRIORITY_USER_UID: 0.0
+                HIGH_PRIORITY_USER_UID: 0
             } | db.get_users_queue_from_processing_time(
                 interval_stop, session=session_write
             )
