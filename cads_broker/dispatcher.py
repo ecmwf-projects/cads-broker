@@ -43,7 +43,7 @@ CONFIG = config.BrokerConfig()
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.get_number_of_workers_cache_time
+        maxsize=1024, ttl=CONFIG.broker_get_number_of_workers_cache_time
     ),
     info=True,
 )
@@ -56,7 +56,7 @@ def get_number_of_workers(client: distributed.Client) -> int:
 
 
 @cachetools.cached(  # type: ignore
-    cache=cachetools.TTLCache(maxsize=1024, ttl=CONFIG.qos_rules_cache_time),
+    cache=cachetools.TTLCache(maxsize=1024, ttl=CONFIG.broker_qos_rules_cache_time),
     info=True,
 )
 def get_rules_hash(rules_path: str):
@@ -70,7 +70,7 @@ def get_rules_hash(rules_path: str):
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.get_tasks_from_scheduler_cache_time
+        maxsize=1024, ttl=CONFIG.broker_get_tasks_from_scheduler_cache_time
     ),
     info=True,
 )
@@ -188,7 +188,7 @@ class Queue:
 class QoSRules:
     def __init__(self, number_of_workers) -> None:
         self.environment = Environment.Environment(number_of_workers=number_of_workers)
-        self.rules_path = CONFIG.rules_path
+        self.rules_path = CONFIG.broker_rules_path
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
         else:
@@ -206,9 +206,9 @@ class Broker:
     address: str
     session_maker_read: sa.orm.sessionmaker
     session_maker_write: sa.orm.sessionmaker
-    wait_time: float = CONFIG.wait_time
+    wait_time: float = CONFIG.broker_wait_time
     ttl_cache = cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.sync_database_cache_time
+        maxsize=1024, ttl=CONFIG.broker_sync_database_cache_time
     )
 
     futures: dict[str, distributed.Future] = attrs.field(
