@@ -534,7 +534,7 @@ def get_users_queue_from_processing_time(
     session: sa.orm.Session,
     interval_stop: datetime.datetime,
     interval: datetime.timedelta = datetime.timedelta(hours=24),
-) -> list[tuple[str, float]]:
+) -> dict[str, float]:
     """Build the queue of the users from the processing time."""
     interval_start = interval_stop - interval
     request_processing_time = sa.sql.func.least(
@@ -558,7 +558,17 @@ def get_users_queue_from_processing_time(
         .order_by("user_cost")
     )
 
-    return session.execute(statement).all()
+    running_user_costs = dict(session.execute(statement).all())
+
+    queue_users = session.execute(
+        sa.select(SystemRequest.user_uid)
+        .where(SystemRequest.status == "accepted")
+        .distinct()
+    ).all()
+
+    queueing_user_costs = {u: 0.0 for u, in queue_users if u not in running_user_costs}
+
+    return queueing_user_costs | running_user_costs
 
 
 def delete_request_qos_status(
