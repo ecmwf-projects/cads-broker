@@ -574,7 +574,7 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        if "BROKER_PRIORITY_ALGORITHM" == "processing_time":
+        if BROKER_PRIORITY_ALGORITHM == "processing_time":
             user_requests: dict[str, list[db.SystemRequest]] = {}
             for request in candidates:
                 user_requests.setdefault(request.user_uid, []).append(request)
