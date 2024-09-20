@@ -587,7 +587,7 @@ class Broker:
                 interval_stop=interval_stop, session=session_write
             )
             requests_counter = 0
-            for user_uid, _ in users_queue:
+            for user_uid in users_queue:
                 if user_uid not in user_requests:
                     continue
                 request = sorted(
