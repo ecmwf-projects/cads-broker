@@ -345,7 +345,8 @@ class Broker:
             request.finished_at = datetime.datetime.now()
         else:
             request.status = "deleted"
-            request.finished_at = datetime.datetime.now()
+            if request.finished_at is None:
+                request.finished_at = datetime.datetime.now()
         if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
