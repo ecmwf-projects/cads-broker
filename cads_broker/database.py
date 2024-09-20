@@ -530,6 +530,49 @@ def decrement_qos_rule_running(
     return None, None
 
 
+def get_users_queue_from_processing_time(
+    session: sa.orm.Session,
+    interval_stop: datetime.datetime,
+    interval: datetime.timedelta = datetime.timedelta(hours=24),
+) -> dict[str, int]:
+    """Build the queue of the users from the processing time."""
+    interval_start = interval_stop - interval
+    request_processing_time = sa.sql.func.least(
+        SystemRequest.finished_at, interval_stop
+    ) - sa.sql.func.greatest(SystemRequest.started_at, interval_start)
+    user_cumulative_processing_time = sa.sql.func.sum(request_processing_time)
+    user_cost = (
+        sa.sql.func.extract("epoch", user_cumulative_processing_time)
+        .cast(sa.Integer)
+        .label("user_cost")
+    )
+    interval_clause = sa.sql.and_(
+        SystemRequest.finished_at >= interval_start,
+        SystemRequest.finished_at < interval_stop,
+        SystemRequest.status != "deleted",
+    )
+    where_clause = sa.sql.or_(interval_clause, SystemRequest.status == "running")
+
+    statement = (
+        sa.sql.select(SystemRequest.user_uid, user_cost)
+        .where(where_clause)
+        .group_by(SystemRequest.user_uid)
+        .order_by("user_cost")
+    )
+
+    running_user_costs = dict(session.execute(statement).all())
+
+    queue_users = session.execute(
+        sa.select(SystemRequest.user_uid)
+        .where(SystemRequest.status == "accepted")
+        .distinct()
+    ).all()
+
+    queueing_user_costs = {u: 0 for (u,) in queue_users if u not in running_user_costs}
+
+    return queueing_user_costs | running_user_costs
+
+
 def delete_request_qos_status(
     request_uid: str,
     rules: list,

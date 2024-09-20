@@ -35,13 +35,15 @@ DASK_STATUS_TO_STATUS = {
     "finished": "successful",
 }
 
-WORKERS_MULTIPLIER = float(os.getenv("WORKERS_MULTIPLIER", 1))
 ONE_SECOND = datetime.timedelta(seconds=1)
+ONE_MINUTE = ONE_SECOND * 60
+ONE_HOUR = ONE_MINUTE * 60
+CONFIG = config.BrokerConfig()
 
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=float(os.getenv("GET_NUMBER_OF_WORKERS_CACHE_TIME", 10))
+        maxsize=1024, ttl=CONFIG.broker_get_number_of_workers_cache_time
     ),
     info=True,
 )
@@ -54,14 +56,12 @@ def get_number_of_workers(client: distributed.Client) -> int:
 
 
 @cachetools.cached(  # type: ignore
-    cache=cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("QOS_RULES_CACHE_TIME", 10))
-    ),
+    cache=cachetools.TTLCache(maxsize=1024, ttl=CONFIG.broker_qos_rules_cache_time),
     info=True,
 )
 def get_rules_hash(rules_path: str):
     if rules_path is None or not os.path.exists(rules_path):
-        rules = os.getenv("DEFAULT_RULES", "")
+        rules = ""
     else:
         with open(rules_path) as f:
             rules = f.read()
@@ -70,7 +70,7 @@ def get_rules_hash(rules_path: str):
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("GET_TASKS_FROM_SCHEDULER_CACHE_TIME", 1))
+        maxsize=1024, ttl=CONFIG.broker_get_tasks_from_scheduler_cache_time
     ),
     info=True,
 )
@@ -188,14 +188,12 @@ class Queue:
 class QoSRules:
     def __init__(self, number_of_workers) -> None:
         self.environment = Environment.Environment(number_of_workers=number_of_workers)
-        self.rules_path = os.getenv("RULES_PATH", "/src/rules.qos")
+        self.rules_path = CONFIG.broker_rules_path
         if os.path.exists(self.rules_path):
             self.rules = self.rules_path
         else:
             logger.info("rules file not found", rules_path=self.rules_path)
-            parser = QoS.RulesParser(
-                io.StringIO(os.getenv("DEFAULT_RULES", "")), logger=logger
-            )
+            parser = QoS.RulesParser(io.StringIO(""), logger=logger)
             self.rules = QoS.RuleSet()
             parser.parse_rules(self.rules, self.environment, raise_exception=False)
 
@@ -208,9 +206,9 @@ class Broker:
     address: str
     session_maker_read: sa.orm.sessionmaker
     session_maker_write: sa.orm.sessionmaker
-    wait_time: float = float(os.getenv("BROKER_WAIT_TIME", 2))
+    wait_time: float = CONFIG.broker_wait_time
     ttl_cache = cachetools.TTLCache(
-        maxsize=1024, ttl=int(os.getenv("SYNC_DATABASE_CACHE_TIME", 10))
+        maxsize=1024, ttl=CONFIG.broker_sync_database_cache_time
     )
 
     futures: dict[str, distributed.Future] = attrs.field(
@@ -278,7 +276,7 @@ class Broker:
         request = db.get_request(request_uid, session=session)
         if request.status != "running":
             return None
-        requeue = os.getenv("BROKER_REQUEUE_ON_KILLED_WORKER_REQUESTS", False)
+        requeue = CONFIG.broker_requeue_on_killed_worker_requests
         if error_reason == "KilledWorker":
             worker_restart_events = self.client.get_events("worker-restart-memory")
             # get info on worker and pid of the killed request
@@ -311,8 +309,10 @@ class Broker:
                             session=session,
                         )
                         requeue = False
-            if requeue and request.request_metadata.get("resubmit_number", 0) < os.getenv(
-                "BROKER_REQUEUE_LIMIT", 3
+            if (
+                requeue
+                and request.request_metadata.get("resubmit_number", 0)
+                < CONFIG.broker_requeue_limit
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
                 db.requeue_request(request=request, session=session)
@@ -341,7 +341,8 @@ class Broker:
             request.finished_at = datetime.datetime.now()
         else:
             request.status = "deleted"
-            request.finished_at = datetime.datetime.now()
+            if request.finished_at is None:
+                request.finished_at = datetime.datetime.now()
         if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
@@ -439,10 +440,10 @@ class Broker:
                         )
                         continue
                 # FIXME: check if request status has changed
-                if os.getenv(
-                    "BROKER_REQUEUE_ON_LOST_REQUESTS", True
-                ) and request.request_metadata.get("resubmit_number", 0) < os.getenv(
-                    "BROKER_REQUEUE_LIMIT", 3
+                if (
+                    CONFIG.broker_requeue_on_lost_requests
+                    and request.request_metadata.get("resubmit_number", 0)
+                    < CONFIG.broker_requeue_limit
                 ):
                     logger.info(
                         "request not found: re-queueing", job_id={request.request_uid}
@@ -483,7 +484,7 @@ class Broker:
         if tasks_number := len(self.internal_scheduler.queue):
             logger.info("performance", tasks_number=tasks_number)
         for task in list(self.internal_scheduler.queue)[
-            : int(os.getenv("BROKER_MAX_INTERNAL_SCHEDULER_TASKS", 500))
+            : CONFIG.broker_max_internal_scheduler_tasks
         ]:
             # the internal scheduler is used to asynchronously add qos rules to database
             # it returns a new qos rule if a new qos rule is added to database
@@ -570,19 +571,49 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        queue = sorted(
-            candidates,
-            key=lambda candidate: self.qos.priority(candidate, session_write),
-            reverse=True,
-        )
-        requests_counter = 0
-        for request in queue:
-            if self.qos.can_run(
-                request, session=session_write, scheduler=self.internal_scheduler
-            ):
-                if requests_counter <= int(number_of_requests * WORKERS_MULTIPLIER):
+        if CONFIG.broker_priority_algorithm == "processing_time":
+            user_requests: dict[str, list[db.SystemRequest]] = {}
+            for request in candidates:
+                user_requests.setdefault(request.user_uid, []).append(request)
+            # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
+            interval_stop = datetime.datetime.now()
+            users_queue = {
+                CONFIG.high_priority_user_uid: 0
+            } | db.get_users_queue_from_processing_time(
+                interval_stop=interval_stop,
+                session=session_write,
+                interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
+            )
+            requests_counter = 0
+            for user_uid in users_queue:
+                if user_uid not in user_requests:
+                    continue
+                request = sorted(
+                    user_requests[user_uid],
+                    key=lambda candidate: self.qos.priority(candidate, session_write),
+                    reverse=True,
+                )[0]
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ):
                     self.submit_request(request, session=session_write)
-                requests_counter += 1
+                    requests_counter += 1
+                    if requests_counter >= int(number_of_requests):
+                        break
+        else:
+            queue = sorted(
+                candidates,
+                key=lambda candidate: self.qos.priority(candidate, session_write),
+                reverse=True,
+            )
+            requests_counter = 0
+            for request in queue:
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ):
+                    if requests_counter <= int(number_of_requests):
+                        self.submit_request(request, session=session_write)
+                    requests_counter += 1
 
     def submit_request(
         self, request: db.SystemRequest, session: sa.orm.Session
