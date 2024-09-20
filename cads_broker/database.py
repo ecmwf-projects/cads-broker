@@ -532,12 +532,26 @@ def decrement_qos_rule_running(
 
 def get_users_queue_from_processing_time(
     session: sa.orm.Session,
-) -> list[tuple[str, int]]:
+    interval_stop: datetime.datetime,
+    interval: datetime.timedelta = datetime.timedelta(hours=24),
+) -> list[tuple[str, float]]:
     """Build the queue of the users from the processing time."""
-    statement = sa.text("select user_uid, sum(EXTRACT(EPOCH FROM (coalesce(finished_at, now()) -" \
-                        " coalesce(started_at, coalesce(finished_at, now()))))::integer) as cost" \
-                        " from system_requests where finished_at > (now() - interval '24h') " \
-                        " or status='running' or status='accepted' group by user_uid order by cost")
+    interval_start = interval_stop - interval
+    request_processing_time = sa.sql.func.least(
+        SystemRequest.finished_at, interval_stop
+    ) - sa.sql.func.greatest(SystemRequest.started_at, interval_start)
+    user_cumulative_processing_time = sa.sql.func.sum(request_processing_time)
+    user_cost = sa.sql.func.extract("epoch", user_cumulative_processing_time)
+    interval_clause = sa.sql.and_(
+        SystemRequest.finished_at >= interval_start,
+        SystemRequest.finished_at < interval_stop,
+    )
+    where_clause = sa.sql.or_(
+        interval_clause, SystemRequest.status in ["running", "accepted"]
+    )
+
+    statement = sa.sql.select(SystemRequest.user_uid, user_cost).where(where_clause)
+
     return session.execute(statement).all()
 
 

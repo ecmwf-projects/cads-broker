@@ -579,9 +579,12 @@ class Broker:
             for request in candidates:
                 user_requests.setdefault(request.user_uid, []).append(request)
             # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
+            interval_stop = datetime.datetime.now()
             users_queue = [
-                (HIGH_PRIORITY_USER_UID, 0)
-            ] + db.get_users_queue_from_processing_time(session=session_write)
+                (HIGH_PRIORITY_USER_UID, 0.0)
+            ] + db.get_users_queue_from_processing_time(
+                interval_stop, session=session_write
+            )
             requests_counter = 0
             for user_uid, _ in users_queue:
                 if user_uid not in user_requests:
