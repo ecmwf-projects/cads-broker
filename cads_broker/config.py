@@ -26,7 +26,6 @@ dbsettings = None
 
 
 class BrokerConfig(pydantic_settings.BaseSettings):
-
     high_priority_user_uid: str = "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f"
     broker_priority_algorithm: str = "legacy"
     broker_priority_interval_hours: int = 24
@@ -34,7 +33,7 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_qos_rules_cache_time: int = 10
     broker_get_tasks_from_scheduler_cache_time: int = 1
     broker_rules_path: str = "/src/rules.qos"
-    broker_wait_time: float = 2.
+    broker_wait_time: float = 2.0
     broker_sync_database_cache_time: int = 10
     broker_requeue_on_killed_worker_requests: bool = False
     broker_requeue_on_lost_requests: bool = True

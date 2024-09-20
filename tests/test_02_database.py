@@ -935,34 +935,40 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
 def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
     adaptor_properties = mock_config()
     request_1 = mock_system_request(
-        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user1",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=10),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=5),
     )
     request_2 = mock_system_request(
-        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user1",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
     request_3 = mock_system_request(
-        status="successful", adaptor_properties_hash=adaptor_properties.hash,
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
     request_4 = mock_system_request(
-        status="running", adaptor_properties_hash=adaptor_properties.hash,
+        status="running",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
     )
     request_5 = mock_system_request(
-        status="accepted", adaptor_properties_hash=adaptor_properties.hash,
+        status="accepted",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
     )
     request_6 = mock_system_request(
-        status="accepted", adaptor_properties_hash=adaptor_properties.hash,
+        status="accepted",
+        adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user3",
     )
     with session_obj() as session:
@@ -975,7 +981,9 @@ def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_6)
         session.commit()
     with session_obj() as session:
-        users_cost = db.get_users_queue_from_processing_time(session, interval_stop=datetime.datetime.now())
+        users_cost = db.get_users_queue_from_processing_time(
+            session, interval_stop=datetime.datetime.now()
+        )
     assert users_cost["user3"] == 0
     assert users_cost["user1"] == 15 * 60 * 60
     assert users_cost["user2"] == 30 * 60 * 60

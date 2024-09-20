@@ -149,7 +149,9 @@ def delete_requests(
         if user_uid:
             statement = statement.where(database.SystemRequest.user_uid == user_uid)
         if request_uid:
-            statement = statement.where(database.SystemRequest.request_uid == request_uid)
+            statement = statement.where(
+                database.SystemRequest.request_uid == request_uid
+            )
         statement = statement.values(
             status="dismissed",
             request_metadata={

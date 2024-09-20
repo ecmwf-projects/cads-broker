@@ -568,7 +568,7 @@ def get_users_queue_from_processing_time(
         .distinct()
     ).all()
 
-    queueing_user_costs = {u: 0 for u, in queue_users if u not in running_user_costs}
+    queueing_user_costs = {u: 0 for (u,) in queue_users if u not in running_user_costs}
 
     return queueing_user_costs | running_user_costs
 
