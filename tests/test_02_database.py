@@ -975,10 +975,10 @@ def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_6)
         session.commit()
     with session_obj() as session:
-        users_cost = db.get_users_queue_from_processing_time(session)
-    assert users_cost[0] == ("user3", 0)
-    assert users_cost[1] == ("user1", 15 * 60 * 60)
-    assert users_cost[2] == ("user2", 30 * 60 * 60)
+        users_cost = db.get_users_queue_from_processing_time(session, interval_stop=datetime.datetime.now())
+    assert users_cost["user3"] == 0
+    assert users_cost["user1"] == 15 * 60 * 60
+    assert users_cost["user2"] == 30 * 60 * 60
 
 
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
