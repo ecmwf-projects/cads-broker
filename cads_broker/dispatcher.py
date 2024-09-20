@@ -584,7 +584,7 @@ class Broker:
             users_queue = {
                 HIGH_PRIORITY_USER_UID: 0
             } | db.get_users_queue_from_processing_time(
-                interval_stop, session=session_write
+                interval_stop=interval_stop, session=session_write
             )
             requests_counter = 0
             for user_uid, _ in users_queue:
