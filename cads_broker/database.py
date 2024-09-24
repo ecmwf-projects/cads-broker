@@ -343,6 +343,8 @@ def reset_qos_rules(session: sa.orm.Session, qos):
     for request in get_running_requests(session):
         # Recompute the limits
         limits = qos.limits_for(request, session)
+        for limit in limits:
+            limit.increment(request.request_uid)
         _, rules = delete_request_qos_status(
             request_uid=request.request_uid,
             rules=limits,
