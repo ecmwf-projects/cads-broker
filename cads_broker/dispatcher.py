@@ -377,11 +377,8 @@ class Broker:
             session = self.manage_dismissed_request(request, session)
         session.commit()
 
-        statement = sa.select(db.SystemRequest).where(
-            db.SystemRequest.status == "running"
-        )
         scheduler_tasks = get_tasks_from_scheduler(self.client)
-        requests = session.scalars(statement).all()
+        requests = db.get_running_requests(session=session)
         if len(scheduler_tasks) == 0 and len(self.futures):
             logger.info(
                 f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
@@ -683,21 +680,14 @@ class Broker:
                         )
                         self.queue.reset()
 
-                self.running_requests = len(
-                    [
-                        future
-                        for future in self.futures.values()
-                        if DASK_STATUS_TO_STATUS.get(future.status)
-                        not in ("successful", "failed")
-                    ]
-                )
+                running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
-                available_workers = self.number_of_workers - self.running_requests
+                available_workers = self.number_of_workers - running_requests
                 if queue_length > 0:
                     logger.info(
                         "broker info",
                         available_workers=available_workers,
-                        running_requests=self.running_requests,
+                        running_requests=running_requests,
                         number_of_workers=self.number_of_workers,
                         futures=len(self.futures),
                     )
