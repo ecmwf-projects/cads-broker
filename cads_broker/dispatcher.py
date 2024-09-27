@@ -591,14 +591,11 @@ class Broker:
                 reverse=True,
             )
             for request in requests:
-                if self.qos.can_run(
-                    request, session=session_write, scheduler=self.internal_scheduler
-                ) and submit_request:
+                can_run = self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler)
+                if can_run and submit_request and requests_counter < number_of_requests:
                     self.submit_request(request, session=session_write)
                     submit_request = False
                     requests_counter += 1
-                    if requests_counter >= int(number_of_requests):
-                        break
 
     @perf_logger
     def submit_requests(
