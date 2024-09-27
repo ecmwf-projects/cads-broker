@@ -239,9 +239,10 @@ class Broker:
             logger=logger,
         )
         with session_maker_write() as session:
-            qos.environment.set_session(session)
             perf_logger(qos.reload_rules)(session=session)
             perf_logger(db.reset_qos_rules)(session, qos)
+        with session_maker_read() as session_read:
+            qos.environment.set_session(session_read)
         self = cls(
             client=client,
             session_maker_read=session_maker_read,
@@ -560,6 +561,45 @@ class Broker:
             future.release()
         return future.key
 
+    def processing_time_priority_algorithm(
+        self,
+        session_write: sa.orm.Session,
+        number_of_requests: int,
+        candidates: Iterable[db.SystemRequest],
+    ) -> None:
+        """Check the qos rules and submit the requests to the dask scheduler."""
+        user_requests: dict[str, list[db.SystemRequest]] = {}
+        for request in candidates:
+            user_requests.setdefault(request.user_uid, []).append(request)
+        # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
+        interval_stop = datetime.datetime.now()
+        users_queue = {
+            CONFIG.high_priority_user_uid: 0
+        } | db.get_users_queue_from_processing_time(
+            interval_stop=interval_stop,
+            session=session_write,
+            interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
+        )
+        requests_counter: int = 0
+        for user_uid in users_queue:
+            submit_request: bool = True
+            if user_uid not in user_requests:
+                continue
+            requests = sorted(
+                user_requests[user_uid],
+                key=lambda candidate: self.qos.priority(candidate, session_write),
+                reverse=True,
+            )
+            for request in requests:
+                if self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                ) and submit_request:
+                    self.submit_request(request, session=session_write)
+                    submit_request = False
+                    requests_counter += 1
+                    if requests_counter >= int(number_of_requests):
+                        break
+
     @perf_logger
     def submit_requests(
         self,
@@ -569,34 +609,9 @@ class Broker:
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
         if CONFIG.broker_priority_algorithm == "processing_time":
-            user_requests: dict[str, list[db.SystemRequest]] = {}
-            for request in candidates:
-                user_requests.setdefault(request.user_uid, []).append(request)
-            # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
-            interval_stop = datetime.datetime.now()
-            users_queue = {
-                CONFIG.high_priority_user_uid: 0
-            } | db.get_users_queue_from_processing_time(
-                interval_stop=interval_stop,
-                session=session_write,
-                interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
+            self.processing_time_priority_algorithm(
+                session_write, number_of_requests, candidates
             )
-            requests_counter = 0
-            for user_uid in users_queue:
-                if user_uid not in user_requests:
-                    continue
-                request = sorted(
-                    user_requests[user_uid],
-                    key=lambda candidate: self.qos.priority(candidate, session_write),
-                    reverse=True,
-                )[0]
-                if self.qos.can_run(
-                    request, session=session_write, scheduler=self.internal_scheduler
-                ):
-                    self.submit_request(request, session=session_write)
-                    requests_counter += 1
-                    if requests_counter >= int(number_of_requests):
-                        break
         else:
             queue = sorted(
                 candidates,
