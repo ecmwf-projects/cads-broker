@@ -582,7 +582,7 @@ class Broker:
         )
         requests_counter: int = 0
         for user_uid in users_queue:
-            submit_request: bool = True
+            may_run: bool = True
             if user_uid not in user_requests:
                 continue
             requests = sorted(
@@ -591,10 +591,11 @@ class Broker:
                 reverse=True,
             )
             for request in requests:
+                # need to check the limits on each request to update the qos_rules table
                 can_run = self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler)
-                if can_run and submit_request and requests_counter < number_of_requests:
+                if can_run and may_run and requests_counter < number_of_requests:
                     self.submit_request(request, session=session_write)
-                    submit_request = False
+                    may_run = False
                     requests_counter += 1
 
     @perf_logger
