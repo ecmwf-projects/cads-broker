@@ -39,6 +39,7 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_requeue_on_lost_requests: bool = True
     broker_requeue_limit: int = 3
     broker_max_internal_scheduler_tasks: int = 500
+    broker_count_requests_cache_size: int = 10
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):

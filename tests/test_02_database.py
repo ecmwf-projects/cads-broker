@@ -182,6 +182,31 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         assert 3 == db.count_requests(session=session, status=["accepted", "running"])
 
 
+def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
+
+    adaptor_properties = mock_config()
+    request1 = mock_system_request(
+        status="accepted",
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request2 = mock_system_request(
+        status="accepted",
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request1)
+        session.commit()
+
+        assert 1 == db.cached_count_requests(session=session)
+        session.add(request2)
+        session.commit()
+        assert 1 == db.cached_count_requests(session=session)
+        # make cache expire
+        [db.cached_count_requests(session=session) for _ in range(8)]
+        assert 2 == db.cached_count_requests(session=session)
+
+
 def test_add_qos_rule(session_obj: sa.orm.sessionmaker) -> None:
     rule = MockRule("rule_name", "conclusion", "info", "condition")
     with session_obj() as session:
