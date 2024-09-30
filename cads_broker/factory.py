@@ -63,7 +63,7 @@ def register_functions():
         status,
         portal=None,
         process_id=None,
-        entry_point=None: database.count_requests(
+        entry_point=None: database.cached_count_requests(
             user_uid=context.request.user_uid,
             status=status,
             process_id=process_id,
