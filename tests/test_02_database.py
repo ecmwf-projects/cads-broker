@@ -186,11 +186,11 @@ def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
 
     adaptor_properties = mock_config()
     request1 = mock_system_request(
-        status="accepted",
+        status="accepted", user_uid="user1",
         adaptor_properties_hash=adaptor_properties.hash,
     )
     request2 = mock_system_request(
-        status="accepted",
+        status="accepted", user_uid="user1",
         adaptor_properties_hash=adaptor_properties.hash,
     )
     with session_obj() as session:
@@ -198,13 +198,17 @@ def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request1)
         session.commit()
 
-        assert 1 == db.cached_count_requests(session=session)
+        # cache miss
+        assert 1 == db.cached_count_requests(session=session, user_uid="user1")
         session.add(request2)
         session.commit()
-        assert 1 == db.cached_count_requests(session=session)
+        # first cache hit (cache is not expired)
+        assert 1 == db.cached_count_requests(session=session, user_uid="user1")
+        # cache miss (cache is not expired because the **kwargs are different)
+        assert 0 == db.cached_count_requests(session=session, user_uid="user2")
         # make cache expire
-        [db.cached_count_requests(session=session) for _ in range(8)]
-        assert 2 == db.cached_count_requests(session=session)
+        [db.cached_count_requests(session=session, user_uid="user1") for _ in range(9)]
+        assert 2 == db.cached_count_requests(session=session, user_uid="user1")
 
 
 def test_add_qos_rule(session_obj: sa.orm.sessionmaker) -> None:

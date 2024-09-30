@@ -33,7 +33,6 @@ status_enum = sa.Enum(
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
 )
-COUNT_REQUESTS_CALLS = 0
 COUNT_REQUEST_CACHE = cachetools.LRUCache(maxsize=1000)
 
 
@@ -314,21 +313,17 @@ def count_requests(
 
 
 def cached_count_requests(*args, **kwargs):
-    global COUNT_REQUESTS_CALLS
-
-    COUNT_REQUESTS_CALLS += 1
-
-    if COUNT_REQUESTS_CALLS >= CONFIG.broker_count_requests_cache_size:
-        COUNT_REQUEST_CACHE.clear()
-        COUNT_REQUESTS_CALLS = 0
 
     key = cachetools.keys.hashkey(*args, **kwargs)
-    if key in COUNT_REQUEST_CACHE:
-        return COUNT_REQUEST_CACHE[key]
-
-    result = count_requests(*args, **kwargs)
-    COUNT_REQUEST_CACHE[key] = result
-
+    # get the result from the cache, if it doesn't exist set count to reset the cache
+    result, count = COUNT_REQUEST_CACHE.get(key, (None, CONFIG.broker_count_requests_cache_size))
+    if count >= CONFIG.broker_count_requests_cache_size:
+        # cache miss or expired
+        result = count_requests(*args, **kwargs)
+        count = 0
+    count += 1
+    # update the cache
+    COUNT_REQUEST_CACHE[key] = (result, count)
     return result
 
 
