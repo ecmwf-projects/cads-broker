@@ -183,14 +183,15 @@ def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
 
 
 def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
-
     adaptor_properties = mock_config()
     request1 = mock_system_request(
-        status="accepted", user_uid="user1",
+        status="accepted",
+        user_uid="user1",
         adaptor_properties_hash=adaptor_properties.hash,
     )
     request2 = mock_system_request(
-        status="accepted", user_uid="user1",
+        status="accepted",
+        user_uid="user1",
         adaptor_properties_hash=adaptor_properties.hash,
     )
     with session_obj() as session:

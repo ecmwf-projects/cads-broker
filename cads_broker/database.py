@@ -313,10 +313,11 @@ def count_requests(
 
 
 def cached_count_requests(*args, **kwargs):
-
     key = cachetools.keys.hashkey(*args, **kwargs)
     # get the result from the cache, if it doesn't exist set count to reset the cache
-    result, count = COUNT_REQUEST_CACHE.get(key, (None, CONFIG.broker_count_requests_cache_size))
+    result, count = COUNT_REQUEST_CACHE.get(
+        key, (None, CONFIG.broker_count_requests_cache_size)
+    )
     if count >= CONFIG.broker_count_requests_cache_size:
         # cache miss or expired
         result = count_requests(*args, **kwargs)

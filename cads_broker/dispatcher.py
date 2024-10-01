@@ -592,7 +592,9 @@ class Broker:
             )
             for request in requests:
                 # need to check the limits on each request to update the qos_rules table
-                can_run = self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler)
+                can_run = self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                )
                 if can_run and may_run and requests_counter < number_of_requests:
                     self.submit_request(request, session=session_write)
                     may_run = False
