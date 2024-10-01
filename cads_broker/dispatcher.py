@@ -682,19 +682,19 @@ class Broker:
                     self.sync_futures()
                     self.sync_database(session=session_write)
                     session_write.commit()
-                    if (queue_length := self.queue.len()) != (
-                        db_queue := db.count_accepted_requests_before(
-                            session=session_write,
-                            last_created_at=self.queue.last_created_at,
-                        )
-                    ):
-                        # if the internal queue is not in sync with the database, re-sync it
-                        logger.info(
-                            "re-syncing internal queue",
-                            internal_queue={queue_length},
-                            db_queue={db_queue},
-                        )
-                        self.queue.reset()
+                    # if (queue_length := self.queue.len()) != (
+                    #     db_queue := db.count_accepted_requests_before(
+                    #         session=session_write,
+                    #         last_created_at=self.queue.last_created_at,
+                    #     )
+                    # ):
+                    #     # if the internal queue is not in sync with the database, re-sync it
+                    #     logger.info(
+                    #         "re-syncing internal queue",
+                    #         internal_queue=queue_length,
+                    #         db_queue=db_queue,
+                    #     )
+                    #     self.queue.reset()
 
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
