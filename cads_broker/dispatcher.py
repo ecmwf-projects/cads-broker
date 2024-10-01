@@ -669,6 +669,7 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
+                    logger.info("last_created_at before", last_created_at=self.queue.last_created_at)
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
@@ -676,6 +677,7 @@ class Broker:
                             limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
+                    logger.info("last_created_at after", last_created_at=self.queue.last_created_at)
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)

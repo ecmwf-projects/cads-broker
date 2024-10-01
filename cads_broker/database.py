@@ -223,7 +223,7 @@ def get_accepted_requests(
     last_created_at: datetime.datetime | None = None,
     limit: int | None = None,
 ):
-    """Get all accepted requests."""
+    """Get all accepted requests after 'last_created_at'."""
     statement = sa.select(SystemRequest)
     if last_created_at:
         statement = statement.where(SystemRequest.created_at >= last_created_at)
