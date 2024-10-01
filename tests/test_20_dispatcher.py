@@ -135,7 +135,6 @@ def test_processing_time_priority_algorithm(
     request1 = mock_system_request(user_uid="user1", request_uid="request1")
     request2 = mock_system_request(user_uid="user1", request_uid="request2")
 
-
     def mock_get_users_queue_from_processing_time():
         return {"user1": [request1, request2]}
 
@@ -154,9 +153,7 @@ def test_processing_time_priority_algorithm(
             if candidate.request_uid == request.request_uid:
                 candidates.remove(candidate)
 
-    mocker.patch(
-        "cads_broker.dispatcher.Broker.submit_request", mock_submit_request
-    )
+    mocker.patch("cads_broker.dispatcher.Broker.submit_request", mock_submit_request)
 
     environment = Environment.Environment()
     qos = QoS.QoS(

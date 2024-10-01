@@ -7,6 +7,7 @@ import os
 import uuid
 from typing import Any
 
+import cachetools
 import cacholote
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -24,6 +25,7 @@ BaseModel = sa.orm.declarative_base()
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
+CONFIG = config.BrokerConfig()
 
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", "deleted", name="status"
@@ -31,6 +33,7 @@ status_enum = sa.Enum(
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
 )
+COUNT_REQUEST_CACHE = cachetools.LRUCache(maxsize=1000)
 
 
 class NoResultFound(Exception):
@@ -307,6 +310,22 @@ def count_requests(
             portal = [portal]
         statement = statement.filter(SystemRequest.portal.in_(portal))
     return statement.count()
+
+
+def cached_count_requests(*args, **kwargs):
+    key = cachetools.keys.hashkey(*args, **kwargs)
+    # get the result from the cache, if it doesn't exist set count to reset the cache
+    result, count = COUNT_REQUEST_CACHE.get(
+        key, (None, CONFIG.broker_count_requests_cache_size)
+    )
+    if count >= CONFIG.broker_count_requests_cache_size:
+        # cache miss or expired
+        result = count_requests(*args, **kwargs)
+        count = 0
+    count += 1
+    # update the cache
+    COUNT_REQUEST_CACHE[key] = (result, count)
+    return result
 
 
 def get_dismissed_requests(session: sa.orm.Session) -> Iterable[SystemRequest]:
