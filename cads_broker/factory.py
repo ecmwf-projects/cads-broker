@@ -2,7 +2,7 @@ from cads_broker import database, expressions
 
 
 def tagged(context, value):
-    if value in context.request.request_metadata.get("qos_tags"):
+    if value in context.request.request_metadata.get("qos_tags", []):
         return True
 
 
