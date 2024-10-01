@@ -34,11 +34,16 @@ def add_dummy_requests(
                 request_uid=str(uuid.uuid4()),
                 process_id="test-adaptor-dummy",
                 user_uid=random.choice(user_uids),
+                # avoid using the same timestamp for all requests
+                created_at=datetime.datetime.now()
+                - datetime.timedelta(seconds=number_of_requests - i),
                 status="accepted",
                 request_body={
                     "setup_code": None,
                     "request": {
-                        "elapsed": str(datetime.timedelta(seconds=random.randint(0, max_length))),
+                        "elapsed": str(
+                            datetime.timedelta(seconds=random.randint(0, max_length))
+                        ),
                         "timestamp": str(datetime.datetime.now()),
                     },
                 },
