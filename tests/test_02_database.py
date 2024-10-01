@@ -100,18 +100,25 @@ def test_get_accepted_requests(session_obj: sa.orm.sessionmaker) -> None:
     successful_request = mock_system_request(
         status="running", adaptor_properties_hash=adaptor_properties.hash
     )
-    accepted_request = mock_system_request(
+    accepted_request1 = mock_system_request(
         status="accepted", adaptor_properties_hash=adaptor_properties.hash
     )
-    accepted_request_uid = accepted_request.request_uid
+    accepted_request2 = mock_system_request(
+        status="accepted", adaptor_properties_hash=adaptor_properties.hash
+    )
+    accepted_request_uid = accepted_request1.request_uid
     with session_obj() as session:
         session.add(adaptor_properties)
         session.add(successful_request)
-        session.add(accepted_request)
+        session.add(accepted_request1)
+        session.add(accepted_request2)
         session.commit()
-        requests = db.get_accepted_requests(session=session)
-    assert len(requests) == 1
-    assert requests[0].request_uid == accepted_request_uid
+        all_requests = db.get_accepted_requests(session=session)
+        one_request = db.get_accepted_requests(session=session, limit=1)
+    assert len(all_requests) == 2
+    assert len(one_request) == 1
+    assert min(all_requests, key=lambda x: x.created_at) == one_request[0]
+    assert all_requests[0].request_uid == accepted_request_uid
 
 
 def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> None:

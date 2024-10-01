@@ -673,6 +673,7 @@ class Broker:
                         db.get_accepted_requests(
                             session=session_write,
                             last_created_at=self.queue.last_created_at,
+                            limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
                     self.sync_qos_rules(session_write)
