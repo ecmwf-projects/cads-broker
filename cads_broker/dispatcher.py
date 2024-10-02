@@ -577,6 +577,10 @@ class Broker:
                 request = db.get_request(request.request_uid, session=session)
                 request.status = "failed"
                 request.finished_at = datetime.datetime.now()
+                request.response_error = {
+                    "reason": "PermissionError",
+                    "message": exception.args[0],
+                }
                 self.queue.pop(request.request_uid, None)
                 self.qos.notify_dismission_of_request(
                     request, session, scheduler=self.internal_scheduler
