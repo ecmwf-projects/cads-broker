@@ -122,7 +122,7 @@ class QoS:
         return not len(limits) and not len(permissions)
 
     @locked
-    def _properties(self, request, session):
+    def _properties(self, request, session, check_permissions=False):
         """Return the Properties object associated with a request.
 
         If it does not exists it is created.
@@ -132,6 +132,9 @@ class QoS:
         properties = self.requests_properties_cache.get(request.request_uid)
         if properties is not None:
             return properties
+
+        if check_permissions:
+            self.check_permissions_for(request, session)
 
         properties = Properties()
 
