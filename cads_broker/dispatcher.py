@@ -580,6 +580,7 @@ class Broker:
                 self.qos.notify_dismission_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
+        session.commit()
 
 
     def processing_time_priority_algorithm(
@@ -702,6 +703,7 @@ class Broker:
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
+                    session_write.commit()
                     if (queue_length := self.queue.len()) != (
                         db_queue := db.count_accepted_requests_before(
                             session=session_write,
@@ -716,7 +718,6 @@ class Broker:
                         )
                         self.queue.reset()
                     self.cache_requests_qos_properties(self.queue.values(), session_write)
-                    session_write.commit()
 
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
