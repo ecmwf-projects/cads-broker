@@ -561,6 +561,7 @@ class Broker:
             future.release()
         return future.key
 
+    @perf_logger
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
         """Cache the qos properties of the requests."""
         for request in list(requests):
