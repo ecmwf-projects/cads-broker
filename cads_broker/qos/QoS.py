@@ -223,8 +223,6 @@ class QoS:
         """
         # check permissions
         properties = self.requests_properties_cache.get(request.request_uid, Properties())
-        if properties is not None:
-            return properties.permissions
 
         for rule in self.rules.permissions:
             if rule.match(request):
