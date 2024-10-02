@@ -221,14 +221,17 @@ def get_running_requests(
 def get_accepted_requests(
     session: sa.orm.Session,
     last_created_at: datetime.datetime | None = None,
+    limit: int | None = None,
 ):
-    """Get all accepted requests."""
+    """Get all accepted requests after 'last_created_at'."""
     statement = sa.select(SystemRequest)
     if last_created_at:
         statement = statement.where(SystemRequest.created_at >= last_created_at)
     statement = statement.where(SystemRequest.status == "accepted").order_by(
         SystemRequest.created_at
     )
+    if limit:
+        statement = statement.limit(limit)
     return session.scalars(statement).all()
 
 
@@ -321,8 +324,12 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def get_dismissed_requests(session: sa.orm.Session) -> Iterable[SystemRequest]:
+def get_dismissed_requests(
+    session: sa.orm.Session, limit: int | None
+) -> Iterable[SystemRequest]:
     stmt_dismissed = sa.select(SystemRequest).where(SystemRequest.status == "dismissed")
+    if limit:
+        stmt_dismissed = stmt_dismissed.limit(limit)
     return session.scalars(stmt_dismissed).fetchall()
 
 
@@ -708,10 +715,12 @@ def add_event(
     request_uid: str,
     message: str,
     session: sa.orm.Session,
+    commit: bool = True,
 ):
     event = Events(event_type=event_type, request_uid=request_uid, message=message)
     session.add(event)
-    session.commit()
+    if commit:
+        session.commit()
 
 
 def dictify_request(request: SystemRequest) -> dict[str, Any]:

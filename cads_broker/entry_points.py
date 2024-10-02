@@ -3,7 +3,6 @@
 import datetime
 import os
 import random
-import sqlite3
 import uuid
 from enum import Enum
 from typing import Any, Optional
@@ -19,42 +18,47 @@ app = typer.Typer()
 
 @app.command()
 def add_dummy_requests(
-    requests_db: str, number_of_requests: int = 1000, number_of_users: int = 100
+    number_of_requests: int = 1000, number_of_users: int = 100, max_length: int = 60
 ) -> None:
-    connection = sqlite3.connect(requests_db)
-    connection.row_factory = sqlite3.Row
-    cursor = connection.execute(f"SELECT * FROM broker limit {number_of_requests}")
     user_uids = [str(uuid.uuid4()) for _ in range(number_of_users)]
     with database.ensure_session_obj(None)() as session:
-        for i, row in enumerate(cursor):
-            if row["elapsed"] != "null":
-                database.ensure_adaptor_properties(
-                    hash="test",
-                    config={},
-                    form={},
-                    session=session,
-                )
-                request = database.SystemRequest(
-                    request_uid=str(uuid.uuid4()),
-                    process_id="test-adaptor-dummy",
-                    user_uid=random.choice(user_uids),
-                    status="accepted",
-                    request_body={
-                        "setup_code": None,
-                        "request": {
-                            "elapsed": str(datetime.timedelta(seconds=row["elapsed"])),
-                            "timestamp": str(datetime.datetime.now()),
-                        },
+        database.ensure_adaptor_properties(
+            hash="test",
+            config={},
+            form={},
+            session=session,
+        )
+        for i in range(number_of_requests):
+            request = database.SystemRequest(
+                request_uid=str(uuid.uuid4()),
+                process_id="test-adaptor-dummy",
+                user_uid=random.choice(user_uids),
+                # avoid using the same timestamp for all requests
+                created_at=datetime.datetime.now()
+                - datetime.timedelta(seconds=number_of_requests - i),
+                status="accepted",
+                request_body={
+                    "setup_code": None,
+                    "request": {
+                        "elapsed": str(
+                            datetime.timedelta(seconds=random.randint(0, max_length))
+                        ),
+                        "timestamp": str(datetime.datetime.now()),
                     },
-                    request_metadata={},
-                    origin="api",
-                    portal="c3s",
-                    adaptor_properties_hash="test",
-                    entry_point="cads_adaptors:DummyAdaptor",
-                )
-                session.add(request)
-                session.commit()
+                },
+                request_metadata={},
+                origin="api",
+                portal="c3s",
+                adaptor_properties_hash="test",
+                entry_point="cads_adaptors:DummyAdaptor",
+            )
+            session.add(request)
+
+            print(f"Added request {i} with request_uid {request.request_uid}")
+
+        # Commit all at the end
         session.commit()
+        print(f"Committed {number_of_requests} requests")
 
 
 @app.command()

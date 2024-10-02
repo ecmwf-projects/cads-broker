@@ -122,7 +122,7 @@ class QoS:
         return not len(limits) and not len(permissions)
 
     @locked
-    def _properties(self, request, session):
+    def _properties(self, request, session, check_permissions=False):
         """Return the Properties object associated with a request.
 
         If it does not exists it is created.
@@ -135,18 +135,8 @@ class QoS:
 
         properties = Properties()
 
-        # First check permissions
-        for rule in self.rules.permissions:
-            if rule.match(request):
-                properties.permissions.append(rule)
-                if not rule.evaluate(request):
-                    database.set_dismissed_request(
-                        request_uid=request.request_uid,
-                        session=session,
-                        message=rule.info.evaluate(Context(request, self.environment)),
-                        reason="PermissionError",
-                    )
-                    break
+        if check_permissions:
+            self.check_permissions_for(request, properties)
 
         # Add general limits
         for rule in self.rules.global_limits:
@@ -217,7 +207,7 @@ class QoS:
             out("    {}".format(priority))
 
         out("Permissions rules:")
-        for permission in self.permissions_for(request, session):
+        for permission in self.check_permissions_for(request, session):
             out("    {}".format(permission))
 
     @locked
@@ -229,12 +219,23 @@ class QoS:
         return self._properties(request, session).limits
 
     @locked
-    def permissions_for(self, request, session):
+    def check_permissions_for(self, request, properties):
         """Return the permission rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).permissions
+        # check permissions
+        for rule in self.rules.permissions:
+            if rule.match(request):
+                properties.permissions.append(rule)
+                if not rule.evaluate(request):
+                    # Store in cache with empty properties
+                    self.requests_properties_cache[request.request_uid] = properties
+                    raise PermissionError(
+                        rule.info.evaluate(Context(request, self.environment))
+                    )
+
+        return properties.permissions
 
     @locked
     def priorities_for(self, request, session):
@@ -303,15 +304,16 @@ class QoS:
         for limit in self.limits_for(request, session):
             limit.remove_from_queue(request.request_uid)
             limits_list.append(limit)
-        scheduler.append(
-            {
-                "function": database.delete_request_qos_status,
-                "kwargs": {
-                    "rules": limits_list,
-                    "request_uid": request.request_uid,
-                },
-            }
-        )
+        if limits_list:
+            scheduler.append(
+                {
+                    "function": database.delete_request_qos_status,
+                    "kwargs": {
+                        "rules": limits_list,
+                        "request_uid": request.request_uid,
+                    },
+                }
+            )
 
     @locked
     def notify_start_of_request(self, request, session, scheduler):

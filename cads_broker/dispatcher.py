@@ -335,6 +335,7 @@ class Broker:
             request_uid=request.request_uid,
             message=dismission_metadata.get("message", ""),
             session=session,
+            commit=False,
         )
         previous_status = dismission_metadata.get("previous_status", "accepted")
         if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":
@@ -371,8 +372,10 @@ class Broker:
         """
         # the retrieve API sets the status to "dismissed",
         # here the broker fixes the QoS and queue status accordingly
-        dismissed_requests = db.get_dismissed_requests(session)
-        for request in dismissed_requests:
+        dismissed_requests = db.get_dismissed_requests(
+            session, limit=CONFIG.broker_max_accepted_requests
+        )
+        for i, request in enumerate(dismissed_requests):
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
             session = self.manage_dismissed_request(request, session)
@@ -561,6 +564,34 @@ class Broker:
             future.release()
         return future.key
 
+    @perf_logger
+    def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
+        """Cache the qos properties of the requests."""
+        # copy list of requests to avoid RuntimeError: dictionary changed size during iteration
+        for request in list(requests):
+            try:
+                self.qos._properties(request, check_permissions=True, session=session)
+            except PermissionError as exception:
+                db.add_event(
+                    event_type="user_visible_error",
+                    request_uid=request.request_uid,
+                    message=exception.args[0],
+                    session=session,
+                )
+                request = db.get_request(request.request_uid, session=session)
+                request.status = "failed"
+                request.finished_at = datetime.datetime.now()
+                request.response_error = {
+                    "reason": "PermissionError",
+                    "message": exception.args[0],
+                }
+                self.queue.pop(request.request_uid, None)
+                self.qos.notify_dismission_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
+                logger.info("job has finished", **db.logger_kwargs(request=request))
+        session.commit()
+
     def processing_time_priority_algorithm(
         self,
         session_write: sa.orm.Session,
@@ -592,7 +623,9 @@ class Broker:
             )
             for request in requests:
                 # need to check the limits on each request to update the qos_rules table
-                can_run = self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler)
+                can_run = self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                )
                 if can_run and may_run and requests_counter < number_of_requests:
                     self.submit_request(request, session=session_write)
                     may_run = False
@@ -673,6 +706,7 @@ class Broker:
                         db.get_accepted_requests(
                             session=session_write,
                             last_created_at=self.queue.last_created_at,
+                            limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
                     self.sync_qos_rules(session_write)
@@ -688,10 +722,13 @@ class Broker:
                         # if the internal queue is not in sync with the database, re-sync it
                         logger.info(
                             "re-syncing internal queue",
-                            internal_queue={queue_length},
-                            db_queue={db_queue},
+                            internal_queue=queue_length,
+                            db_queue=db_queue,
                         )
                         self.queue.reset()
+                    self.cache_requests_qos_properties(
+                        self.queue.values(), session_write
+                    )
 
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
