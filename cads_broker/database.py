@@ -324,7 +324,9 @@ def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
     )
 
 
-def get_dismissed_requests(session: sa.orm.Session, limit: int | None) -> Iterable[SystemRequest]:
+def get_dismissed_requests(
+    session: sa.orm.Session, limit: int | None
+) -> Iterable[SystemRequest]:
     stmt_dismissed = sa.select(SystemRequest).where(SystemRequest.status == "dismissed")
     if limit:
         stmt_dismissed = stmt_dismissed.limit(limit)
