@@ -564,7 +564,11 @@ class Broker:
     @perf_logger
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
         """Cache the qos properties of the requests."""
-        for request in perf_logger(list)(requests):
+        start = time.perf_counter()
+        reqs = list(requests)
+        logger.info("performance", elapsed=time.perf_counter() - start)
+        print(f"performance cache_requests_qos_properties: {len(reqs)}")
+        for request in list(requests):
             try:
                 self.qos._properties(request, session=session)
             except PermissionError as exception:
