@@ -378,7 +378,7 @@ class Broker:
                 future.cancel()
             session = self.manage_dismissed_request(request, session)
             if i % 2000 == 0:
-                session.flush()
+                session.commit()
         session.commit()
 
         scheduler_tasks = get_tasks_from_scheduler(self.client)
