@@ -140,6 +140,8 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
+                    # Store in cache with empty properties
+                    self.requests_properties_cache[request.request_uid] = properties
                     raise PermissionError(
                         rule.info.evaluate(Context(request, self.environment))
                     )
