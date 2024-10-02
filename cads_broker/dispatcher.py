@@ -335,6 +335,7 @@ class Broker:
             request_uid=request.request_uid,
             message=dismission_metadata.get("message", ""),
             session=session,
+            commit=False,
         )
         previous_status = dismission_metadata.get("previous_status", "accepted")
         if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":

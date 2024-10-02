@@ -699,10 +699,12 @@ def add_event(
     request_uid: str,
     message: str,
     session: sa.orm.Session,
+    commit: bool = True,
 ):
     event = Events(event_type=event_type, request_uid=request_uid, message=message)
     session.add(event)
-    session.commit()
+    if commit:
+        session.commit()
 
 
 def dictify_request(request: SystemRequest) -> dict[str, Any]:
