@@ -312,7 +312,19 @@ def count_requests(
     return statement.count()
 
 
-def get_dismissed_requests(session: sa.orm.Session, limit: int | None = None) -> Iterable[SystemRequest]:
+def count_users(status: str, entry_point: str, session: sa.orm.Session) -> int:
+    """Users that have running requests, per dataset."""
+    return (
+        session.query(SystemRequest.user_uid)
+        .filter(
+            SystemRequest.status == status, SystemRequest.entry_point == entry_point
+        )
+        .distinct()
+        .count()
+    )
+
+
+def get_dismissed_requests(session: sa.orm.Session) -> Iterable[SystemRequest]:
     stmt_dismissed = sa.select(SystemRequest).where(SystemRequest.status == "dismissed")
     if limit:
         stmt_dismissed = stmt_dismissed.limit(limit)

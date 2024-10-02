@@ -133,10 +133,10 @@ class QoS:
         if properties is not None:
             return properties
 
-        if check_permissions:
-            self.check_permissions_for(request, session)
-
         properties = Properties()
+
+        if check_permissions:
+            self.check_permissions_for(request, properties)
 
         # Add general limits
         for rule in self.rules.global_limits:
@@ -219,14 +219,12 @@ class QoS:
         return self._properties(request, session).limits
 
     @locked
-    def check_permissions_for(self, request, session):
+    def check_permissions_for(self, request, properties):
         """Return the permission rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
         # check permissions
-        properties = self.requests_properties_cache.get(request.request_uid, Properties())
-
         for rule in self.rules.permissions:
             if rule.match(request):
                 properties.permissions.append(rule)

@@ -819,3 +819,55 @@ def test_ensure_session_obj(
     ret_value = db.ensure_session_obj(None)
     assert isinstance(ret_value, sessionmaker)
     config.dbsettings = None
+
+
+def test_count_running_users(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request0 = mock_system_request(
+        status="running",
+        entry_point="foobar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request1 = mock_system_request(
+        status="running",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request2 = mock_system_request(
+        status="running",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    request3 = mock_system_request(
+        status="accepted",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="carl",
+    )
+    request4 = mock_system_request(
+        status="accepted",
+        entry_point="bar",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="bob",
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request0)
+        session.add(request1)
+        session.add(request2)
+        session.add(request3)
+        session.add(request4)
+        session.commit()
+        assert 2 == db.count_users(
+            session=session, entry_point="bar", status="accepted"
+        )
+        assert 1 == db.count_users(session=session, entry_point="bar", status="running")
+        assert 0 == db.count_users(
+            session=session, entry_point="foobar", status="accepted"
+        )
+        assert 1 == db.count_users(
+            session=session, entry_point="foobar", status="running"
+        )
