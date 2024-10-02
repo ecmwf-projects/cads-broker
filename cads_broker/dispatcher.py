@@ -564,6 +564,7 @@ class Broker:
     @perf_logger
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
         """Cache the qos properties of the requests."""
+        # copy list of requests to avoid RuntimeError: dictionary changed size during iteration
         for request in list(requests):
             try:
                 self.qos._properties(request, session=session)
@@ -698,20 +699,12 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
-                    logger.info(
-                        "last_created_at before",
-                        last_created_at=self.queue.last_created_at,
-                    )
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
                             last_created_at=self.queue.last_created_at,
                             limit=CONFIG.broker_max_accepted_requests,
                         )
-                    )
-                    logger.info(
-                        "last_created_at after",
-                        last_created_at=self.queue.last_created_at,
                     )
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
