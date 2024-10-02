@@ -312,8 +312,10 @@ def count_requests(
     return statement.count()
 
 
-def get_dismissed_requests(session: sa.orm.Session) -> Iterable[SystemRequest]:
+def get_dismissed_requests(session: sa.orm.Session, limit: int | None = None) -> Iterable[SystemRequest]:
     stmt_dismissed = sa.select(SystemRequest).where(SystemRequest.status == "dismissed")
+    if limit:
+        stmt_dismissed = stmt_dismissed.limit(limit)
     return session.scalars(stmt_dismissed).fetchall()
 
 
