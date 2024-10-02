@@ -373,10 +373,12 @@ class Broker:
         # the retrieve API sets the status to "dismissed",
         # here the broker fixes the QoS and queue status accordingly
         dismissed_requests = db.get_dismissed_requests(session)
-        for request in dismissed_requests:
+        for i, request in enumerate(dismissed_requests):
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
             session = self.manage_dismissed_request(request, session)
+            if i % 2000 == 0:
+                session.flush()
         session.commit()
 
         scheduler_tasks = get_tasks_from_scheduler(self.client)
