@@ -452,7 +452,7 @@ def get_users_queue_from_processing_time(
         SystemRequest.finished_at >= interval_start,
         SystemRequest.finished_at < interval_stop,
         SystemRequest.status != "deleted",
-        SystemRequest.started_at != None,
+        SystemRequest.started_at.is_not(None),
     )
     where_clause = sa.sql.or_(interval_clause, SystemRequest.status == "running")
 
