@@ -135,17 +135,6 @@ class QoS:
 
         properties = Properties()
 
-        # First check permissions
-        for rule in self.rules.permissions:
-            if rule.match(request):
-                properties.permissions.append(rule)
-                if not rule.evaluate(request):
-                    # Store in cache with empty properties
-                    self.requests_properties_cache[request.request_uid] = properties
-                    raise PermissionError(
-                        rule.info.evaluate(Context(request, self.environment))
-                    )
-
         # Add general limits
         for rule in self.rules.global_limits:
             if rule.match(request):
@@ -215,7 +204,7 @@ class QoS:
             out("    {}".format(priority))
 
         out("Permissions rules:")
-        for permission in self.permissions_for(request, session):
+        for permission in self.check_permissions_for(request, session):
             out("    {}".format(permission))
 
     @locked
@@ -227,12 +216,27 @@ class QoS:
         return self._properties(request, session).limits
 
     @locked
-    def permissions_for(self, request, session):
+    def check_permissions_for(self, request, session):
         """Return the permission rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).permissions
+        # check permissions
+        properties = self.requests_properties_cache.get(request.request_uid, Properties())
+        if properties is not None:
+            return properties.permissions
+
+        for rule in self.rules.permissions:
+            if rule.match(request):
+                properties.permissions.append(rule)
+                if not rule.evaluate(request):
+                    # Store in cache with empty properties
+                    self.requests_properties_cache[request.request_uid] = properties
+                    raise PermissionError(
+                        rule.info.evaluate(Context(request, self.environment))
+                    )
+
+        return properties.permissions
 
     @locked
     def priorities_for(self, request, session):
@@ -298,11 +302,7 @@ class QoS:
     def notify_dismission_of_request(self, request, session, scheduler):
         """Notify the dismission of a request."""
         limits_list = []
-        try:
-            limits_for_request = self.limits_for(request, session)
-        except PermissionError:
-            return
-        for limit in limits_for_request:
+        for limit in self.limits_for(request, session):
             limit.remove_from_queue(request.request_uid)
             limits_list.append(limit)
         if limits_list:

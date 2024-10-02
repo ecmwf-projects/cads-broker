@@ -567,8 +567,9 @@ class Broker:
         """Cache the qos properties of the requests."""
         # copy list of requests to avoid RuntimeError: dictionary changed size during iteration
         for request in list(requests):
+            self.qos._properties(request, session=session)
             try:
-                self.qos._properties(request, session=session)
+                self.qos.check_permissions_for(request, session=session)
             except PermissionError as exception:
                 db.add_event(
                     event_type="user_visible_error",
