@@ -564,10 +564,6 @@ class Broker:
     @perf_logger
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
         """Cache the qos properties of the requests."""
-        start = time.perf_counter()
-        reqs = list(requests)
-        logger.info("performance", elapsed=time.perf_counter() - start)
-        print(f"performance cache_requests_qos_properties: {len(reqs)}")
         for request in list(requests):
             try:
                 self.qos._properties(request, session=session)
@@ -585,8 +581,8 @@ class Broker:
                 self.qos.notify_dismission_of_request(
                     request, session, scheduler=self.internal_scheduler
                 )
+                logger.info("job has finished", **db.logger_kwargs(request=request))
         session.commit()
-
 
     def processing_time_priority_algorithm(
         self,
@@ -619,7 +615,9 @@ class Broker:
             )
             for request in requests:
                 # need to check the limits on each request to update the qos_rules table
-                can_run = self.qos.can_run(request, session=session_write, scheduler=self.internal_scheduler)
+                can_run = self.qos.can_run(
+                    request, session=session_write, scheduler=self.internal_scheduler
+                )
                 if can_run and may_run and requests_counter < number_of_requests:
                     self.submit_request(request, session=session_write)
                     may_run = False
@@ -696,7 +694,10 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
-                    logger.info("last_created_at before", last_created_at=self.queue.last_created_at)
+                    logger.info(
+                        "last_created_at before",
+                        last_created_at=self.queue.last_created_at,
+                    )
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
@@ -704,7 +705,10 @@ class Broker:
                             limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
-                    logger.info("last_created_at after", last_created_at=self.queue.last_created_at)
+                    logger.info(
+                        "last_created_at after",
+                        last_created_at=self.queue.last_created_at,
+                    )
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
@@ -722,7 +726,9 @@ class Broker:
                             db_queue=db_queue,
                         )
                         self.queue.reset()
-                    self.cache_requests_qos_properties(self.queue.values(), session_write)
+                    self.cache_requests_qos_properties(
+                        self.queue.values(), session_write
+                    )
 
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
