@@ -608,7 +608,7 @@ def test_get_request(session_obj: sa.orm.sessionmaker) -> None:
     assert request.request_uid == request_uid
 
 
-def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
+def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) -> None:
     adaptor_properties = mock_config()
     request_1 = mock_system_request(
         status="successful",
@@ -647,6 +647,13 @@ def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user3",
     )
+    request_7 = mock_system_request(
+        status="failed",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user3",
+        started_at=None,
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+    )
     with session_obj() as session:
         session.add(adaptor_properties)
         session.add(request_1)
@@ -655,6 +662,7 @@ def test_get_users_queue_per_cost(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_4)
         session.add(request_5)
         session.add(request_6)
+        session.add(request_7)
         session.commit()
     with session_obj() as session:
         users_cost = db.get_users_queue_from_processing_time(
