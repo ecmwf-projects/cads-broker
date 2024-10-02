@@ -298,7 +298,11 @@ class QoS:
     def notify_dismission_of_request(self, request, session, scheduler):
         """Notify the dismission of a request."""
         limits_list = []
-        for limit in self.limits_for(request, session):
+        try:
+            limits_for_request = self.limits_for(request, session)
+        except PermissionError:
+            return
+        for limit in limits_for_request:
             limit.remove_from_queue(request.request_uid)
             limits_list.append(limit)
         if limits_list:
