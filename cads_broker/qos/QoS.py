@@ -140,13 +140,9 @@ class QoS:
             if rule.match(request):
                 properties.permissions.append(rule)
                 if not rule.evaluate(request):
-                    database.set_dismissed_request(
-                        request_uid=request.request_uid,
-                        session=session,
-                        message=rule.info.evaluate(Context(request, self.environment)),
-                        reason="PermissionError",
+                    raise PermissionError(
+                        rule.info.evaluate(Context(request, self.environment))
                     )
-                    break
 
         # Add general limits
         for rule in self.rules.global_limits:

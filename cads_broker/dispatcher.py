@@ -561,6 +561,27 @@ class Broker:
             future.release()
         return future.key
 
+    def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
+        """Cache the qos properties of the requests."""
+        for request in requests:
+            try:
+                self.qos._properties(request, session=session)
+            except PermissionError as exception:
+                db.add_event(
+                    event_type="user_visible_error",
+                    request_uid=request.request_uid,
+                    message=exception.args[0],
+                    session=session,
+                )
+                request = db.get_request(request.request_uid, session=session)
+                request.status = "failed"
+                request.finished_at = datetime.datetime.now()
+                self.queue.pop(request.request_uid, None)
+                self.qos.notify_dismission_of_request(
+                    request, session, scheduler=self.internal_scheduler
+                )
+
+
     def processing_time_priority_algorithm(
         self,
         session_write: sa.orm.Session,
@@ -681,7 +702,6 @@ class Broker:
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
-                    session_write.commit()
                     if (queue_length := self.queue.len()) != (
                         db_queue := db.count_accepted_requests_before(
                             session=session_write,
@@ -695,6 +715,8 @@ class Broker:
                             db_queue=db_queue,
                         )
                         self.queue.reset()
+                    self.cache_requests_qos_properties(self.queue.values(), session_write)
+                    session_write.commit()
 
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
