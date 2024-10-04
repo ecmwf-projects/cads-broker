@@ -26,7 +26,6 @@ dbsettings = None
 
 
 class BrokerConfig(pydantic_settings.BaseSettings):
-    high_priority_user_uid: str = "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f"
     broker_priority_algorithm: str = "legacy"
     broker_priority_interval_hours: int = 24
     broker_get_number_of_workers_cache_time: int = 10
