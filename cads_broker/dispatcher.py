@@ -316,8 +316,12 @@ class Broker:
                 < CONFIG.broker_requeue_limit
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
-                db.requeue_request(request=request, session=session)
-                self.queue.add(request_uid, request)
+                queued_request = db.requeue_request(request=request, session=session)
+                if queued_request:
+                    self.queue.add(request_uid, request)
+                    self.qos.notify_end_of_request(
+                        request, session, scheduler=self.internal_scheduler
+                    )
         else:
             request = db.set_request_status(
                 request_uid,
