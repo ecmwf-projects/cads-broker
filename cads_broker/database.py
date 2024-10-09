@@ -24,7 +24,6 @@ BaseModel = sa.orm.declarative_base()
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-
 status_enum = sa.Enum(
     "accepted", "running", "failed", "successful", "dismissed", "deleted", name="status"
 )
@@ -474,6 +473,20 @@ def get_users_queue_from_processing_time(
     queueing_user_costs = {u: 0 for (u,) in queue_users if u not in running_user_costs}
 
     return queueing_user_costs | running_user_costs
+
+
+def get_stuck_requests(session: sa.orm.Session, hours: int = 1) -> list[str]:
+    """Get all running requests that are not assigned to any worker."""
+    query = (
+        sa.select(SystemRequest.request_uid)
+        .outerjoin(Events, SystemRequest.request_uid == Events.request_uid)
+        .where(
+            SystemRequest.status == "running",
+            SystemRequest.started_at < sa.func.now() - sa.text(f"interval '{hours} hour'"),
+        )
+        .where(Events.event_id == None)
+    )
+    return session.execute(query).scalars().all()
 
 
 def delete_request_qos_status(
