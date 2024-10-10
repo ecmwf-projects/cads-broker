@@ -92,6 +92,37 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
     return client.run_on_scheduler(get_tasks_on_scheduler)
 
 
+def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> None:
+    """Cancel jobs on the dask scheduler.
+
+    This function is executed on the scheduler pod. This just cancel the jobs on the scheduler.
+    See https://stackoverflow.com/questions/49203128/how-do-i-stop-a-running-task-in-dask.
+    """
+
+    def cancel_jobs(dask_scheduler: distributed.Scheduler, job_ids: list[str]) -> None:
+        for job_id in job_ids:
+            if job_id in dask_scheduler.tasks:
+                dask_scheduler.transitions(
+                    {job_id: "cancelled"}, stimulus_id="manual-cancel"
+                )
+
+    return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
+
+
+@cachetools.cached(  # type: ignore
+    cache=cachetools.TTLCache(
+        maxsize=1024, ttl=CONFIG.broker_cancel_stuck_requests_cache_ttl
+    ),
+    info=True,
+)
+def cancel_stuck_requests(client: distributed.Client, session: sa.orm.Session) -> None:
+    """Get the stuck requests from the database and cancel them on the dask scheduler."""
+    stuck_requests = db.get_stuck_requests(
+        session=session, hours=CONFIG.broker_stuck_requests_limit_hours
+    )
+    cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
+
+
 class Scheduler:
     """A simple scheduler to store the tasks to update the qos_rules in the database.
 
@@ -316,8 +347,12 @@ class Broker:
                 < CONFIG.broker_requeue_limit
             ):
                 logger.info("worker killed: re-queueing", job_id=request_uid)
-                db.requeue_request(request=request, session=session)
-                self.queue.add(request_uid, request)
+                queued_request = db.requeue_request(request=request, session=session)
+                if queued_request:
+                    self.queue.add(request_uid, request)
+                    self.qos.notify_end_of_request(
+                        request, session, scheduler=self.internal_scheduler
+                    )
         else:
             request = db.set_request_status(
                 request_uid,
@@ -375,9 +410,13 @@ class Broker:
         dismissed_requests = db.get_dismissed_requests(
             session, limit=CONFIG.broker_max_accepted_requests
         )
-        for i, request in enumerate(dismissed_requests):
+        for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
+            else:
+                # if the request is not in the futures, it means that the request has been lost by the broker
+                # try to cancel the job directly on the scheduler
+                cancel_jobs_on_scheduler(self.client, job_ids=[request.request_uid])
             session = self.manage_dismissed_request(request, session)
         session.commit()
 
@@ -606,12 +645,12 @@ class Broker:
         interval_stop = datetime.datetime.now()
         # temporary solution to prioritize high priority user
         users_queue = {
-            "27888ffa-0973-4794-9b3c-9efb6767f66f": 0, # wekeo
-            "d67a13db-86cc-439d-823d-6517003de29f": 0, # CDS Apps user
-            "365ac1da-090e-4b85-9088-30c676bc5251": 0, # Gionata
-            "74c6f9a1-8efe-4a6c-b06b-9f8ddcab188d": 0, # User Support
-            "4d92cc89-d586-4731-8553-07df5dae1886": 0, # Luke Jones
-            "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f": 0, # Petrut
+            "27888ffa-0973-4794-9b3c-9efb6767f66f": 0,  # wekeo
+            "d67a13db-86cc-439d-823d-6517003de29f": 0,  # CDS Apps user
+            "365ac1da-090e-4b85-9088-30c676bc5251": 0,  # Gionata
+            "74c6f9a1-8efe-4a6c-b06b-9f8ddcab188d": 0,  # User Support
+            "4d92cc89-d586-4731-8553-07df5dae1886": 0,  # Luke Jones
+            "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f": 0,  # Petrut
         } | db.get_users_queue_from_processing_time(
             interval_stop=interval_stop,
             session=session_write,
@@ -736,6 +775,7 @@ class Broker:
                         self.queue.values(), session_write
                     )
 
+                cancel_stuck_requests(client=self.client, session=session_read)
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
                 available_workers = self.number_of_workers - running_requests

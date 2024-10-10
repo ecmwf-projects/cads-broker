@@ -39,6 +39,8 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_requeue_limit: int = 3
     broker_max_internal_scheduler_tasks: int = 500
     broker_max_accepted_requests: int = 2000
+    broker_cancel_stuck_requests_cache_ttl: int = 60
+    broker_stuck_requests_limit_hours: int = 1
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):
