@@ -482,9 +482,10 @@ def get_stuck_requests(session: sa.orm.Session, hours: int = 1) -> list[str]:
         .outerjoin(Events, SystemRequest.request_uid == Events.request_uid)
         .where(
             SystemRequest.status == "running",
-            SystemRequest.started_at < sa.func.now() - sa.text(f"interval '{hours} hour'"),
+            SystemRequest.started_at
+            < sa.func.now() - sa.text(f"interval '{hours} hour'"),
         )
-        .where(Events.event_id == None)
+        .where(Events.event_id.is_(None))
     )
     return session.execute(query).scalars().all()
 
