@@ -85,16 +85,12 @@ class UserPriority(QoSRule):
     """
     It represents a user priority rule.
 
+    This is a special rule since it applies to a user instead of a request.
+
     The 'conclusion' part must evaluate as a number,
     which is then used to compute the starting
-    priority of a request. All rules matching a request contributes to
-    the starting priority of the request. The priority is a number that
-    represents a number of seconds. For example, a request with a
-    starting priority of 120 will overtake all requests of priority zero
-    added to the queue in the last 2 minutes. Priorities are only used to
-    decide which request to run next. It does not affect already running
-    requests.
-
+    priority of a user. The priority represents the number of seconds 
+    used by a user in the CDS in the last 24 hours.
     """
 
     name = "user_priority"
