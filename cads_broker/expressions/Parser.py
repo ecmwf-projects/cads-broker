@@ -50,6 +50,7 @@ class Parser:
         self.eof = False
         self.line = 0
         self.logger = logger
+        self.variables = {}
 
     def read(self):
         if self.eof:
@@ -87,7 +88,7 @@ class Parser:
         while True:
             c = self.read()
             if c == "":
-                raise ParserError(self, "next reached eof", self.line + 1)
+                raise ParserError("next reached eof", self.line + 1)
 
             if c == "\n":
                 self.line += 1

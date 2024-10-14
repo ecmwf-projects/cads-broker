@@ -81,6 +81,25 @@ class Priority(QoSRule):
     name = "priority"
 
 
+class UserPriority(QoSRule):
+    """
+    It represents a user priority rule.
+
+    The 'conclusion' part must evaluate as a number,
+    which is then used to compute the starting
+    priority of a request. All rules matching a request contributes to
+    the starting priority of the request. The priority is a number that
+    represents a number of seconds. For example, a request with a
+    starting priority of 120 will overtake all requests of priority zero
+    added to the queue in the last 2 minutes. Priorities are only used to
+    decide which request to run next. It does not affect already running
+    requests.
+
+    """
+
+    name = "user_priority"
+
+
 class Permission(QoSRule):
     """
     It implements the permission rule.
@@ -165,12 +184,17 @@ class RuleSet:
 
     def __init__(self):
         self.priorities = []
+        self.user_priorities = []
         self.global_limits = []
         self.permissions = []
         self.user_limits = []
+        self.variables = {}
 
     def add_priority(self, environment, info, condition, conclusion):
         self.priorities.append(Priority(environment, info, condition, conclusion))
+
+    def add_user_priority(self, environment, info, condition, conclusion):
+        self.user_priorities.append(UserPriority(environment, info, condition, conclusion))
 
     def add_permission(self, environment, info, condition, conclusion):
         self.permissions.append(Permission(environment, info, condition, conclusion))

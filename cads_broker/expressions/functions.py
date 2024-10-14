@@ -64,6 +64,14 @@ class BinOp(FunctionExpression):
         return self.op(a, b)
 
 
+# class FunctionIn(BinOp):
+#     def execute(self, context, a, b):
+#         return operator.contains(b, a)
+
+class FunctionContains(BinOp):
+    op = operator.contains
+
+
 class FunctionAdd(BinOp):
     op = operator.add
 
