@@ -312,7 +312,11 @@ class Broker:
         if error_reason == "KilledWorker":
             worker_restart_events = self.client.get_events("worker-restart-memory")
             # get info on worker and pid of the killed request
-            _, worker_pid_event = self.client.get_events(request_uid)[0]
+            try:
+                worker_pid_event = self.client.get_events(request_uid)[0][1]
+            except IndexError:
+                worker_restart_events = False
+                requeue = True
             if worker_restart_events:
                 for event in worker_restart_events:
                     _, job = event
