@@ -7,6 +7,7 @@
 # nor does it submit to any jurisdiction.
 #
 
+import collections
 import threading
 from functools import wraps
 
@@ -168,6 +169,17 @@ class QoS:
         """Compute the priority of a request."""
         # The priority of a request increases with time
         return self._properties(request, session).starting_priority + request.age
+
+    @locked
+    def user_priority(self, user_uid: str, priority_cost: int) -> int:
+        """Compute the priority of a user."""
+        # user_priority doesn't work as the other QoS rules, it applies to users instead of requests
+        # we need to mock a system request with just the user_uid attribute
+        request = collections.namedtuple("SystemRequest", "user_uid")(user_uid)
+        for user_priority in self.rules.user_priorities:
+            if user_priority.match(request):
+                priority_cost -= user_priority.evaluate(request)
+        return priority_cost
 
     def dump(self, out=print):
         self.rules.dump(out)
