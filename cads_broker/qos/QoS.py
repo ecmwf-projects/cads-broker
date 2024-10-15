@@ -178,7 +178,7 @@ class QoS:
         request = collections.namedtuple("SystemRequest", "user_uid")(user_uid)
         for user_priority in self.rules.user_priorities:
             if user_priority.match(request):
-                priority_cost += user_priority.evaluate(request)
+                priority_cost -= user_priority.evaluate(request)
         return priority_cost
 
     def dump(self, out=print):
