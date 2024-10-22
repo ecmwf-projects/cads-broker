@@ -118,7 +118,11 @@ def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> 
 def cancel_stuck_requests(client: distributed.Client, session: sa.orm.Session) -> None:
     """Get the stuck requests from the database and cancel them on the dask scheduler."""
     stuck_requests = db.get_stuck_requests(
-        session=session, hours=CONFIG.broker_stuck_requests_limit_hours
+        session=session, minutes=CONFIG.broker_stuck_requests_limit_minutes
+    )
+    logger.info(
+        f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
+        stuck_requests=stuck_requests,
     )
     cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
 
@@ -657,7 +661,7 @@ class Broker:
             interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
         )
         requests_counter: int = 0
-        for user_uid in users_queue:
+        for user_uid, user_cost in users_queue.items():
             may_run: bool = True
             if user_uid not in user_requests:
                 continue
@@ -672,6 +676,12 @@ class Broker:
                     request, session=session_write, scheduler=self.internal_scheduler
                 )
                 if can_run and may_run and requests_counter < number_of_requests:
+                    logger.info(
+                        "user priority",
+                        user=user_uid,
+                        request_uid=request.request_uid,
+                        priority=user_cost,
+                    )
                     self.submit_request(request, session=session_write)
                     may_run = False
                     requests_counter += 1
