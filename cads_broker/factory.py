@@ -61,6 +61,7 @@ def register_functions():
         "user_request_count",
         lambda context, status: database.cache_count_requests(
             user_uid=context.request.user_uid,
+            status=status,
             request_uid=context.request.request_uid,
             session=context.environment.session,
         ),
