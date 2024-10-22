@@ -283,11 +283,14 @@ def count_finished_requests_per_user(
 def cache_count_requests(
     session: sa.orm.Session,
     user_uid: str,
+    status: str,
     # request_uid is used to invalidate the cache
     request_uid: str,  # noqa: B008
 ) -> int:
     """Count running requests for user_uid."""
-    statement = session.query(SystemRequest).where(SystemRequest.user_uid == user_uid)
+    statement = session.query(SystemRequest).where(
+        SystemRequest.user_uid == user_uid, SystemRequest.status == status
+    )
     return statement.count()
 
 
