@@ -120,11 +120,12 @@ def cancel_stuck_requests(client: distributed.Client, session: sa.orm.Session) -
     stuck_requests = db.get_stuck_requests(
         session=session, minutes=CONFIG.broker_stuck_requests_limit_minutes
     )
-    logger.info(
-        f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
-        stuck_requests=stuck_requests,
-    )
-    cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
+    if stuck_requests:
+        logger.info(
+            f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
+            stuck_requests=stuck_requests,
+        )
+        cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
 
 
 class Scheduler:
