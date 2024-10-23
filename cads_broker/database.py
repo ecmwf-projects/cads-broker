@@ -291,7 +291,6 @@ def cache_count_requests(
     statement = session.query(SystemRequest).where(
         SystemRequest.user_uid == user_uid, SystemRequest.status == status
     )
-    print("----------------------------------", statement.count())
     return statement.count()
 
 

@@ -696,6 +696,7 @@ class Broker:
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
         if CONFIG.broker_priority_algorithm == "processing_time":
+            logger.info("priority algorithm", algorithm="processing_time")
             self.processing_time_priority_algorithm(
                 session_write, number_of_requests, candidates
             )
