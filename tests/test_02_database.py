@@ -161,7 +161,10 @@ def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         session.commit()
         assert (
             db.cache_count_requests(
-                session=session, user_uid=user_uid, request_uid=request1.request_uid
+                session=session,
+                user_uid=user_uid,
+                request_uid=request1.request_uid,
+                status="accepted",
             )
             == 1
         )
@@ -169,13 +172,19 @@ def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
         # cache the previous result
         assert (
             db.cache_count_requests(
-                session=session, user_uid=user_uid, request_uid=request1.request_uid
+                session=session,
+                user_uid=user_uid,
+                request_uid=request1.request_uid,
+                status="accepted",
             )
             == 1
         )
         assert (
             db.cache_count_requests(
-                session=session, user_uid=user_uid, request_uid=request2.request_uid
+                session=session,
+                user_uid=user_uid,
+                request_uid=request2.request_uid,
+                status="accepted",
             )
             == 2
         )
