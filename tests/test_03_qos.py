@@ -1,6 +1,6 @@
+import collections
 import io
 import logging
-import collections
 
 from cads_broker import Environment
 from cads_broker.expressions import FunctionFactory
@@ -92,10 +92,13 @@ def test_contains():
 
 
 def test_user_prorities():
-    request_alice = collections.namedtuple("SystemRequest", "user_uid")(user_uid="alice")
+    request_alice = collections.namedtuple("SystemRequest", "user_uid")(
+        user_uid="alice"
+    )
     request_bob = collections.namedtuple("SystemRequest", "user_uid")(user_uid="bob")
-    request_david = collections.namedtuple("SystemRequest", "user_uid")(user_uid="david")
-
+    request_david = collections.namedtuple("SystemRequest", "user_uid")(
+        user_uid="david"
+    )
 
     rules = compile(
         """

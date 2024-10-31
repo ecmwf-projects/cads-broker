@@ -89,7 +89,7 @@ class UserPriority(QoSRule):
 
     The 'conclusion' part must evaluate as a number,
     which is then used to compute the starting
-    priority of a user. The priority represents the number of seconds 
+    priority of a user. The priority represents the number of seconds
     used by a user in the CDS in the last 24 hours.
     """
 
@@ -190,7 +190,9 @@ class RuleSet:
         self.priorities.append(Priority(environment, info, condition, conclusion))
 
     def add_user_priority(self, environment, info, condition, conclusion):
-        self.user_priorities.append(UserPriority(environment, info, condition, conclusion))
+        self.user_priorities.append(
+            UserPriority(environment, info, condition, conclusion)
+        )
 
     def add_permission(self, environment, info, condition, conclusion):
         self.permissions.append(Permission(environment, info, condition, conclusion))

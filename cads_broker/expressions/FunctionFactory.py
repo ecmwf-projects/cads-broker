@@ -11,8 +11,10 @@ from . import functions
 
 FUNCTIONS = {}
 
+
 class FunctionNotFound(ValueError):
     pass
+
 
 class UserFunction(functions.FunctionExpression):
     def execute(self, context, *args):

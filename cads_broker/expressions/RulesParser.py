@@ -10,9 +10,9 @@
 from .FunctionFactory import FunctionFactory
 from .ListExpression import ListExpression
 from .NumberExpression import NumberExpression
-from .VariableExpression import VariableExpression
 from .Parser import Parser, ParserError
 from .StringExpression import StringExpression
+from .VariableExpression import VariableExpression
 
 OPERATORS = {
     "+": "add",
