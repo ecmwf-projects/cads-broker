@@ -1,6 +1,7 @@
 """SQLAlchemy ORM model."""
 
 import datetime
+import functools
 import hashlib
 import json
 import os
@@ -278,6 +279,21 @@ def count_finished_requests_per_user(
         return ret_value
 
 
+@functools.lru_cache()
+def cache_count_requests(
+    session: sa.orm.Session,
+    user_uid: str,
+    status: str,
+    # request_uid is used to invalidate the cache
+    request_uid: str,  # noqa: B008
+) -> int:
+    """Count running requests for user_uid."""
+    statement = session.query(SystemRequest).where(
+        SystemRequest.user_uid == user_uid, SystemRequest.status == status
+    )
+    return statement.count()
+
+
 def count_requests(
     session: sa.orm.Session,
     process_id: str | list[str] | None = None,
@@ -438,9 +454,10 @@ def get_users_queue_from_processing_time(
 ) -> dict[str, int]:
     """Build the queue of the users from the processing time."""
     interval_start = interval_stop - interval
-    request_processing_time = sa.sql.func.least(
-        SystemRequest.finished_at, interval_stop
-    ) - sa.sql.func.greatest(SystemRequest.started_at, interval_start)
+    request_processing_time = (
+        sa.sql.func.least(SystemRequest.finished_at, interval_stop)
+        - SystemRequest.started_at
+    )
     user_cumulative_processing_time = sa.sql.func.sum(request_processing_time)
     user_cost = (
         sa.sql.func.extract("epoch", user_cumulative_processing_time)
@@ -475,7 +492,7 @@ def get_users_queue_from_processing_time(
     return queueing_user_costs | running_user_costs
 
 
-def get_stuck_requests(session: sa.orm.Session, hours: int = 1) -> list[str]:
+def get_stuck_requests(session: sa.orm.Session, minutes: int = 15) -> list[str]:
     """Get all running requests that are not assigned to any worker."""
     query = (
         sa.select(SystemRequest.request_uid)
@@ -483,7 +500,7 @@ def get_stuck_requests(session: sa.orm.Session, hours: int = 1) -> list[str]:
         .where(
             SystemRequest.status == "running",
             SystemRequest.started_at
-            < sa.func.now() - sa.text(f"interval '{hours} hour'"),
+            < sa.func.now() - datetime.timedelta(minutes=minutes),
         )
         .where(Events.event_id.is_(None))
     )

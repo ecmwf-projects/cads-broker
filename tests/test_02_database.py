@@ -142,6 +142,54 @@ def test_count_finished_requests_per_user(session_obj: sa.orm.sessionmaker) -> N
         )
 
 
+def test_cache_count_requests(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    user_uid = str(uuid.uuid4())
+    request1 = mock_system_request(
+        status="accepted",
+        user_uid=user_uid,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    request2 = mock_system_request(
+        status="accepted",
+        user_uid=user_uid,
+        adaptor_properties_hash=adaptor_properties.hash,
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request1)
+        session.commit()
+        assert (
+            db.cache_count_requests(
+                session=session,
+                user_uid=user_uid,
+                request_uid=request1.request_uid,
+                status="accepted",
+            )
+            == 1
+        )
+        session.add(request2)
+        # cache the previous result
+        assert (
+            db.cache_count_requests(
+                session=session,
+                user_uid=user_uid,
+                request_uid=request1.request_uid,
+                status="accepted",
+            )
+            == 1
+        )
+        assert (
+            db.cache_count_requests(
+                session=session,
+                user_uid=user_uid,
+                request_uid=request2.request_uid,
+                status="accepted",
+            )
+            == 2
+        )
+
+
 def test_count_requests(session_obj: sa.orm.sessionmaker) -> None:
     entry_point_1 = "entry_point_1"
     entry_point_2 = "entry_point_2"
