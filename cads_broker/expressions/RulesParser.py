@@ -12,6 +12,7 @@ from .ListExpression import ListExpression
 from .NumberExpression import NumberExpression
 from .Parser import Parser, ParserError
 from .StringExpression import StringExpression
+from .VariableExpression import VariableExpression
 
 OPERATORS = {
     "+": "add",
@@ -28,6 +29,7 @@ OPERATORS = {
     "&&": "and",
     "||": "or",
     "~": "match",
+    "in": "contains",
 }
 
 
@@ -141,7 +143,9 @@ class RulesParser(Parser):
 
         while str.isalpha(c) or c == "_":
             name = self.parse_ident()
-            if self.peek() == "(":
+            if name in self.variables:
+                return self.variables[name].value
+            elif self.peek() == "(":
                 args = self.parse_args()
                 return FunctionFactory.create(name, *args)
             else:
@@ -222,8 +226,24 @@ class RulesParser(Parser):
 
         return result
 
-    def parse_test(self):
+    def parse_contains(self):
         result = self.parse_term()
+        c = self.peek()
+        while c == "i":
+            self.consume(c)
+            self.consume("n")
+
+            result = FunctionFactory.create(
+                "contains",
+                self.parse_term(),
+                result,
+            )
+            c = self.peek()
+
+        return result
+
+    def parse_test(self):
+        result = self.parse_contains()
         c = self.peek()
         while c in ("<", ">", "=", "!", "~"):
             self.consume(c)
@@ -238,7 +258,7 @@ class RulesParser(Parser):
             result = FunctionFactory.create(
                 OPERATORS[name],
                 result,
-                self.parse_term(),
+                self.parse_contains(),
             )
             c = self.peek()
 
@@ -291,6 +311,22 @@ class RulesParser(Parser):
         conclusion = self.parse_expression()
 
         rules.add_priority(environment, info, condition, conclusion)
+
+    def parse_user_priority(self, rules, environment):
+        info = self.parse_string()
+        condition = self.parse_expression()
+        self.consume(":")
+        conclusion = self.parse_expression()
+
+        rules.add_user_priority(environment, info, condition, conclusion)
+
+    def parse_definition(self, rules):
+        self.peek()
+        name = self.parse_ident()
+        self.consume("=")
+        value = self.parse_expression()
+        variable = VariableExpression(name, value)
+        self.variables[name] = variable
 
     def parse_global_limit(self, rules, environment):
         info = self.parse_string()
@@ -357,6 +393,14 @@ class RulesParser(Parser):
 
                 if ident == "user":
                     self.parse_user_limit(rules, environment)
+                    continue
+
+                if ident == "user_priority":
+                    self.parse_user_priority(rules, environment)
+                    continue
+
+                if ident == "define":
+                    self.parse_definition(rules)
                     continue
 
                 raise ParserError(f"Unknown rule: '{ident}'", self.line + 1)

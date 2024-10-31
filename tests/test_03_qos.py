@@ -1,3 +1,4 @@
+import collections
 import io
 import logging
 
@@ -42,7 +43,91 @@ def test_rules():
     rules = compile(
         """
     user "Limit for david"       (user == "david") : 5
-                    """
+    """
     )
     assert len(rules.user_limits) == 1
     assert rules.user_limits[0].match(request)
+
+
+def test_definition():
+    rules = compile(
+        """
+    define user = "david"
+
+    limit "Limit for user" user == user: 5
+    """
+    )
+    assert len(rules.global_limits) == 1
+    request = collections.namedtuple("SystemRequest", "user_uid")(user_uid="david")
+    assert rules.global_limits[0].capacity(request) == 5
+    assert rules.global_limits[0].match(request)
+
+
+def test_contains():
+    rules = compile(
+        """
+    define users = ["alice", "bob"]
+
+    limit "Limit for Alice and Bob" contains(users, user): 5
+    limit "Limit for era5" (dataset() == "era5") && !(user in users): 10
+    """
+    )
+    assert len(rules.global_limits) == 2
+    request_david = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
+        user_uid="david", dataset="era5"
+    )
+    request_bob = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
+        user_uid="bob", dataset="era5"
+    )
+    request_alice = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
+        user_uid="alice", dataset="era5"
+    )
+    assert not rules.global_limits[0].match(request_david)
+    assert rules.global_limits[0].match(request_bob)
+    assert rules.global_limits[0].match(request_alice)
+
+    assert not rules.global_limits[1].match(request_alice)
+    assert not rules.global_limits[1].match(request_bob)
+    assert rules.global_limits[1].match(request_david)
+
+
+def test_user_prorities():
+    request_alice = collections.namedtuple("SystemRequest", "user_uid")(
+        user_uid="alice"
+    )
+    request_bob = collections.namedtuple("SystemRequest", "user_uid")(user_uid="bob")
+    request_david = collections.namedtuple("SystemRequest", "user_uid")(
+        user_uid="david"
+    )
+
+    rules = compile(
+        """
+    user_priority "Priority for Alice" user == "alice": 5
+    """
+    )
+    assert len(rules.user_priorities) == 1
+    assert rules.user_priorities[0].match(request_alice)
+    assert rules.user_priorities[0].evaluate(request_alice) == 5
+    assert not rules.user_priorities[0].match(request_bob)
+
+    rules = compile(
+        """
+    define users = ["alice", "bob"]
+
+    user_priority "Priority for Alice and Bob" user in users: 5
+    user_priority "Priority for David" user == "david": 10
+    """
+    )
+    assert len(rules.user_priorities) == 2
+    assert rules.user_priorities[0].match(request_alice)
+    assert rules.user_priorities[0].match(request_bob)
+
+    assert not rules.user_priorities[1].match(request_alice)
+    assert not rules.user_priorities[1].match(request_bob)
+
+    assert rules.user_priorities[0].evaluate(request_alice) == 5
+    assert rules.user_priorities[0].evaluate(request_bob) == 5
+
+    assert not rules.user_priorities[0].match(request_david)
+    assert rules.user_priorities[1].match(request_david)
+    assert rules.user_priorities[1].evaluate(request_david) == 10

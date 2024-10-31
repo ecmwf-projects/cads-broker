@@ -81,6 +81,21 @@ class Priority(QoSRule):
     name = "priority"
 
 
+class UserPriority(QoSRule):
+    """
+    It represents a user priority rule.
+
+    This is a special rule since it applies to a user instead of a request.
+
+    The 'conclusion' part must evaluate as a number,
+    which is then used to compute the starting
+    priority of a user. The priority represents the number of seconds
+    used by a user in the CDS in the last 24 hours.
+    """
+
+    name = "user_priority"
+
+
 class Permission(QoSRule):
     """
     It implements the permission rule.
@@ -165,12 +180,19 @@ class RuleSet:
 
     def __init__(self):
         self.priorities = []
+        self.user_priorities = []
         self.global_limits = []
         self.permissions = []
         self.user_limits = []
+        self.variables = {}
 
     def add_priority(self, environment, info, condition, conclusion):
         self.priorities.append(Priority(environment, info, condition, conclusion))
+
+    def add_user_priority(self, environment, info, condition, conclusion):
+        self.user_priorities.append(
+            UserPriority(environment, info, condition, conclusion)
+        )
 
     def add_permission(self, environment, info, condition, conclusion):
         self.permissions.append(Permission(environment, info, condition, conclusion))

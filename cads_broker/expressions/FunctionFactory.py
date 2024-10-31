@@ -12,6 +12,10 @@ from . import functions
 FUNCTIONS = {}
 
 
+class FunctionNotFound(ValueError):
+    pass
+
+
 class UserFunction(functions.FunctionExpression):
     def execute(self, context, *args):
         func = self._func[0]
@@ -42,7 +46,7 @@ class FunctionFactory:
             func = f"Function{func}"
             func = getattr(functions, func, None)
             if func is None:
-                raise ValueError(f"Cannot find a function called '{name}'")
+                raise FunctionNotFound(f"Cannot find a function called '{name}'")
             FUNCTIONS[name] = func
         return FUNCTIONS[name](name, args)
 

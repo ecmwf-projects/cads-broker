@@ -64,6 +64,10 @@ class BinOp(FunctionExpression):
         return self.op(a, b)
 
 
+class FunctionContains(BinOp):
+    op = operator.contains
+
+
 class FunctionAdd(BinOp):
     op = operator.add
 
@@ -187,11 +191,6 @@ class FunctionNumberOfWorkers(FunctionExpression):
 class FunctionUser(FunctionExpression):
     def execute(self, context):
         return context.request.user_uid
-
-
-# class FunctionAdaptor(FunctionExpression):
-#     def execute(self, context):
-#         return request.adaptor
 
 
 class FunctionAvailable(FunctionExpression):

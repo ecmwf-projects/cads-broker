@@ -317,7 +317,11 @@ class Broker:
         if error_reason == "KilledWorker":
             worker_restart_events = self.client.get_events("worker-restart-memory")
             # get info on worker and pid of the killed request
-            _, worker_pid_event = self.client.get_events(request_uid)[0]
+            try:
+                worker_pid_event = self.client.get_events(request_uid)[0][1]
+            except IndexError:
+                worker_restart_events = False
+                requeue = True
             if worker_restart_events:
                 for event in worker_restart_events:
                     _, job = event
@@ -649,19 +653,21 @@ class Broker:
         # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
         interval_stop = datetime.datetime.now()
         # temporary solution to prioritize high priority user
-        users_queue = {
-            "27888ffa-0973-4794-9b3c-9efb6767f66f": 0,  # wekeo
-            "d67a13db-86cc-439d-823d-6517003de29f": 0,  # CDS Apps user
-            "365ac1da-090e-4b85-9088-30c676bc5251": 0,  # Gionata
-            "74c6f9a1-8efe-4a6c-b06b-9f8ddcab188d": 0,  # User Support
-            "4d92cc89-d586-4731-8553-07df5dae1886": 0,  # Luke Jones
-            "8d8ee054-6a09-4da8-a5be-d5dff52bbc5f": 0,  # Petrut
-        } | db.get_users_queue_from_processing_time(
+        users_queue = db.get_users_queue_from_processing_time(
             interval_stop=interval_stop,
             session=session_write,
             interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
         )
         requests_counter: int = 0
+        users_queue = {
+            k: v
+            for k, v in sorted(
+                users_queue.items(),
+                key=lambda user_cost: self.qos.user_priority(
+                    user_uid=user_cost[0], priority_cost=user_cost[1]
+                ),
+            )
+        }
         for user_uid, user_cost in users_queue.items():
             may_run: bool = True
             if user_uid not in user_requests:
