@@ -66,13 +66,7 @@ def add_dummy_requests(
 def requests_cleaner(
     connection_string: Optional[str] = None, older_than_days: Optional[int] = 365
 ) -> None:
-    """Remove records from the system_requests table older than `older_than_days`.
-
-    Parameters
-    ----------
-    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    older_than_days: minimum age (in days) to consider a record to be removed
-    """
+    """Remove records from the system_requests table older than `older_than_days`."""
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
@@ -116,17 +110,10 @@ def requests_cleaner(
 @app.command()
 def list_request_uids(
     query: str,
-    output_file: Annotated[Path, typer.Argument(file_okay=True, dir_okay=False)] = Path(
-        "request_uids.txt"
-    ),
+    output_file: Annotated[Path, typer.Argument(file_okay=True, dir_okay=False)]
+    | None = Path("request_uids.txt"),
 ) -> None:
-    """List request_uids from the system_requests table.
-
-    Parameters
-    ----------
-    query: SQL query to filter the request_uids
-    output_file: file to write the request_uids
-    """
+    """List request_uids from the system_requests table."""
     with database.ensure_session_obj(None)() as session:
         result = session.execute(
             sa.text(f"select request_uid from system_requests where {query}")
@@ -161,12 +148,7 @@ def delete_requests(
     message: Optional[str] = "The request has been dismissed by the administrator.",
     skip_confirmation: Annotated[bool, typer.Option("--yes", "-y")] = False,
 ) -> None:
-    """Set the status of records in the system_requests table to 'dismissed'.
-
-    Parameters
-    ----------
-    connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    """
+    """Set the status of records in the system_requests table to 'dismissed'."""
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
