@@ -759,7 +759,9 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos.reload_rules(session=session_read)
+                    with self.session_maker_write() as session_write:
+                        self.qos.reload_rules(session=session_write)
+                        db.reset_qos_rules(session_write, self.qos)
                     self.qos.rules_hash = rules_hash
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
