@@ -131,7 +131,7 @@ def list_request_uids(
         result = session.execute(
             sa.text(f"select request_uid from system_requests where {query}")
         )
-        with output_file.open() as f:
+        with output_file.open("w") as f:
             for row in result:
                 f.write(row[0] + "\n")
     print(f"successfully wrote {result.rowcount} request_uids to {output_file}")
