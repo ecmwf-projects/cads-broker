@@ -4,8 +4,8 @@ import datetime
 import os
 import random
 import uuid
-from typing import Any, Optional
 from pathlib import Path
+from typing import Any, Optional
 
 import sqlalchemy as sa
 import typer
@@ -136,7 +136,7 @@ def list_request_uids(
     print(f"successfully wrote {result.rowcount} request_uids to {output_file}")
 
 
-class RequestStatus(str, Enum):
+class RequestStatus(str, sa.Enum):
     """Enum for request status."""
 
     running = "running"
