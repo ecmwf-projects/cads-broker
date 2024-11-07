@@ -1,6 +1,7 @@
 """Module for entry points."""
 
 import datetime
+import enum
 import os
 import random
 import uuid
@@ -136,7 +137,7 @@ def list_request_uids(
     print(f"successfully wrote {result.rowcount} request_uids to {output_file}")
 
 
-class RequestStatus(str, sa.Enum):
+class RequestStatus(str, enum.Enum):
     """Enum for request status."""
 
     running = "running"
@@ -150,7 +151,8 @@ def delete_requests(
     request_uid: Optional[str] = None,
     request_uids_file: Annotated[
         Path, typer.Argument(exists=True, file_okay=True, dir_okay=False)
-    ] | None = None,
+    ]
+    | None = None,
     connection_string: Optional[str] = None,
     minutes: float = 0,
     seconds: float = 0,
