@@ -133,7 +133,7 @@ def list_request_uids(
         )
         with output_file.open("w") as f:
             for row in result:
-                f.write(row[0] + "\n")
+                f.write(str(row[0]) + "\n")
     print(f"successfully wrote {result.rowcount} request_uids to {output_file}")
 
 
@@ -205,7 +205,7 @@ def delete_requests(
         number_of_requests = session.execute(statement).rowcount
         if not skip_confirmation:
             if not typer.confirm(
-                f"Setting status to 'dismissed' for {number_of_requests} {status} requests. "
+                f"Setting status to 'dismissed' for {number_of_requests} requests. "
                 "Do you want to continue?",
                 abort=True,
                 default=True,
