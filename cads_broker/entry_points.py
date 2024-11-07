@@ -4,8 +4,8 @@ import datetime
 import os
 import random
 import uuid
-from enum import Enum
 from typing import Any, Optional
+from pathlib import Path
 
 import sqlalchemy as sa
 import typer
@@ -112,6 +112,30 @@ def requests_cleaner(
             raise
 
 
+@app.command()
+def list_request_uids(
+    query: str,
+    output_file: Annotated[Path, typer.Argument(file_okay=True, dir_okay=False)] = Path(
+        "request_uids.txt"
+    ),
+) -> None:
+    """List request_uids from the system_requests table.
+
+    Parameters
+    ----------
+    query: SQL query to filter the request_uids
+    output_file: file to write the request_uids
+    """
+    with database.ensure_session_obj(None)() as session:
+        result = session.execute(
+            sa.text(f"select request_uid from system_requests where {query}")
+        )
+        with output_file.open() as f:
+            for row in result:
+                f.write(row[0] + "\n")
+    print(f"successfully wrote {result.rowcount} request_uids to {output_file}")
+
+
 class RequestStatus(str, Enum):
     """Enum for request status."""
 
@@ -124,6 +148,9 @@ def delete_requests(
     status: RequestStatus = RequestStatus.running,
     user_uid: Optional[str] = None,
     request_uid: Optional[str] = None,
+    request_uids_file: Annotated[
+        Path, typer.Argument(exists=True, file_okay=True, dir_okay=False)
+    ] | None = None,
     connection_string: Optional[str] = None,
     minutes: float = 0,
     seconds: float = 0,
@@ -145,11 +172,18 @@ def delete_requests(
         minutes=minutes, seconds=seconds, hours=hours, days=days
     )
     with database.ensure_session_obj(None)() as session:
-        statement = (
-            sa.update(database.SystemRequest)
-            .where(database.SystemRequest.status == status)
-            .where(database.SystemRequest.created_at < timestamp)
-        )
+        if request_uids_file:
+            with request_uids_file.open() as f:
+                request_uids = f.read().splitlines()
+            statement = sa.update(database.SystemRequest).where(
+                database.SystemRequest.request_uid.in_(request_uids)
+            )
+        else:
+            statement = (
+                sa.update(database.SystemRequest)
+                .where(database.SystemRequest.status == status)
+                .where(database.SystemRequest.created_at < timestamp)
+            )
         if user_uid:
             statement = statement.where(database.SystemRequest.user_uid == user_uid)
         if request_uid:
