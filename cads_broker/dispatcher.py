@@ -774,6 +774,8 @@ class Broker:
                             limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
+                    for request in self.queue.values():
+                        print(request.request_uid, request.created_at)
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
@@ -799,11 +801,6 @@ class Broker:
                 cancel_stuck_requests(client=self.client, session=session_read)
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
-                logger.info(
-                    "broker info",
-                    running_requests=running_requests,
-                    queue_length=queue_length,
-                )
                 available_workers = self.number_of_workers - running_requests
                 if queue_length > 0:
                     logger.info(
