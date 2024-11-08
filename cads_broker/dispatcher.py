@@ -789,6 +789,7 @@ class Broker:
                             "re-syncing internal queue",
                             internal_queue=queue_length,
                             db_queue=db_queue,
+                            last_created_at=self.queue.last_created_at,
                         )
                         self.queue.reset()
                     self.cache_requests_qos_properties(
