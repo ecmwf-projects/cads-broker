@@ -799,6 +799,11 @@ class Broker:
                 cancel_stuck_requests(client=self.client, session=session_read)
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
+                logger.info(
+                    "broker info",
+                    running_requests=running_requests,
+                    queue_length=queue_length,
+                )
                 available_workers = self.number_of_workers - running_requests
                 if queue_length > 0:
                     logger.info(
