@@ -384,11 +384,8 @@ class Broker:
         previous_status = dismission_metadata.get("previous_status", "accepted")
         if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":
             request.status = "failed"
-            request.finished_at = datetime.datetime.now()
         else:
             request.status = "deleted"
-            if request.finished_at is None:
-                request.finished_at = datetime.datetime.now()
         if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
@@ -398,6 +395,9 @@ class Broker:
             self.qos.notify_dismission_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
+        # set finished_at if it is not set
+        if request.finished_at is None:
+            request.finished_at = datetime.datetime.now()
         logger.info("job has finished", **db.logger_kwargs(request=request))
         return session
 
