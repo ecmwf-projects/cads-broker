@@ -747,6 +747,13 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         started_at=None,
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
+    request_8 = mock_system_request(
+        status="deleted",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=15),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+    )
     with session_obj() as session:
         session.add(adaptor_properties)
         session.add(request_1)
@@ -756,6 +763,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         session.add(request_5)
         session.add(request_6)
         session.add(request_7)
+        session.add(request_8)
         session.commit()
     with session_obj() as session:
         users_cost = db.get_users_queue_from_processing_time(
@@ -763,7 +771,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         )
     assert users_cost["user3"] == 0
     assert users_cost["user1"] == 15 * 60 * 60
-    assert users_cost["user2"] == 30 * 60 * 60
+    assert users_cost["user2"] == (10 + 20 + 5) * 60 * 60
 
 
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:

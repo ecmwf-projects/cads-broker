@@ -384,11 +384,8 @@ class Broker:
         previous_status = dismission_metadata.get("previous_status", "accepted")
         if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":
             request.status = "failed"
-            request.finished_at = datetime.datetime.now()
         else:
             request.status = "deleted"
-            if request.finished_at is None:
-                request.finished_at = datetime.datetime.now()
         if previous_status == "running":
             self.qos.notify_end_of_request(
                 request, session, scheduler=self.internal_scheduler
@@ -398,6 +395,9 @@ class Broker:
             self.qos.notify_dismission_of_request(
                 request, session, scheduler=self.internal_scheduler
             )
+        # set finished_at if it is not set
+        if request.finished_at is None:
+            request.finished_at = datetime.datetime.now()
         logger.info("job has finished", **db.logger_kwargs(request=request))
         return session
 
@@ -683,13 +683,9 @@ class Broker:
                     request, session=session_write, scheduler=self.internal_scheduler
                 )
                 if can_run and may_run and requests_counter < number_of_requests:
-                    logger.info(
-                        "user priority",
-                        user=user_uid,
-                        request_uid=request.request_uid,
-                        priority=user_cost,
+                    self.submit_request(
+                        request, priority=user_cost, session=session_write
                     )
-                    self.submit_request(request, session=session_write)
                     may_run = False
                     requests_counter += 1
 
@@ -722,7 +718,10 @@ class Broker:
                     requests_counter += 1
 
     def submit_request(
-        self, request: db.SystemRequest, session: sa.orm.Session
+        self,
+        request: db.SystemRequest,
+        session: sa.orm.Session,
+        priority: int | None = None,
     ) -> None:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
         request = db.set_request_status(
@@ -749,6 +748,7 @@ class Broker:
         self.futures[request.request_uid] = future
         logger.info(
             "submitted job to scheduler",
+            priority=priority,
             **db.logger_kwargs(request=request),
         )
 
