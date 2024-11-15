@@ -494,16 +494,20 @@ def get_users_queue_from_processing_time(
 
 def get_stuck_requests(session: sa.orm.Session, minutes: int = 15) -> list[str]:
     """Get all running requests that are not assigned to any worker."""
-    query = (
+    subquery = (
         sa.select(SystemRequest.request_uid)
-        .outerjoin(Events, SystemRequest.request_uid == Events.request_uid)
         .where(
             SystemRequest.status == "running",
             SystemRequest.started_at
             < sa.func.now() - datetime.timedelta(minutes=minutes),
         )
-        .where(Events.event_id.is_(None))
+        .subquery()
     )
+    query = (
+        sa.select(subquery.c.request_uid).outerjoin(
+            Events, subquery.c.request_uid == Events.request_uid
+        )
+    ).where(Events.event_id.is_(None))
     return session.execute(query).scalars().all()
 
 
