@@ -147,7 +147,7 @@ def test_processing_time_priority_algorithm(
 
     submitted_requests = []
 
-    def mock_submit_request(self, request, session):
+    def mock_submit_request(self, request, priority, session):
         submitted_requests.append(request.request_uid)
         for candidate in candidates:
             if candidate.request_uid == request.request_uid:
