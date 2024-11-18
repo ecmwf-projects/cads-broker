@@ -196,15 +196,17 @@ def ensure_session_obj(
         connection_string = settings.connection_string_read
     elif mode == "w":
         connection_string = settings.connection_string
-    if settings.pool_size == -1:
+    if settings.broker_pool_size == -1:
         engine = sa.create_engine(connection_string, poolclass=sa.pool.NullPool)
     else:
         engine = sa.create_engine(
             connection_string,
-            pool_recycle=settings.pool_recycle,
-            pool_size=settings.pool_size,
-            pool_timeout=settings.pool_timeout,
-            max_overflow=settings.max_overflow,
+            pool_recycle=settings.broker_pool_recycle,
+            pool_size=settings.broker_pool_size,
+            pool_timeout=settings.broker_pool_timeout,
+            max_overflow=settings.broker_max_overflow,
+            pool_pre_ping=settings.broker_pool_pre_ping,
+            pool_use_lifo=settings.broker_pool_use_lifo,
         )
     session_obj = sa.orm.sessionmaker(engine)
     return session_obj

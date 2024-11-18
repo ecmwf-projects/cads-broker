@@ -57,10 +57,12 @@ class SqlalchemySettings(pydantic_settings.BaseSettings):
     compute_db_host: str | None = None
     compute_db_host_read: str | None = None
     compute_db_name: str | None = None
-    pool_timeout: float = 1.0
-    pool_recycle: int = 60
-    pool_size: int = 5
-    max_overflow: int = 15
+    broker_pool_timeout: float = 1.0
+    broker_pool_recycle: int = 60
+    broker_pool_size: int = 5
+    broker_max_overflow: int = 15
+    broker_pool_pre_ping: bool = False
+    broker_pool_use_lifo: bool = False
 
     @pydantic.field_validator(
         "compute_db_user",
