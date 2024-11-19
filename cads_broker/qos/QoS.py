@@ -100,7 +100,7 @@ class QoS:
         properties = self._properties(request=request, session=session)
         limits = []
         new_limits = []
-        for limit in properties.limits:
+        for limit in properties.limits + self.dynamic_limits(request, session):
             if limit.full(request):
                 limit.queue(request.request_uid)
                 limits.append(limit)
@@ -168,7 +168,9 @@ class QoS:
     def priority(self, request, session):
         """Compute the priority of a request."""
         # The priority of a request increases with time
-        return self._properties(request, session).starting_priority + request.age
+        return self._properties(
+            request, session
+        ).starting_priority + self.dynamic_priority(request, session)
 
     @locked
     def user_priority(self, user_uid: str, priority_cost: int) -> int:
