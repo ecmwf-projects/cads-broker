@@ -618,7 +618,7 @@ class Broker:
         # copy list of requests to avoid RuntimeError: dictionary changed size during iteration
         for request in list(requests):
             try:
-                self.qos._properties(request, check_permissions=True, session=session)
+                self.qos._properties(request, check_permissions=True)
             except PermissionError as exception:
                 db.add_event(
                     event_type="user_visible_error",
