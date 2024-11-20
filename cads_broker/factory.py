@@ -82,6 +82,11 @@ def register_functions():
             session=context.environment.session,
         ),
     )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "request_age",
+        lambda context: context.request.age
+    )
+
     expressions.FunctionFactory.FunctionFactory.register_function("tagged", tagged)
     expressions.FunctionFactory.FunctionFactory.register_function(
         "request_contains_all", request_contains_all
