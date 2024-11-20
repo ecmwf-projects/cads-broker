@@ -60,14 +60,14 @@ class RulesParser(Parser):
         if self.peek(True) == ".":
             s += self.next()
             c = self.next()
-            if not str.isdigit(self, c):
+            if not str.isdigit(c):
                 raise ParserError(
                     "parseNumber invalid '{c}'",
                     self.line + 1,
                 )
 
             s += c
-            while str.isdigit(self, self.peek(True)):
+            while str.isdigit(self.peek(True)):
                 s += self.next()
 
         c = self.peek(True)
@@ -79,14 +79,14 @@ class RulesParser(Parser):
                 s += c
                 c = self.next()
 
-            if not str.isdigit(self, c):
+            if not str.isdigit(c):
                 raise ParserError(
                     f"parseNumber invalid '{c}'",
                     self.line + 1,
                 )
 
             s += c
-            while str.isdigit(self, self.peek()):
+            while str.isdigit(self.peek()):
                 s += self.next()
 
         try:
