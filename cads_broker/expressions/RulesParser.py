@@ -312,13 +312,13 @@ class RulesParser(Parser):
 
         rules.add_priority(environment, info, condition, conclusion)
 
-    def parse_user_priority(self, rules, environment):
+    def parse_dynamic_priority(self, rules, environment):
         info = self.parse_string()
         condition = self.parse_expression()
         self.consume(":")
         conclusion = self.parse_expression()
 
-        rules.add_user_priority(environment, info, condition, conclusion)
+        rules.add_dynamic_priority(environment, info, condition, conclusion)
 
     def parse_definition(self, rules):
         self.peek()
@@ -395,8 +395,8 @@ class RulesParser(Parser):
                     self.parse_user_limit(rules, environment)
                     continue
 
-                if ident == "user_priority":
-                    self.parse_user_priority(rules, environment)
+                if ident == "dynamic_priority":
+                    self.parse_dynamic_priority(rules, environment)
                     continue
 
                 if ident == "define":

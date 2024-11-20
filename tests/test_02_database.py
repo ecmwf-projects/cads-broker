@@ -774,6 +774,133 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
     assert users_cost["user2"] == (10 + 20 + 5) * 60 * 60
 
 
+def test_users_last_finished_at(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    now = datetime.datetime.now()
+    finished_at = now - datetime.timedelta(hours=5)
+    finished_at_old = now - datetime.timedelta(hours=30)
+    request_1 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=now - datetime.timedelta(hours=10),
+        finished_at=finished_at,
+    )
+    request_2 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=now - datetime.timedelta(hours=20),
+        finished_at=finished_at - datetime.timedelta(hours=5),
+    )
+    request_3 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+        started_at=now - datetime.timedelta(hours=40),
+        finished_at=finished_at_old,
+    )
+
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request_1)
+        session.add(request_2)
+        session.add(request_3)
+        session.commit()
+        users_last_finished_at = db.users_last_finished_at(session=session, max_time=now - datetime.timedelta(hours=24))
+        assert finished_at == users_last_finished_at["user1"]
+        assert "user2" not in users_last_finished_at
+
+
+def test_user_last_completed_request(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    now = datetime.datetime.now()
+    finished_at = now - datetime.timedelta(hours=5)
+    finished_at_old = now - datetime.timedelta(hours=30)
+    request_1 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=now - datetime.timedelta(hours=10),
+        finished_at=finished_at,
+    )
+    request_2 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=now - datetime.timedelta(hours=20),
+        finished_at=finished_at + datetime.timedelta(hours=5),
+    )
+    request_3 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user2",
+        started_at=now - datetime.timedelta(hours=40),
+        finished_at=finished_at_old,
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request_1)
+        session.add(request_3)
+        session.commit()
+        assert (
+            now - finished_at
+        ).seconds == db.user_last_completed_request(
+            session=session, user_uid="user1", max_time=60 * 60 * 24
+        )
+        assert 60 * 60 * 24 == db.user_last_completed_request(
+            session=session, user_uid="user2", max_time=60 * 60 * 24
+        )
+        session.add(request_2)
+        session.commit()
+        assert (
+            now - finished_at
+        ).seconds == db.user_last_completed_request(
+            session=session, user_uid="user1", max_time=60 * 60 * 24
+        )
+        # invalidate cache
+        db.QOS_FUNCTIONS_CACHE = {}
+        assert 0 == db.user_last_completed_request(
+            session=session, user_uid="user1", max_time=60 * 60 * 24
+        )
+
+
+def test_user_resource_used(session_obj: sa.orm.sessionmaker) -> None:
+    adaptor_properties = mock_config()
+    request_1 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=5),
+    )
+    request_2 = mock_system_request(
+        status="successful",
+        adaptor_properties_hash=adaptor_properties.hash,
+        user_uid="user1",
+        started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
+        finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
+    )
+    with session_obj() as session:
+        session.add(adaptor_properties)
+        session.add(request_1)
+        session.commit()
+        assert 5 * 60 * 60 == db.user_resource_used(
+            session=session, user_uid="user1", interval=60 * 60 * 24
+        )
+        session.add(request_2)
+        session.commit()
+        # cache hit
+        assert 5 * 60 * 60 == db.user_resource_used(
+            session=session, user_uid="user1", interval=60 * 60 * 24
+        )
+        # invalidate cache
+        db.QOS_FUNCTIONS_CACHE = {}
+        assert (5 + 10) * 60 * 60 == db.user_resource_used(
+            session=session, user_uid="user1", interval=60 * 60 * 24
+        )
+
+
 def test_get_request_result(session_obj: sa.orm.sessionmaker) -> None:
     cache_entry = mock_cache_entry()
     with session_obj() as session:

@@ -91,7 +91,7 @@ def test_contains():
     assert rules.global_limits[1].match(request_david)
 
 
-def test_user_prorities():
+def test_dynamic_prorities():
     request_alice = collections.namedtuple("SystemRequest", "user_uid")(
         user_uid="alice"
     )
@@ -102,32 +102,32 @@ def test_user_prorities():
 
     rules = compile(
         """
-    user_priority "Priority for Alice" user == "alice": 5
+    dynamic_priority "Priority for Alice" user == "alice": 5
     """
     )
-    assert len(rules.user_priorities) == 1
-    assert rules.user_priorities[0].match(request_alice)
-    assert rules.user_priorities[0].evaluate(request_alice) == 5
-    assert not rules.user_priorities[0].match(request_bob)
+    assert len(rules.dynamic_priorities) == 1
+    assert rules.dynamic_priorities[0].match(request_alice)
+    assert rules.dynamic_priorities[0].evaluate(request_alice) == 5
+    assert not rules.dynamic_priorities[0].match(request_bob)
 
     rules = compile(
         """
     define users = ["alice", "bob"]
 
-    user_priority "Priority for Alice and Bob" user in users: 5
-    user_priority "Priority for David" user == "david": 10
+    dynamic_priority "Priority for Alice and Bob" user in users: 5
+    dynamic_priority "Priority for David" user == "david": 10
     """
     )
-    assert len(rules.user_priorities) == 2
-    assert rules.user_priorities[0].match(request_alice)
-    assert rules.user_priorities[0].match(request_bob)
+    assert len(rules.dynamic_priorities) == 2
+    assert rules.dynamic_priorities[0].match(request_alice)
+    assert rules.dynamic_priorities[0].match(request_bob)
 
-    assert not rules.user_priorities[1].match(request_alice)
-    assert not rules.user_priorities[1].match(request_bob)
+    assert not rules.dynamic_priorities[1].match(request_alice)
+    assert not rules.dynamic_priorities[1].match(request_bob)
 
-    assert rules.user_priorities[0].evaluate(request_alice) == 5
-    assert rules.user_priorities[0].evaluate(request_bob) == 5
+    assert rules.dynamic_priorities[0].evaluate(request_alice) == 5
+    assert rules.dynamic_priorities[0].evaluate(request_bob) == 5
 
-    assert not rules.user_priorities[0].match(request_david)
-    assert rules.user_priorities[1].match(request_david)
-    assert rules.user_priorities[1].evaluate(request_david) == 10
+    assert not rules.dynamic_priorities[0].match(request_david)
+    assert rules.dynamic_priorities[1].match(request_david)
+    assert rules.dynamic_priorities[1].evaluate(request_david) == 10

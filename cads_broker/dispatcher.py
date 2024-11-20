@@ -360,7 +360,7 @@ class Broker:
                 if queued_request:
                     self.queue.add(request_uid, request)
                     self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
+                        request, scheduler=self.internal_scheduler
                     )
         else:
             request = db.set_request_status(
@@ -388,12 +388,12 @@ class Broker:
             request.status = "deleted"
         if previous_status == "running":
             self.qos.notify_end_of_request(
-                request, session, scheduler=self.internal_scheduler
+                request, scheduler=self.internal_scheduler
             )
         elif previous_status == "accepted":
             self.queue.pop(request.request_uid, None)
             self.qos.notify_dismission_of_request(
-                request, session, scheduler=self.internal_scheduler
+                request, scheduler=self.internal_scheduler
             )
         # set finished_at if it is not set
         if request.finished_at is None:
@@ -461,7 +461,7 @@ class Broker:
                     # notify the qos only if the request has been set to successful or failed here.
                     if finished_request:
                         self.qos.notify_end_of_request(
-                            finished_request, session, scheduler=self.internal_scheduler
+                            finished_request, scheduler=self.internal_scheduler
                         )
                         logger.info(
                             "job has finished",
@@ -481,7 +481,7 @@ class Broker:
                     )
                     if successful_request:
                         self.qos.notify_end_of_request(
-                            request, session, scheduler=self.internal_scheduler
+                            request, scheduler=self.internal_scheduler
                         )
                         logger.info(
                             "job has finished",
@@ -503,7 +503,7 @@ class Broker:
                     if queued_request:
                         self.queue.add(queued_request.request_uid, request)
                         self.qos.notify_end_of_request(
-                            request, session, scheduler=self.internal_scheduler
+                            request, scheduler=self.internal_scheduler
                         )
                 else:
                     db.set_request_status(
@@ -514,7 +514,7 @@ class Broker:
                         session=session,
                     )
                     self.qos.notify_end_of_request(
-                        request, session, scheduler=self.internal_scheduler
+                        request, scheduler=self.internal_scheduler
                     )
                     logger.info("job has finished", **db.logger_kwargs(request=request))
 
@@ -602,7 +602,7 @@ class Broker:
             # self.futures.pop(future.key, None)
             if request:
                 self.qos.notify_end_of_request(
-                    request, session, scheduler=self.internal_scheduler
+                    request, scheduler=self.internal_scheduler
                 )
             logger.info(
                 "job has finished",
@@ -635,59 +635,10 @@ class Broker:
                 }
                 self.queue.pop(request.request_uid, None)
                 self.qos.notify_dismission_of_request(
-                    request, session, scheduler=self.internal_scheduler
+                    request, scheduler=self.internal_scheduler
                 )
                 logger.info("job has finished", **db.logger_kwargs(request=request))
         session.commit()
-
-    def processing_time_priority_algorithm(
-        self,
-        session_write: sa.orm.Session,
-        number_of_requests: int,
-        candidates: Iterable[db.SystemRequest],
-    ) -> None:
-        """Check the qos rules and submit the requests to the dask scheduler."""
-        user_requests: dict[str, list[db.SystemRequest]] = {}
-        for request in candidates:
-            user_requests.setdefault(request.user_uid, []).append(request)
-        # FIXME: this is a temporary solution to prioritize subrequests from the high priority user
-        interval_stop = datetime.datetime.now()
-        # temporary solution to prioritize high priority user
-        users_queue = db.get_users_queue_from_processing_time(
-            interval_stop=interval_stop,
-            session=session_write,
-            interval=ONE_HOUR * CONFIG.broker_priority_interval_hours,
-        )
-        requests_counter: int = 0
-        users_queue = {
-            k: v
-            for k, v in sorted(
-                users_queue.items(),
-                key=lambda user_cost: self.qos.user_priority(
-                    user_uid=user_cost[0], priority_cost=user_cost[1]
-                ),
-            )
-        }
-        for user_uid, user_cost in users_queue.items():
-            may_run: bool = True
-            if user_uid not in user_requests:
-                continue
-            requests = sorted(
-                user_requests[user_uid],
-                key=lambda candidate: self.qos.priority(candidate, session_write),
-                reverse=True,
-            )
-            for request in requests:
-                # need to check the limits on each request to update the qos_rules table
-                can_run = self.qos.can_run(
-                    request, session=session_write, scheduler=self.internal_scheduler
-                )
-                if can_run and may_run and requests_counter < number_of_requests:
-                    self.submit_request(
-                        request, priority=user_cost, session=session_write
-                    )
-                    may_run = False
-                    requests_counter += 1
 
     @perf_logger
     def submit_requests(
@@ -697,25 +648,19 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        if CONFIG.broker_priority_algorithm == "processing_time":
-            logger.info("priority algorithm", algorithm="processing_time")
-            self.processing_time_priority_algorithm(
-                session_write, number_of_requests, candidates
-            )
-        else:
-            queue = sorted(
-                candidates,
-                key=lambda candidate: self.qos.priority(candidate, session_write),
-                reverse=True,
-            )
-            requests_counter = 0
-            for request in queue:
-                if self.qos.can_run(
-                    request, session=session_write, scheduler=self.internal_scheduler
-                ):
-                    if requests_counter <= int(number_of_requests):
-                        self.submit_request(request, session=session_write)
-                    requests_counter += 1
+        queue = sorted(
+            candidates,
+            key=lambda candidate: self.qos.priority(candidate),
+            reverse=True,
+        )
+        requests_counter = 0
+        for request in queue:
+            if self.qos.can_run(
+                request, session=session_write, scheduler=self.internal_scheduler
+            ):
+                if requests_counter <= int(number_of_requests):
+                    self.submit_request(request, session=session_write)
+                requests_counter += 1
 
     def submit_request(
         self,
@@ -728,7 +673,7 @@ class Broker:
             request_uid=request.request_uid, status="running", session=session
         )
         self.qos.notify_start_of_request(
-            request, session, scheduler=self.internal_scheduler
+            request, scheduler=self.internal_scheduler
         )
         self.queue.pop(request.request_uid)
         future = self.client.submit(
@@ -756,6 +701,8 @@ class Broker:
         """Run the broker loop."""
         while True:
             start_loop = time.perf_counter()
+            # reset the cache of the qos functions
+            db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
                 if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
                     logger.info("reloading qos rules")

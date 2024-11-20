@@ -81,19 +81,20 @@ class Priority(QoSRule):
     name = "priority"
 
 
-class UserPriority(QoSRule):
+class DynamicPriority(QoSRule):
     """
-    It represents a user priority rule.
-
-    This is a special rule since it applies to a user instead of a request.
+    It represents a priority rule.
 
     The 'conclusion' part must evaluate as a number,
-    which is then used to compute the starting
-    priority of a user. The priority represents the number of seconds
-    used by a user in the CDS in the last 24 hours.
+    which is then used to compute the dynamic priority
+    of a request. All rules matching a request contributes to
+    the dynamic priority of the request. The priority is a number that
+    represents a number of seconds. Priorities are only used to
+    decide which request to run next. It does not affect already running
+    requests.
     """
 
-    name = "user_priority"
+    name = "dynamic_priority"
 
 
 class Permission(QoSRule):
@@ -180,7 +181,7 @@ class RuleSet:
 
     def __init__(self):
         self.priorities = []
-        self.user_priorities = []
+        self.dynamic_priorities = []
         self.global_limits = []
         self.permissions = []
         self.user_limits = []
@@ -189,10 +190,8 @@ class RuleSet:
     def add_priority(self, environment, info, condition, conclusion):
         self.priorities.append(Priority(environment, info, condition, conclusion))
 
-    def add_user_priority(self, environment, info, condition, conclusion):
-        self.user_priorities.append(
-            UserPriority(environment, info, condition, conclusion)
-        )
+    def add_dynamic_priority(self, environment, info, condition, conclusion):
+        self.dynamic_priorities.append(DynamicPriority(environment, info, condition, conclusion))
 
     def add_permission(self, environment, info, condition, conclusion):
         self.permissions.append(Permission(environment, info, condition, conclusion))
