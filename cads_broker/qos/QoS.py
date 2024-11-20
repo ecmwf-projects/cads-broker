@@ -290,7 +290,7 @@ class QoS:
     @locked
     def pick(self, queue, session):
         # Create the list of requests than can run
-        candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r, session)]
+        candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r)]
 
         # If no request can run, return 'None'
         if len(candidates) == 0:

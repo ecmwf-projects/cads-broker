@@ -656,7 +656,7 @@ class Broker:
         requests_counter = 0
         for request in queue:
             if self.qos.can_run(
-                request, session=session_write, scheduler=self.internal_scheduler
+                request, scheduler=self.internal_scheduler
             ):
                 if requests_counter <= int(number_of_requests):
                     self.submit_request(request, session=session_write)
