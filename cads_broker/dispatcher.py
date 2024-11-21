@@ -387,9 +387,7 @@ class Broker:
         else:
             request.status = "deleted"
         if previous_status == "running":
-            self.qos.notify_end_of_request(
-                request, scheduler=self.internal_scheduler
-            )
+            self.qos.notify_end_of_request(request, scheduler=self.internal_scheduler)
         elif previous_status == "accepted":
             self.queue.pop(request.request_uid, None)
             self.qos.notify_dismission_of_request(
@@ -648,18 +646,19 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        queue = sorted(
-            candidates,
-            key=lambda candidate: self.qos.priority(candidate),
-            reverse=True,
+        candidates_priorities: list[tuple[db.SystemRequest, int]] = [
+            (candidate, self.qos.priority(candidate)) for candidate in candidates
+        ]
+        queue: list[tuple[db.SystemRequest, int]] = sorted(
+            candidates_priorities, key=lambda x: x[1], reverse=True
         )
         requests_counter = 0
-        for request in queue:
-            if self.qos.can_run(
-                request, scheduler=self.internal_scheduler
-            ):
+        for request, priority in queue:
+            if self.qos.can_run(request, scheduler=self.internal_scheduler):
                 if requests_counter <= int(number_of_requests):
-                    self.submit_request(request, session=session_write)
+                    self.submit_request(
+                        request, session=session_write, priority=priority
+                    )
                 requests_counter += 1
 
     def submit_request(
@@ -672,9 +671,7 @@ class Broker:
         request = db.set_request_status(
             request_uid=request.request_uid, status="running", session=session
         )
-        self.qos.notify_start_of_request(
-            request, scheduler=self.internal_scheduler
-        )
+        self.qos.notify_start_of_request(request, scheduler=self.internal_scheduler)
         self.queue.pop(request.request_uid)
         future = self.client.submit(
             worker.submit_workflow,
