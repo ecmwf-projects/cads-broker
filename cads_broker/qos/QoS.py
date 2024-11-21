@@ -180,11 +180,9 @@ class QoS:
     def priority(self, request):
         """Compute the priority of a request."""
         # The priority of a request increases with time
-        starting_priority = self._properties(request).starting_priority
-        dynamic_priority = self.dynamic_priority(request)
-        print("starting priority: ", starting_priority)
-        print("dynamic priority: ", dynamic_priority)
-        return starting_priority + dynamic_priority
+        return self._properties(
+            request
+        ).starting_priority + self.dynamic_priority(request)
 
     def dump(self, out=print):
         self.rules.dump(out)

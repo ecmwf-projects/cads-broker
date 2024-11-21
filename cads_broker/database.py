@@ -527,12 +527,14 @@ def user_last_completed_request(
         user_uid, max_time_datetime
     )
 
-    return int(
+    value = int(
         (
             datetime.datetime.now()
             - max(user_last_finished_at_datetime, max_time_datetime)
         ).total_seconds()
     )
+    print("FINISHED AT", value)
+    return value
 
 
 def user_resource_used(
@@ -552,6 +554,7 @@ def user_resource_used(
         )
         QOS_FUNCTIONS_CACHE["users_resources"] = users_resources
 
+    print("--------RESOURCE", users_resources.get(user_uid, 0))
     return users_resources.get(user_uid, 0)
 
 
