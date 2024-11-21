@@ -646,18 +646,19 @@ class Broker:
         candidates: Iterable[db.SystemRequest],
     ) -> None:
         """Check the qos rules and submit the requests to the dask scheduler."""
-        candidates_priorities: list[tuple[db.SystemRequest, int]] = [
-            (candidate, self.qos.priority(candidate)) for candidate in candidates
-        ]
-        queue: list[tuple[db.SystemRequest, int]] = sorted(
-            candidates_priorities, key=lambda x: x[1], reverse=True
+        queue = sorted(
+            candidates,
+            key=lambda candidate: self.qos.priority(candidate),
+            reverse=True,
         )
         requests_counter = 0
-        for request, priority in queue:
+        for request in queue:
             if self.qos.can_run(request, scheduler=self.internal_scheduler):
                 if requests_counter <= int(number_of_requests):
                     self.submit_request(
-                        request, session=session_write, priority=priority
+                        request,
+                        session=session_write,
+                        priority=self.qos.priority(request),
                     )
                 requests_counter += 1
 
