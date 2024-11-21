@@ -169,23 +169,25 @@ class QoS:
         return properties
 
     @locked
-    def priority(self, request):
-        """Compute the priority of a request."""
-        # The priority of a request increases with time
-        return self._properties(
-            request
-        ).starting_priority + self.dynamic_priority(request)
-
-    def dump(self, out=print):
-        self.rules.dump(out)
-
-    @locked
     def dynamic_priority(self, request):
         """Compute the dynamic priority of a request."""
         priority = 0
         for rule in self._properties(request).dynamic_priorities:
             priority += rule.evaluate(request)
         return priority
+
+    @locked
+    def priority(self, request):
+        """Compute the priority of a request."""
+        # The priority of a request increases with time
+        starting_priority = self._properties(request).starting_priority
+        dynamic_priority = self.dynamic_priority(request)
+        print("starting priority: ", starting_priority)
+        print("dynamic priority: ", dynamic_priority)
+        return starting_priority + dynamic_priority
+
+    def dump(self, out=print):
+        self.rules.dump(out)
 
     @locked
     def status(self, requests, session, out=print):
