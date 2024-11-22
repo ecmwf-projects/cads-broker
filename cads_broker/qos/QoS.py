@@ -173,6 +173,7 @@ class QoS:
         """Compute the dynamic priority of a request."""
         priority = 0
         for rule in self._properties(request).dynamic_priorities:
+            print('-------------', rule.info, rule.evaluate(request))
             priority += rule.evaluate(request)
         return priority
 
