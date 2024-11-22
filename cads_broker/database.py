@@ -496,22 +496,22 @@ def get_users_queue_from_processing_time(
 
 
 def users_last_finished_at(
-    session: sa.orm.Session, max_time: datetime.datetime
+    session: sa.orm.Session, after: datetime.datetime
 ) -> dict[str, datetime.datetime]:
     """Return the last completed request for each user."""
     statement = (
         sa.select(SystemRequest.user_uid, sa.func.max(SystemRequest.finished_at))
-        .where(SystemRequest.finished_at > max_time)
+        .where(SystemRequest.finished_at > after)
         .group_by(SystemRequest.user_uid)
     )
     return dict(session.execute(statement).all())
 
 
 def user_last_completed_request(
-    session: sa.orm.Session, user_uid: str, max_time: int
+    session: sa.orm.Session, user_uid: str, interval: int
 ) -> int:
     global QOS_FUNCTIONS_CACHE
-    max_time_datetime = datetime.datetime.now() - datetime.timedelta(seconds=max_time)
+    after_datetime = datetime.datetime.now() - datetime.timedelta(seconds=interval)
 
     if QOS_FUNCTIONS_CACHE.get("users_last_finished_at") is not None:
         users_last_finished_at_datetime = QOS_FUNCTIONS_CACHE.get(
@@ -519,18 +519,18 @@ def user_last_completed_request(
         )
     else:
         users_last_finished_at_datetime = users_last_finished_at(
-            session, max_time_datetime
+            session, after_datetime
         )
         QOS_FUNCTIONS_CACHE["users_last_finished_at"] = users_last_finished_at_datetime
 
     user_last_finished_at_datetime = users_last_finished_at_datetime.get(
-        user_uid, max_time_datetime
+        user_uid, after_datetime
     )
 
     value = int(
         (
             datetime.datetime.now()
-            - max(user_last_finished_at_datetime, max_time_datetime)
+            - max(user_last_finished_at_datetime, after_datetime)
         ).total_seconds()
     )
     return value

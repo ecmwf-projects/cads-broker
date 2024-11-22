@@ -78,7 +78,7 @@ def register_functions():
         "user_last_completed_request",
         lambda context, max_time=24 * 60 * 60: database.user_last_completed_request(
             user_uid=context.request.user_uid,
-            max_time=max_time,
+            interval=max_time,
             session=context.environment.session,
         ),
     )

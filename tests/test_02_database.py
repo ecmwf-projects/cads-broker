@@ -846,22 +846,22 @@ def test_user_last_completed_request(session_obj: sa.orm.sessionmaker) -> None:
         assert (
             now - finished_at
         ).seconds == db.user_last_completed_request(
-            session=session, user_uid="user1", max_time=60 * 60 * 24
+            session=session, user_uid="user1", interval=60 * 60 * 24
         )
         assert 60 * 60 * 24 == db.user_last_completed_request(
-            session=session, user_uid="user2", max_time=60 * 60 * 24
+            session=session, user_uid="user2", interval=60 * 60 * 24
         )
         session.add(request_2)
         session.commit()
         assert (
             now - finished_at
         ).seconds == db.user_last_completed_request(
-            session=session, user_uid="user1", max_time=60 * 60 * 24
+            session=session, user_uid="user1", interval=60 * 60 * 24
         )
         # invalidate cache
         db.QOS_FUNCTIONS_CACHE = {}
         assert 0 == db.user_last_completed_request(
-            session=session, user_uid="user1", max_time=60 * 60 * 24
+            session=session, user_uid="user1", interval=60 * 60 * 24
         )
 
 
