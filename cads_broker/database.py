@@ -32,6 +32,8 @@ DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
 )
 
+QOS_FUNCTIONS_CACHE: dict[str, dict[str, Any]] = dict()
+
 
 class NoResultFound(Exception):
     pass
@@ -379,7 +381,7 @@ def reset_qos_rules(session: sa.orm.Session, qos):
     for request in get_running_requests(session):
         # Recompute the limits
         # It just updates the database. Internal qos is already updated.
-        limits = qos.limits_for(request, session)
+        limits = qos.limits_for(request)
         _, rules = delete_request_qos_status(
             request_uid=request.request_uid,
             rules=limits,
@@ -491,6 +493,67 @@ def get_users_queue_from_processing_time(
     queueing_user_costs = {u: 0 for (u,) in queue_users if u not in running_user_costs}
 
     return queueing_user_costs | running_user_costs
+
+
+def users_last_finished_at(
+    session: sa.orm.Session, after: datetime.datetime
+) -> dict[str, datetime.datetime]:
+    """Return the last completed request for each user."""
+    statement = (
+        sa.select(SystemRequest.user_uid, sa.func.max(SystemRequest.finished_at))
+        .where(SystemRequest.finished_at > after)
+        .group_by(SystemRequest.user_uid)
+    )
+    return dict(session.execute(statement).all())
+
+
+def user_last_completed_request(
+    session: sa.orm.Session, user_uid: str, interval: int
+) -> int:
+    global QOS_FUNCTIONS_CACHE
+    after_datetime = datetime.datetime.now() - datetime.timedelta(seconds=interval)
+
+    if QOS_FUNCTIONS_CACHE.get("users_last_finished_at") is not None:
+        users_last_finished_at_datetime = QOS_FUNCTIONS_CACHE.get(
+            "users_last_finished_at"
+        )
+    else:
+        users_last_finished_at_datetime = users_last_finished_at(
+            session, after_datetime
+        )
+        QOS_FUNCTIONS_CACHE["users_last_finished_at"] = users_last_finished_at_datetime
+
+    user_last_finished_at_datetime = users_last_finished_at_datetime.get(
+        user_uid, after_datetime
+    )
+
+    value = int(
+        (
+            datetime.datetime.now()
+            - max(user_last_finished_at_datetime, after_datetime)
+        ).total_seconds()
+    )
+    return value
+
+
+def user_resource_used(
+    user_uid: str,
+    session: sa.orm.Session,
+    interval: int,
+) -> int:
+    """Return the amount of resource used by a user."""
+    global QOS_FUNCTIONS_CACHE
+    if QOS_FUNCTIONS_CACHE.get("users_resources") is not None:
+        users_resources = QOS_FUNCTIONS_CACHE.get("users_resources")
+    else:
+        users_resources = get_users_queue_from_processing_time(
+            session=session,
+            interval_stop=datetime.datetime.now(),
+            interval=datetime.timedelta(hours=interval / 60 / 60),
+        )
+        QOS_FUNCTIONS_CACHE["users_resources"] = users_resources
+
+    return users_resources.get(user_uid, 0)
 
 
 def get_stuck_requests(session: sa.orm.Session, minutes: int = 15) -> list[str]:

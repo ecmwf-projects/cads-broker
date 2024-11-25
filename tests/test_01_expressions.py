@@ -50,6 +50,8 @@ def test_expression():
     assert evaluate("2 + 3 * 5") == 17.0
     assert evaluate("(2+3) * 5") == 25.0
     assert evaluate("(2 + 3) * -5") == -25.0
+    assert evaluate("1.0") == 1.0
+    assert evaluate("1.5 * 0.1") == 1.5 * 0.1
 
     assert evaluate("1 > 2") is False
     assert evaluate("3 > 3") is False

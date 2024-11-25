@@ -91,13 +91,13 @@ class QoS:
         # Re-register the active tasks
         for request in database.get_running_requests(session=session):
             # Recompute the limits
-            for limit in self.limits_for(request, session):
+            for limit in self.limits_for(request):
                 limit.increment(request.request_uid)
 
     @locked
-    def can_run(self, request, session, scheduler):
+    def can_run(self, request, scheduler):
         """Check if a request can run."""
-        properties = self._properties(request=request, session=session)
+        properties = self._properties(request=request)
         limits = []
         new_limits = []
         for limit in properties.limits:
@@ -123,7 +123,7 @@ class QoS:
         return not len(limits) and not len(permissions)
 
     @locked
-    def _properties(self, request, session, check_permissions=False):
+    def _properties(self, request, check_permissions=False):
         """Return the Properties object associated with a request.
 
         If it does not exists it is created.
@@ -159,27 +159,30 @@ class QoS:
         # Set starting priority
         properties.starting_priority = priority
 
+        for rule in self.rules.dynamic_priorities:
+            if rule.match(request):
+                properties.dynamic_priorities.append(rule)
+
         # Store in cache
         self.requests_properties_cache[request.request_uid] = properties
 
         return properties
 
     @locked
-    def priority(self, request, session):
-        """Compute the priority of a request."""
-        # The priority of a request increases with time
-        return self._properties(request, session).starting_priority + request.age
+    def dynamic_priority(self, request):
+        """Compute the dynamic priority of a request."""
+        priority = 0
+        for rule in self._properties(request).dynamic_priorities:
+            priority += rule.evaluate(request)
+        return priority
 
     @locked
-    def user_priority(self, user_uid: str, priority_cost: int) -> int:
-        """Compute the priority of a user."""
-        # user_priority doesn't work as the other QoS rules, it applies to users instead of requests
-        # we need to mock a system request with just the user_uid attribute
-        request = collections.namedtuple("SystemRequest", "user_uid")(user_uid)
-        for user_priority in self.rules.user_priorities:
-            if user_priority.match(request):
-                priority_cost -= user_priority.evaluate(request)
-        return priority_cost
+    def priority(self, request):
+        """Compute the priority of a request."""
+        # The priority of a request increases with time
+        return self._properties(
+            request
+        ).starting_priority + self.dynamic_priority(request)
 
     def dump(self, out=print):
         self.rules.dump(out)
@@ -204,7 +207,7 @@ class QoS:
         out(request, request.status)
         out("Priority: {}".format(self.priority(request, session)))
         out("Limits rules:")
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request):
             out(
                 "    {} ({}/{}) {}".format(
                     limit,
@@ -223,12 +226,12 @@ class QoS:
             out("    {}".format(permission))
 
     @locked
-    def limits_for(self, request, session):
+    def limits_for(self, request):
         """Return the limit rules that applies to a request.
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).limits
+        return self._properties(request).limits
 
     @locked
     def check_permissions_for(self, request, properties):
@@ -255,7 +258,7 @@ class QoS:
 
         Ensure that the properties cache is created if needed.
         """
-        return self._properties(request, session).priorities
+        return self._properties(request).priorities
 
     @locked
     def user_limit(self, request):
@@ -287,7 +290,7 @@ class QoS:
     @locked
     def pick(self, queue, session):
         # Create the list of requests than can run
-        candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r, session)]
+        candidates = [(n, r) for n, r in enumerate(queue) if self.can_run(r)]
 
         # If no request can run, return 'None'
         if len(candidates) == 0:
@@ -310,10 +313,10 @@ class QoS:
         return request
 
     @locked
-    def notify_dismission_of_request(self, request, session, scheduler):
+    def notify_dismission_of_request(self, request, scheduler):
         """Notify the dismission of a request."""
         limits_list = []
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request):
             limit.remove_from_queue(request.request_uid)
             limits_list.append(limit)
         if limits_list:
@@ -328,7 +331,7 @@ class QoS:
             )
 
     @locked
-    def notify_start_of_request(self, request, session, scheduler):
+    def notify_start_of_request(self, request, scheduler):
         """Notify the start of a request.
 
         Increment the limits matching that request so that other request
@@ -336,7 +339,7 @@ class QoS:
         its capacity.
         """
         limits_list = []
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request):
             limit.increment(request.request_uid)
             limits_list.append(limit)
         scheduler.append(
@@ -351,14 +354,14 @@ class QoS:
         # Keep track of the running request. This is needed by reconfigure(self)
 
     @locked
-    def notify_end_of_request(self, request, session, scheduler):
+    def notify_end_of_request(self, request, scheduler):
         """Notify the end of a request.
 
         Decrement the limits matching that request so that other request
         sharing the same limits can run.
         """
         limits_list = []
-        for limit in self.limits_for(request, session):
+        for limit in self.limits_for(request):
             limit.decrement()
             limits_list.append(limit)
 

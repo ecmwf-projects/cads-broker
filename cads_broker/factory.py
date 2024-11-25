@@ -66,6 +66,27 @@ def register_functions():
             session=context.environment.session,
         ),
     )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "user_resource_used",
+        lambda context, interval=24 * 60 * 60: database.user_resource_used(
+            user_uid=context.request.user_uid,
+            interval=interval,
+            session=context.environment.session,
+        ),
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "user_last_completed_request",
+        lambda context, interval=24 * 60 * 60: database.user_last_completed_request(
+            user_uid=context.request.user_uid,
+            interval=interval,
+            session=context.environment.session,
+        ),
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "request_age",
+        lambda context: context.request.age
+    )
+
     expressions.FunctionFactory.FunctionFactory.register_function("tagged", tagged)
     expressions.FunctionFactory.FunctionFactory.register_function(
         "request_contains_all", request_contains_all

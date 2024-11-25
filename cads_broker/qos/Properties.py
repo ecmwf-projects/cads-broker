@@ -15,4 +15,5 @@ class Properties:
         self.starting_priority = 0
         self.limits = []
         self.priorities = []
+        self.dynamic_priorities = []
         self.permissions = []
