@@ -807,7 +807,7 @@ def test_users_last_finished_at(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_2)
         session.add(request_3)
         session.commit()
-        users_last_finished_at = db.users_last_finished_at(session=session, max_time=now - datetime.timedelta(hours=24))
+        users_last_finished_at = db.users_last_finished_at(session=session, after=now - datetime.timedelta(hours=24))
         assert finished_at == users_last_finished_at["user1"]
         assert "user2" not in users_last_finished_at
 

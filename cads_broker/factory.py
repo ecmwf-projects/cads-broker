@@ -76,9 +76,9 @@ def register_functions():
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "user_last_completed_request",
-        lambda context, max_time=24 * 60 * 60: database.user_last_completed_request(
+        lambda context, interval=24 * 60 * 60: database.user_last_completed_request(
             user_uid=context.request.user_uid,
-            interval=max_time,
+            interval=interval,
             session=context.environment.session,
         ),
     )
