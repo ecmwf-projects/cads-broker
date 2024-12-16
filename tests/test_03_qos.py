@@ -70,9 +70,10 @@ def test_contains():
 
     limit "Limit for Alice and Bob" contains(users, user): 5
     limit "Limit for era5" (dataset() == "era5") && !(user in users): 10
+    limit "Limit for alice" "lice" in user: 1
     """
     )
-    assert len(rules.global_limits) == 2
+    assert len(rules.global_limits) == 3
     request_david = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
         user_uid="david", dataset="era5"
     )
@@ -89,6 +90,10 @@ def test_contains():
     assert not rules.global_limits[1].match(request_alice)
     assert not rules.global_limits[1].match(request_bob)
     assert rules.global_limits[1].match(request_david)
+
+    assert rules.global_limits[2].match(request_alice)
+    assert not rules.global_limits[2].match(request_bob)
+    assert not rules.global_limits[2].match(request_david)
 
 
 def test_dynamic_prorities():
