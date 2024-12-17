@@ -48,6 +48,7 @@ def mock_system_request(
     request_metadata: dict | None = None,
     adaptor_properties_hash: str = "adaptor_properties_hash",
     entry_point: str = "entry_point",
+    origin: str = "api",
 ) -> db.SystemRequest:
     system_request = db.SystemRequest(
         request_uid=request_uid or str(uuid.uuid4()),
@@ -62,6 +63,7 @@ def mock_system_request(
         request_metadata=request_metadata or {},
         adaptor_properties_hash=adaptor_properties_hash,
         entry_point=entry_point,
+        origin=origin,
     )
     return system_request
 
@@ -707,6 +709,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         status="successful",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user1",
+        origin="api",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=10),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=5),
     )
@@ -714,6 +717,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         status="successful",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user1",
+        origin="ui",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
@@ -721,6 +725,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         status="successful",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
+        origin="api",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
@@ -728,22 +733,26 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         status="running",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
+        origin="api",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=20),
     )
     request_5 = mock_system_request(
         status="accepted",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
+        origin="api",
     )
     request_6 = mock_system_request(
         status="accepted",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user3",
+        origin="api",
     )
     request_7 = mock_system_request(
         status="failed",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user3",
+        origin="api",
         started_at=None,
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
@@ -751,6 +760,7 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         status="deleted",
         adaptor_properties_hash=adaptor_properties.hash,
         user_uid="user2",
+        origin="api",
         started_at=datetime.datetime.now() - datetime.timedelta(hours=15),
         finished_at=datetime.datetime.now() - datetime.timedelta(hours=10),
     )
@@ -769,9 +779,18 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
         users_cost = db.get_users_queue_from_processing_time(
             session, interval_stop=datetime.datetime.now()
         )
-    assert users_cost["user3"] == 0
-    assert users_cost["user1"] == 15 * 60 * 60
-    assert users_cost["user2"] == (10 + 20 + 5) * 60 * 60
+        users_cost_api = db.get_users_queue_from_processing_time(
+            session, interval_stop=datetime.datetime.now(), origin="api"
+        )
+        users_cost_ui = db.get_users_queue_from_processing_time(
+            session, interval_stop=datetime.datetime.now(), origin="ui"
+        )
+    assert users_cost["user3"] == users_cost_api["user3"] == users_cost_ui["user3"] == 0
+    assert users_cost["user1"] == (5 + 10) * 60 * 60
+    assert users_cost["user2"] == users_cost_api["user2"] == (10 + 20 + 5) * 60 * 60
+    assert users_cost_api["user1"] == 5 * 60 * 60
+    assert users_cost_ui["user1"] == 10 * 60 * 60
+
 
 
 def test_users_last_finished_at(session_obj: sa.orm.sessionmaker) -> None:
