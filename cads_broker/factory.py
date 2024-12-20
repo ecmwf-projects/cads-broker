@@ -6,8 +6,7 @@ def tagged(context, value):
         return True
 
 
-def request_contains_all(context, key, values):
-    request_values = context.request.request_body.get("request").get(key)
+def contains_all(request_values, values):
     if not isinstance(request_values, (list, tuple)):
         request_values = [request_values]
     s1 = set(request_values)
@@ -15,13 +14,32 @@ def request_contains_all(context, key, values):
     return len(s1 & s2) == len(s2)
 
 
-def request_contains_any(context, key, values):
-    request_values = context.request.request_body.get("request").get(key)
+def contains_any(request_values, values):
     if not isinstance(request_values, (list, tuple)):
         request_values = [request_values]
     s1 = set(request_values)
     s2 = set(values)
     return len(s1 & s2) > 0
+
+
+def request_contains_all(context, key, values):
+    request_values = context.request.request_body.get("request").get(key)
+    return contains_all(request_values, values)
+
+
+def request_contains_any(context, column, key, values):
+    request_values = context.request.request_body.get("request").get(key)
+    return contains_any(request_values, values)
+
+
+def metadata_contains_all(context, key, values):
+    metadata_values = context.request.request_metadata.get(key)
+    return contains_all(metadata_values, values)
+
+
+def metadata_contains_any(context, key, values):
+    metadata_values = context.request.request_metadata.get(key)
+    return contains_any(metadata_values, values)
 
 
 def register_functions():
@@ -94,4 +112,10 @@ def register_functions():
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "request_contains_any", request_contains_any
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "metadata_contains_all", metadata_contains_all
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "metadata_contains_any", metadata_contains_any
     )
