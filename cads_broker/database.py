@@ -723,6 +723,7 @@ def set_request_status(
     error_message: str | None = None,
     error_reason: str | None = None,
     resubmit: bool | None = None,
+    priority: float | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -735,6 +736,8 @@ def set_request_status(
             {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
         )
         request.request_metadata = metadata
+    if priority is not None:
+        request.request_metadata["priority"] = priority
     if status == "successful":
         request.finished_at = sa.func.now()
     elif status == "failed":
