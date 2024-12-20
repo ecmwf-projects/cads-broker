@@ -105,6 +105,14 @@ def register_functions():
         "request_age",
         lambda context: context.request.age
     )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "user_data",
+        lambda context: context.request.request_metadata.get("user_data", {})
+    )
+    expressions.FunctionFactory.FunctionFactory.register_function(
+        "get",
+        lambda context, object, key: object.get(key)
+    )
 
     expressions.FunctionFactory.FunctionFactory.register_function("tagged", tagged)
     expressions.FunctionFactory.FunctionFactory.register_function(

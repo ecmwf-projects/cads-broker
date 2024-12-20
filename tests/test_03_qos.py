@@ -2,7 +2,8 @@ import collections
 import io
 import logging
 
-from cads_broker import Environment
+from cads_broker import database
+from cads_broker import Environment, factory
 from cads_broker.expressions import FunctionFactory
 from cads_broker.expressions.RulesParser import RulesParser
 from cads_broker.qos.Rule import RuleSet
@@ -15,7 +16,17 @@ FunctionFactory.FunctionFactory.register_function(
     "adaptor",
     lambda context, *args: context.request.adaptor,
 )
+factory.register_functions()
 logger = logging.getLogger("test")
+
+
+def mock_system_request(
+    user_uid: str, request_metadata: dict = {}, process_id: str = "era5"
+) -> database.SystemRequest:
+    system_request = database.SystemRequest(
+        user_uid=user_uid, request_metadata=request_metadata, process_id=process_id
+    )
+    return system_request
 
 
 class TestRequest:
@@ -58,7 +69,7 @@ def test_definition():
     """
     )
     assert len(rules.global_limits) == 1
-    request = collections.namedtuple("SystemRequest", "user_uid")(user_uid="david")
+    request = mock_system_request(user_uid="david")
     assert rules.global_limits[0].capacity(request) == 5
     assert rules.global_limits[0].match(request)
 
@@ -74,15 +85,9 @@ def test_contains():
     """
     )
     assert len(rules.global_limits) == 3
-    request_david = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
-        user_uid="david", dataset="era5"
-    )
-    request_bob = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
-        user_uid="bob", dataset="era5"
-    )
-    request_alice = collections.namedtuple("SystemRequest", ["user_uid", "dataset"])(
-        user_uid="alice", dataset="era5"
-    )
+    request_david = mock_system_request(user_uid="david", process_id="era5")
+    request_bob = mock_system_request(user_uid="bob", process_id="era5")
+    request_alice = mock_system_request(user_uid="alice", process_id="era5")
     assert not rules.global_limits[0].match(request_david)
     assert rules.global_limits[0].match(request_bob)
     assert rules.global_limits[0].match(request_alice)
@@ -97,13 +102,9 @@ def test_contains():
 
 
 def test_dynamic_prorities():
-    request_alice = collections.namedtuple("SystemRequest", "user_uid")(
-        user_uid="alice"
-    )
-    request_bob = collections.namedtuple("SystemRequest", "user_uid")(user_uid="bob")
-    request_david = collections.namedtuple("SystemRequest", "user_uid")(
-        user_uid="david"
-    )
+    request_alice = mock_system_request(user_uid="alice")
+    request_bob = mock_system_request(user_uid="bob")
+    request_david = mock_system_request(user_uid="david")
 
     rules = compile(
         """
@@ -136,3 +137,17 @@ def test_dynamic_prorities():
     assert not rules.dynamic_priorities[0].match(request_david)
     assert rules.dynamic_priorities[1].match(request_david)
     assert rules.dynamic_priorities[1].evaluate(request_david) == 10
+
+
+def test_user_data():
+    request_alice = mock_system_request(
+        user_uid="alice", request_metadata={"user_data": {"email": "alice@ecmwf.int"}}
+    )
+
+    rules = compile(
+        """
+    user "Limit for Alice" ("alice" in get(user_data, "email")): 0
+    """
+    )
+    assert len(rules.user_limits) == 1
+    assert rules.user_limits[0].match(request_alice)
