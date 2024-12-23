@@ -40,7 +40,12 @@ class QoSRule:
         return self.conclusion.evaluate(Context(request, self.environment))
 
     def match(self, request):
-        return self.condition.evaluate(Context(request, self.environment))
+        try:
+            ret_value = self.condition.evaluate(Context(request, self.environment))
+        except Exception as e:
+            print(f"Error evaluating condition {self.condition} for request {request.request_uid}")
+            print(e)
+        return ret_value
 
     def dump(self, out):
         out(self)
