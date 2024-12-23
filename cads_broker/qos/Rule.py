@@ -45,6 +45,7 @@ class QoSRule:
         except Exception as e:
             print(f"Error evaluating condition {self.condition} for request {request.request_uid}")
             print(e)
+            return False
         return ret_value
 
     def dump(self, out):
