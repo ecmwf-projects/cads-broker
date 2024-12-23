@@ -111,7 +111,7 @@ def register_functions():
     )
     expressions.FunctionFactory.FunctionFactory.register_function(
         "get",
-        lambda context, object, key: object.get(key)
+        lambda context, object, key, default=None: object.get(key, default)
     )
 
     expressions.FunctionFactory.FunctionFactory.register_function("tagged", tagged)
