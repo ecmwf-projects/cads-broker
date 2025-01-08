@@ -1,5 +1,6 @@
 """utility module to interface to the object storage."""
 
+import os.path
 import urllib.parse
 from typing import Any
 
@@ -8,6 +9,18 @@ import botocore  # type: ignore
 import structlog
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
+
+
+def parse_data_volumes_config(path: str | None = None) -> list[str]:
+    if path is None:
+        path = os.environ["DATA_VOLUMES_CONFIG"]
+
+    data_volumes = []
+    with open(path) as fp:
+        for line in fp:
+            if data_volume := os.path.expandvars(line.rstrip("\n")):
+                data_volumes.append(data_volume)
+    return data_volumes
 
 
 def is_bucket_existing(client: Any, bucket_name: str) -> bool | None:

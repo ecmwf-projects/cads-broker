@@ -10,7 +10,6 @@ from typing import Any, List, Optional
 
 import sqlalchemy as sa
 import typer
-from cads_worker import utils
 from typing_extensions import Annotated
 
 from cads_broker import config, database, dispatcher, object_storage
@@ -246,7 +245,7 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
         "aws_access_key_id": os.environ["STORAGE_ADMIN"],
         "aws_secret_access_key": os.environ["STORAGE_PASSWORD"],
     }
-    download_buckets: List[str] = utils.parse_data_volumes_config()
+    download_buckets: List[str] = object_storage.parse_data_volumes_config()
     for download_bucket in download_buckets:
         object_storage.create_download_bucket(
             download_bucket, object_storage_url, **storage_kws
