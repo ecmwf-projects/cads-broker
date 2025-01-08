@@ -670,7 +670,10 @@ class Broker:
     ) -> None:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
         request = db.set_request_status(
-            request_uid=request.request_uid, status="running", session=session
+            request_uid=request.request_uid,
+            status="running",
+            priority=priority,
+            session=session,
         )
         self.qos.notify_start_of_request(request, scheduler=self.internal_scheduler)
         self.queue.pop(request.request_uid)

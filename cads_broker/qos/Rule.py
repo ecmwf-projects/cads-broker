@@ -40,7 +40,15 @@ class QoSRule:
         return self.conclusion.evaluate(Context(request, self.environment))
 
     def match(self, request):
-        return self.condition.evaluate(Context(request, self.environment))
+        try:
+            ret_value = self.condition.evaluate(Context(request, self.environment))
+        except Exception as e:
+            print(
+                f"Error evaluating condition {self.condition} for request {request.request_uid}"
+            )
+            print(e)
+            return False
+        return ret_value
 
     def dump(self, out):
         out(self)
@@ -191,7 +199,9 @@ class RuleSet:
         self.priorities.append(Priority(environment, info, condition, conclusion))
 
     def add_dynamic_priority(self, environment, info, condition, conclusion):
-        self.dynamic_priorities.append(DynamicPriority(environment, info, condition, conclusion))
+        self.dynamic_priorities.append(
+            DynamicPriority(environment, info, condition, conclusion)
+        )
 
     def add_permission(self, environment, info, condition, conclusion):
         self.permissions.append(Permission(environment, info, condition, conclusion))

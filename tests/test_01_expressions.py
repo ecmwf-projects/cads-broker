@@ -21,7 +21,7 @@ logger = logging.getLogger("test")
 class TestRequest:
     user_uid = "david"
     dataset = "dataset-1"
-    adaptor = "adaptor1"
+    entry_point = "adaptor1"
     cost = (1024 * 1024, 60 * 60 * 24)
 
 

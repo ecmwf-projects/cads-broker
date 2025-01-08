@@ -455,6 +455,7 @@ def get_users_queue_from_processing_time(
     session: sa.orm.Session,
     interval_stop: datetime.datetime,
     interval: datetime.timedelta = datetime.timedelta(hours=24),
+    origin: str | None = None,
 ) -> dict[str, int]:
     """Build the queue of the users from the processing time."""
     interval_start = interval_stop - interval
@@ -474,6 +475,8 @@ def get_users_queue_from_processing_time(
         SystemRequest.started_at.is_not(None),
     )
     where_clause = sa.sql.or_(interval_clause, SystemRequest.status == "running")
+    if origin:
+        where_clause = sa.sql.and_(where_clause, SystemRequest.origin == origin)
 
     statement = (
         sa.sql.select(SystemRequest.user_uid, user_cost)
@@ -482,7 +485,7 @@ def get_users_queue_from_processing_time(
         .order_by("user_cost")
     )
 
-    running_user_costs = dict(session.execute(statement).all())
+    running_user_costs: dict[str, int] = dict(session.execute(statement).all())
 
     queue_users = session.execute(
         sa.select(SystemRequest.user_uid)
@@ -540,6 +543,7 @@ def user_resource_used(
     user_uid: str,
     session: sa.orm.Session,
     interval: int,
+    origin: str | None = None,
 ) -> int:
     """Return the amount of resource used by a user."""
     global QOS_FUNCTIONS_CACHE
@@ -550,6 +554,7 @@ def user_resource_used(
             session=session,
             interval_stop=datetime.datetime.now(),
             interval=datetime.timedelta(hours=interval / 60 / 60),
+            origin=origin,
         )
         QOS_FUNCTIONS_CACHE["users_resources"] = users_resources
 
@@ -718,6 +723,7 @@ def set_request_status(
     error_message: str | None = None,
     error_reason: str | None = None,
     resubmit: bool | None = None,
+    priority: float | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -730,6 +736,8 @@ def set_request_status(
             {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
         )
         request.request_metadata = metadata
+    if priority is not None:
+        request.request_metadata["priority"] = priority
     if status == "successful":
         request.finished_at = sa.func.now()
     elif status == "failed":
