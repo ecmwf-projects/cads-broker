@@ -1,9 +1,7 @@
-import collections
 import io
 import logging
 
-from cads_broker import database
-from cads_broker import Environment, factory
+from cads_broker import Environment, database, factory
 from cads_broker.expressions import FunctionFactory
 from cads_broker.expressions.RulesParser import RulesParser
 from cads_broker.qos.Rule import RuleSet

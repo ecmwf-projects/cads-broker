@@ -792,7 +792,6 @@ def test_get_users_queue_from_processing_time(session_obj: sa.orm.sessionmaker) 
     assert users_cost_ui["user1"] == 10 * 60 * 60
 
 
-
 def test_users_last_finished_at(session_obj: sa.orm.sessionmaker) -> None:
     adaptor_properties = mock_config()
     now = datetime.datetime.now()
@@ -826,7 +825,9 @@ def test_users_last_finished_at(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_2)
         session.add(request_3)
         session.commit()
-        users_last_finished_at = db.users_last_finished_at(session=session, after=now - datetime.timedelta(hours=24))
+        users_last_finished_at = db.users_last_finished_at(
+            session=session, after=now - datetime.timedelta(hours=24)
+        )
         assert finished_at == users_last_finished_at["user1"]
         assert "user2" not in users_last_finished_at
 
@@ -862,9 +863,7 @@ def test_user_last_completed_request(session_obj: sa.orm.sessionmaker) -> None:
         session.add(request_1)
         session.add(request_3)
         session.commit()
-        assert (
-            now - finished_at
-        ).seconds == db.user_last_completed_request(
+        assert (now - finished_at).seconds == db.user_last_completed_request(
             session=session, user_uid="user1", interval=60 * 60 * 24
         )
         assert 60 * 60 * 24 == db.user_last_completed_request(
@@ -872,9 +871,7 @@ def test_user_last_completed_request(session_obj: sa.orm.sessionmaker) -> None:
         )
         session.add(request_2)
         session.commit()
-        assert (
-            now - finished_at
-        ).seconds == db.user_last_completed_request(
+        assert (now - finished_at).seconds == db.user_last_completed_request(
             session=session, user_uid="user1", interval=60 * 60 * 24
         )
         # invalidate cache
