@@ -566,7 +566,15 @@ class Broker:
 
     def on_future_done(self, future: distributed.Future) -> str:
         with self.session_maker_write() as session:
-            request = db.get_request(future.key, session=session)
+            try:
+                request = db.get_request(future.key, session=session)
+            except db.NoResultFound:
+                logger.warning(
+                    "request not found",
+                    job_id=future.key,
+                    dask_status=future.status,
+                )
+                return future.key
             if request.status != "running":
                 return
             if future.status == "finished":
