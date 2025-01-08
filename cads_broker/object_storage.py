@@ -1,5 +1,6 @@
 """utility module to interface to the object storage."""
 
+import urllib.parse
 from typing import Any
 
 import boto3  # type: ignore
@@ -43,13 +44,18 @@ def create_download_bucket(
 
     Parameters
     ----------
-    bucket_name: name of the bucket
+    bucket_name: name of the bucket (something as 's3://mybucketname' or just 'mybucketname')
     object_storage_url: endpoint URL of the object storage
     client: client to use, default is boto3 (used for testing)
     storage_kws: dictionary of parameters used to pass to the storage client.
     """
+    bucket_url_obj = urllib.parse.urlparse(bucket_name)
+    scheme = "s3"
+    if bucket_url_obj.scheme:
+        scheme = bucket_url_obj.scheme
+        bucket_name = bucket_url_obj.netloc
     if not client:
-        client = boto3.client("s3", endpoint_url=object_storage_url, **storage_kws)
+        client = boto3.client(scheme, endpoint_url=object_storage_url, **storage_kws)
     if not is_bucket_existing(client, bucket_name):
         logger.info(f"creation of bucket {bucket_name}")
         client.create_bucket(Bucket=bucket_name)
