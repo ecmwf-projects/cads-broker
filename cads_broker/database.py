@@ -897,9 +897,10 @@ def get_request(
         )
         return session.scalars(statement).one()
     except sqlalchemy.exc.DataError:
+        logger.error("invalid request_uid", request_uid=request_uid)
         raise InvalidRequestID(f"Invalid request_uid {request_uid}")
     except sqlalchemy.orm.exc.NoResultFound:
-        logger.exception("get_request failed")
+        logger.error("no request found", request_uid=request_uid)
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
