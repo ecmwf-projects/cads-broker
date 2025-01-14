@@ -7,7 +7,6 @@
 # nor does it submit to any jurisdiction.
 #
 
-import collections
 import threading
 from functools import wraps
 
@@ -180,9 +179,9 @@ class QoS:
     def priority(self, request):
         """Compute the priority of a request."""
         # The priority of a request increases with time
-        return self._properties(
+        return self._properties(request).starting_priority + self.dynamic_priority(
             request
-        ).starting_priority + self.dynamic_priority(request)
+        )
 
     def dump(self, out=print):
         self.rules.dump(out)
