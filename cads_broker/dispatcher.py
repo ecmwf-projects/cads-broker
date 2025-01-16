@@ -94,14 +94,23 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
 
 def kill_job_on_worker(client: distributed.Client, request_uid: str) -> None:
-    worker_pid_event = client.get_events(request_uid)[0][1]
-    client.run(
-        os.kill,
-        worker_pid_event["pid"],
-        signal.SIGTERM,
-        workers=[worker_pid_event["worker"]],
-        nanny=True,
-    )
+    """Kill the job on the worker."""
+    # loop on all the processes related to the request_uid
+    for worker_pid_event in client.get_events(request_uid):
+        _, worker_pid_event = worker_pid_event
+        pid = worker_pid_event["pid"]
+        worker_ip = worker_pid_event["worker"]
+        try:
+            client.run(
+                os.kill,
+                pid,
+                signal.SIGTERM,
+                workers=[worker_ip],
+                nanny=True,
+            )
+            logger.info("killing worker", job_id=request_uid, pid=pid, worker_ip=worker_ip)
+        except (KeyError, NameError):
+            logger.warning("worker not found", job_id=request_uid, pid=pid, worker_ip=worker_ip)
 
 
 def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> None:
