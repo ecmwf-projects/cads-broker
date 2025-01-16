@@ -3,11 +3,11 @@ import hashlib
 import io
 import os
 import pickle
+import signal
 import threading
 import time
 import traceback
 from typing import Any
-import signal
 
 import attrs
 import cachetools
