@@ -779,6 +779,7 @@ def logger_kwargs(request: SystemRequest) -> dict[str, str]:
             if event.event_type == "worker_name"
         ],
         "origin": request.origin,
+        "cache_id": request.cache_id,
         "portal": request.portal,
         "entry_point": request.entry_point,
         "request_metadata": request.request_metadata,
@@ -897,9 +898,10 @@ def get_request(
         )
         return session.scalars(statement).one()
     except sqlalchemy.exc.DataError:
+        logger.error("invalid request_uid", request_uid=request_uid)
         raise InvalidRequestID(f"Invalid request_uid {request_uid}")
     except sqlalchemy.orm.exc.NoResultFound:
-        logger.exception("get_request failed")
+        logger.error("no request found", request_uid=request_uid)
         raise NoResultFound(f"No request found with request_uid {request_uid}")
 
 
