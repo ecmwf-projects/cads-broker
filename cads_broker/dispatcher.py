@@ -109,11 +109,11 @@ def kill_job_on_worker(client: distributed.Client, request_uid: str) -> None:
                 nanny=True,
             )
             logger.info(
-                "killing worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
+                "killed job on worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
             )
         except (KeyError, NameError):
             logger.warning(
-                "worker not found", job_id=request_uid, pid=pid, worker_ip=worker_ip
+                "worker not found while killing a job", job_id=request_uid, pid=pid, worker_ip=worker_ip
             )
 
 
