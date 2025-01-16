@@ -7,6 +7,7 @@ import threading
 import time
 import traceback
 from typing import Any
+import signal
 
 import attrs
 import cachetools
@@ -90,6 +91,17 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
         return tasks
 
     return client.run_on_scheduler(get_tasks_on_scheduler)
+
+
+def kill_job_on_worker(client: distributed.Client, request_uid: str) -> None:
+    worker_pid_event = client.get_events(request_uid)[0][1]
+    client.run(
+        os.kill,
+        worker_pid_event["pid"],
+        signal.SIGTERM,
+        workers=[worker_pid_event["worker"]],
+        nanny=True,
+    )
 
 
 def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> None:
@@ -420,6 +432,7 @@ class Broker:
         for request in dismissed_requests:
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
+                kill_job_on_worker(self.client, request.request_uid)
             else:
                 # if the request is not in the futures, it means that the request has been lost by the broker
                 # try to cancel the job directly on the scheduler
