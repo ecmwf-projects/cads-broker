@@ -108,9 +108,13 @@ def kill_job_on_worker(client: distributed.Client, request_uid: str) -> None:
                 workers=[worker_ip],
                 nanny=True,
             )
-            logger.info("killing worker", job_id=request_uid, pid=pid, worker_ip=worker_ip)
+            logger.info(
+                "killing worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
+            )
         except (KeyError, NameError):
-            logger.warning("worker not found", job_id=request_uid, pid=pid, worker_ip=worker_ip)
+            logger.warning(
+                "worker not found", job_id=request_uid, pid=pid, worker_ip=worker_ip
+            )
 
 
 def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> None:
