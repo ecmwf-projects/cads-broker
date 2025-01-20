@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
+import prettytable
 import sqlalchemy as sa
 import typer
 from typing_extensions import Annotated
@@ -129,6 +130,61 @@ class RequestStatus(str, enum.Enum):
 
     running = "running"
     accepted = "accepted"
+
+
+@app.command()
+def get_dynamic_priority(
+    request_uid: Optional[str] = None,
+    request_uids_file: Annotated[
+        Path, typer.Argument(exists=True, file_okay=True, dir_okay=False)
+    ]
+    | None = None,
+    interval: float = 24 * 60 * 60,
+    origin: Optional[str] = None,
+    resource_mul: float = -1.0,
+    last_completed_mul: float = 0.8,
+):
+    with database.ensure_session_obj(None)() as session:
+        users_resources = database.get_users_queue_from_processing_time(
+            session=session,
+            interval_stop=datetime.datetime.now(),
+            interval=datetime.timedelta(hours=interval / 60 / 60),
+            origin=origin,
+        )
+        if request_uid:
+            request_uids = [request_uid]
+        elif request_uids_file:
+            request_uids = request_uids_file.open().read().splitlines()
+        table = prettytable.PrettyTable(
+            [
+                "user_uid",
+                "request_uid",
+                "process_id",
+                "entry_point",
+                "user_resources_used",
+                "user_last_completed_request",
+                "priority",
+            ]
+        )
+        for request_uid in request_uids:
+            request = database.get_request(request_uid, session)
+            resources = users_resources[request.user_uid]
+            last_completed_request = database.user_last_completed_request(
+                session, request.user_uid, interval
+            )
+            table.add_row(
+                [
+                    request.user_uid,
+                    request_uid,
+                    request.process_id,
+                    request.entry_point,
+                    resources,
+                    last_completed_request,
+                    resource_mul * resources
+                    + last_completed_mul * last_completed_request,
+                ]
+            )
+        typer.echo(table)
 
 
 @app.command()
