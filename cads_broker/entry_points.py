@@ -80,10 +80,10 @@ def requests_cleaner(
     # clean system requests and (via cascading delete) events
     database.logger.info("deleting old system_requests and events...")
     curr_deleted = 1
-    with engine.begin() as conn:
-        subquery = sa.select(database.SystemRequest.request_uid).where(
-            database.SystemRequest.created_at <= time_delta
-        )
+    subquery = sa.select(database.SystemRequest.request_uid).where(
+        database.SystemRequest.created_at <= time_delta
+    )
+    with engine.connect() as conn:
         if delete_bulk_size is not None:
             # delete in sized bulks to give time to db replicas for synch
             subquery = subquery.limit(delete_bulk_size)
@@ -91,9 +91,10 @@ def requests_cleaner(
             database.SystemRequest.request_uid.in_(subquery)
         )
         while curr_deleted:
-            result = conn.execute(stmt)
-            conn.commit()
-            curr_deleted = result.rowcount
+            with conn.begin():
+                result = conn.execute(stmt)
+                conn.commit()
+                curr_deleted = result.rowcount
             database.logger.info(
                 f"{curr_deleted} old system requests "
                 f"successfully removed from the broker database."
