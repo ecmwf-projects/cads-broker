@@ -27,7 +27,7 @@ def request_contains_all(context, key, values):
     return contains_all(request_values, values)
 
 
-def request_contains_any(context, column, key, values):
+def request_contains_any(context, key, values):
     request_values = context.request.request_body.get("request").get(key)
     return contains_any(request_values, values)
 

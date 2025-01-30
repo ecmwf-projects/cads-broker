@@ -1,10 +1,13 @@
 import datetime
+import json
+import logging
 import os
 import unittest.mock
 import uuid
 from typing import Any
 
 import cacholote
+import pytest
 import sqlalchemy as sa
 from psycopg import Connection
 from typer.testing import CliRunner
@@ -147,7 +150,9 @@ def prepare_db(
         # not existing case of recent properties with old requests
 
 
-def test_requests_cleaner(session_obj: sa.orm.sessionmaker):
+def test_requests_cleaner(
+    session_obj: sa.orm.sessionmaker, caplog: pytest.LogCaptureFixture
+):
     connection_string = session_obj.kw["bind"].url
 
     # test remove nothing, older_than_days=365 by default
@@ -207,3 +212,45 @@ def test_requests_cleaner(session_obj: sa.orm.sessionmaker):
         assert len(all_requests) == 5
         assert len(all_events) == 5
         assert len(all_props) == 5
+
+    # test remove 10 requests in bulk size of 3 (all old props have old requests)
+    prepare_db(
+        session_obj,
+        num_old_props_used_by_old=10,
+        num_recent_props_used_by_recent=5,
+    )
+    caplog.clear()
+    caplog.set_level(logging.INFO)
+    result = runner.invoke(
+        entry_points.app,
+        [
+            "requests-cleaner",
+            "--connection-string",
+            connection_string,
+            "--delete-bulk-size",
+            3,
+            "--delete-sleep-time",
+            1,
+        ],
+    )
+    assert result.exit_code == 0
+    with session_obj() as session:
+        all_requests = session.query(database.SystemRequest).all()
+        all_events = session.query(database.Events).all()
+        all_props = session.query(database.AdaptorProperties).all()
+        assert len(all_requests) == 5
+        assert len(all_events) == 5
+        assert len(all_props) == 5
+    with caplog.at_level(logging.ERROR):
+        log_msgs = [json.loads(r.msg)["event"] for r in caplog.records]
+    assert log_msgs == [
+        "deleting old system_requests and events...",
+        "3 old system requests successfully removed from the broker database.",
+        "3 old system requests successfully removed from the broker database.",
+        "3 old system requests successfully removed from the broker database.",
+        "1 old system requests successfully removed from the broker database.",
+        "0 old system requests successfully removed from the broker database.",
+        "deleting old adaptor_properties...",
+        "10 old adaptor properties successfully removed from the broker database.",
+    ]
+    caplog.clear()

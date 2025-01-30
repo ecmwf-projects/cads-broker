@@ -15,6 +15,7 @@ dependencies:
 - dask-core
 - distributed
 - lz4  # dask distributed needs this to compress / de-compress
+- prettytable
 - psycopg2
 - pydantic>2
 - pydantic-settings
