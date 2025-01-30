@@ -373,7 +373,6 @@ def get_events_from_request(
 def reset_qos_rules(session: sa.orm.Session, qos):
     """Delete all QoS rules."""
     session.execute(sa.text("delete from qos_rules cascade"))
-    logger.debug(event="---------------DEBUG-------------", rules=get_qos_rules(session))
     # for rule in session.scalars(sa.select(QoSRule)):
     #     # rule.system_requests = []
     #     session.delete(rule)
