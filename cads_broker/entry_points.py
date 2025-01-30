@@ -4,6 +4,7 @@ import datetime
 import enum
 import os
 import random
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -65,7 +66,10 @@ def add_dummy_requests(
 
 @app.command()
 def requests_cleaner(
-    connection_string: Optional[str] = None, older_than_days: Optional[int] = 365
+    connection_string: Optional[str] = None,
+    older_than_days: Optional[int] = 365,
+    delete_bulk_size: Optional[int] = None,
+    delete_sleep_time: Optional[int] = None,
 ) -> None:
     """Remove records from the system_requests table older than `older_than_days`."""
     if not connection_string:
@@ -74,18 +78,29 @@ def requests_cleaner(
     engine = sa.create_engine(connection_string)
     time_delta = datetime.datetime.now() - datetime.timedelta(days=older_than_days)
     # clean system requests and (via cascading delete) events
-    with engine.begin() as conn:
-        database.logger.info("deleting old system_requests and events...")
+    database.logger.info("deleting old system_requests and events...")
+    curr_deleted = 1
+    subquery = sa.select(database.SystemRequest.request_uid).where(
+        database.SystemRequest.created_at <= time_delta
+    )
+    with engine.connect() as conn:
+        if delete_bulk_size is not None:
+            # delete in sized bulks to give time to db replicas for synch
+            subquery = subquery.limit(delete_bulk_size)
         stmt = sa.delete(database.SystemRequest).where(
-            database.SystemRequest.created_at <= time_delta
+            database.SystemRequest.request_uid.in_(subquery)
         )
-        result = conn.execute(stmt)
-        conn.commit()
-        num_requests_deleted = result.rowcount
-        database.logger.info(
-            f"{num_requests_deleted} old system requests "
-            f"successfully removed from the broker database."
-        )
+        while curr_deleted:
+            with conn.begin():
+                result = conn.execute(stmt)
+                conn.commit()
+                curr_deleted = result.rowcount
+            database.logger.info(
+                f"{curr_deleted} old system requests "
+                f"successfully removed from the broker database."
+            )
+            if delete_sleep_time is not None:
+                time.sleep(delete_sleep_time)
     # clean adaptor_properties
     with engine.begin() as conn:
         try:
