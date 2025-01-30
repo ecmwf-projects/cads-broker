@@ -179,6 +179,11 @@ class Scheduler:
             self.queue.remove(item)
             self.index[item["function"].__name__].remove(item["kwargs"]["request_uid"])
 
+    def refresh(self) -> None:
+        with self._lock:
+            self.queue = list()
+            self.index = dict()
+
 
 def perf_logger(func):
     def wrapper(*args, **kwargs):
@@ -753,6 +758,7 @@ class Broker:
                     self.qos = instantiate_qos(session_read, self.number_of_workers)
                     with self.session_maker_write() as session_write:
                         reload_qos_rules(session_write, self.qos)
+                        self.internal_scheduler.refresh()
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
