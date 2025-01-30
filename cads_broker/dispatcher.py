@@ -167,6 +167,25 @@ def perf_logger(func):
     return wrapper
 
 
+def instantiate_qos(session_read: sa.orm.Session, number_of_workers: int) -> QoS.QoS:
+    qos_config = QoSRules(number_of_workers=number_of_workers)
+    factory.register_functions()
+    rules_hash = get_rules_hash(qos_config.rules_path)
+    qos = QoS.QoS(
+        qos_config.rules,
+        qos_config.environment,
+        rules_hash=rules_hash,
+        logger=logger,
+    )
+    qos.environment.set_session(session_read)
+    return qos
+
+
+def reload_qos_rules(session: sa.orm.sessionmaker, qos: QoS.QoS) -> None:
+    perf_logger(qos.reload_rules)(session=session)
+    perf_logger(db.reset_qos_rules)(session, qos)
+
+
 class Queue:
     """A simple queue to store the requests that have been accepted by the broker.
 
@@ -263,27 +282,17 @@ class Broker:
         session_maker_write: sa.orm.sessionmaker | None = None,
     ):
         client = distributed.Client(address)
-        qos_config = QoSRules(get_number_of_workers(client))
-        factory.register_functions()
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
-        rules_hash = get_rules_hash(qos_config.rules_path)
-        qos = QoS.QoS(
-            qos_config.rules,
-            qos_config.environment,
-            rules_hash=rules_hash,
-            logger=logger,
-        )
         with session_maker_read() as session_read:
-            qos.environment.set_session(session_read)
+            qos = instantiate_qos(session_read, get_number_of_workers(client))
         with session_maker_write() as session:
-            perf_logger(qos.reload_rules)(session=session)
-            perf_logger(db.reset_qos_rules)(session, qos)
+            reload_qos_rules(session, qos)
         self = cls(
             client=client,
             session_maker_read=session_maker_read,
             session_maker_write=session_maker_write,
-            environment=qos_config.environment,
+            environment=qos.environment,
             qos=qos,
             address=address,
         )
@@ -713,12 +722,11 @@ class Broker:
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
-                if (rules_hash := get_rules_hash(self.qos.path)) != self.qos.rules_hash:
+                if get_rules_hash(self.qos.path) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
+                    self.qos = instantiate_qos(session_read, self.number_of_workers)
                     with self.session_maker_write() as session_write:
-                        self.qos.reload_rules(session=session_write)
-                        db.reset_qos_rules(session_write, self.qos)
-                    self.qos.rules_hash = rules_hash
+                        reload_qos_rules(session_write, self.qos)
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
