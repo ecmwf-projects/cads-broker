@@ -451,6 +451,10 @@ class Broker:
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
+                # notify start of request if it is not already notified
+                self.qos.notify_start_of_request(
+                    request, scheduler=self.internal_scheduler
+                )
                 continue
             elif task := scheduler_tasks.get(request.request_uid, None):
                 if (state := task["state"]) in ("memory", "erred"):
@@ -481,11 +485,27 @@ class Broker:
                             **db.logger_kwargs(request=finished_request),
                         )
                 # if the task is in processing, it means that the task is still running
-                if state == "processing":
+                elif state == "processing":
+                    # notify start of request if it is not already notified
+                    self.qos.notify_start_of_request(
+                        request, scheduler=self.internal_scheduler
+                    )
+                    continue
+                elif state == "released":
+                    # notify start of request if it is not already notified
+                    queued_request = db.requeue_request(
+                        request=request, session=session
+                    )
+                    if queued_request:
+                        self.queue.add(queued_request.request_uid, request)
+                        self.qos.notify_end_of_request(
+                            request, scheduler=self.internal_scheduler
+                        )
                     continue
             # if it doesn't find the request: re-queue it
             else:
                 request = db.get_request(request.request_uid, session=session)
+                # if the broker finds the cache_id it means that the job has finished
                 if request.cache_id:
                     successful_request = db.set_successful_request(
                         request_uid=request.request_uid,
