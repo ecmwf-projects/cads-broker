@@ -512,6 +512,7 @@ class Broker:
             # if it doesn't find the request: re-queue it
             else:
                 request = db.get_request(request.request_uid, session=session)
+                # if the broker finds the cache_id it means that the job has finished
                 if request.cache_id:
                     successful_request = db.set_successful_request(
                         request_uid=request.request_uid,
