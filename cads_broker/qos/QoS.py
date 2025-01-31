@@ -339,7 +339,7 @@ class QoS:
         """
         limits_list = []
         for limit in self.limits_for(request):
-            print(f"-------------DEBUG--------- {limit.info}: queued {len(limit.queue)}, running {limit.value}")
+            print(f"-------------DEBUG--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
             limit.increment(request.request_uid)
             limits_list.append(limit)
         scheduler.append(
