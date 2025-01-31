@@ -342,7 +342,6 @@ class QoS:
         for limit in self.limits_for(request):
             if request.request_uid not in limit.running:
                 limit.increment(request.request_uid)
-                print(f"---------START--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
                 limits_list.append(limit)
         if limits_list:
             scheduler.append(
@@ -366,7 +365,6 @@ class QoS:
         limits_list = []
         for limit in self.limits_for(request):
             limit.decrement(request.request_uid)
-            print(f"---------END--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
             limits_list.append(limit)
 
         scheduler.append(
