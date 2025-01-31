@@ -340,19 +340,21 @@ class QoS:
         """
         limits_list = []
         for limit in self.limits_for(request):
-            limit.increment(request.request_uid)
-            print(f"---------START--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
-            limits_list.append(limit)
-        scheduler.append(
-            {
-                "function": database.delete_request_qos_status,
-                "kwargs": {
-                    "rules": limits_list,
-                    "request_uid": request.request_uid,
-                },
-            }
-        )
-        # Keep track of the running request. This is needed by reconfigure(self)
+            if request.request_uid not in limit.running:
+                limit.increment(request.request_uid)
+                print(f"---------START--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
+                limits_list.append(limit)
+        if limits_list:
+            scheduler.append(
+                {
+                    "function": database.delete_request_qos_status,
+                    "kwargs": {
+                        "rules": limits_list,
+                        "request_uid": request.request_uid,
+                    },
+                }
+            )
+            # Keep track of the running request. This is needed by reconfigure(self)
 
     @locked
     def notify_end_of_request(self, request, scheduler):
@@ -363,7 +365,7 @@ class QoS:
         """
         limits_list = []
         for limit in self.limits_for(request):
-            limit.decrement()
+            limit.decrement(request.request_uid)
             print(f"---------END--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
             limits_list.append(limit)
 

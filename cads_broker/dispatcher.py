@@ -477,6 +477,10 @@ class Broker:
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:
+                # notify start of request if it is not already notified
+                self.qos.notify_start_of_request(
+                    request, scheduler=self.internal_scheduler
+                )
                 continue
             elif task := scheduler_tasks.get(request.request_uid, None):
                 if (state := task["state"]) in ("memory", "erred"):
@@ -508,6 +512,10 @@ class Broker:
                         )
                 # if the task is in processing, it means that the task is still running
                 if state == "processing":
+                    # notify start of request if it is not already notified
+                    self.qos.notify_start_of_request(
+                        request, scheduler=self.internal_scheduler
+                    )
                     continue
             # if it doesn't find the request: re-queue it
             else:
