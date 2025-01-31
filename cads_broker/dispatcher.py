@@ -150,7 +150,11 @@ def cancel_stuck_requests(client: distributed.Client, session: sa.orm.Session) -
             f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
             stuck_requests=stuck_requests,
         )
-        cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
+        try:
+            cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
+        except RuntimeError as e:
+            # avoid race condition when previous status is "released"
+            logger.error("error canceling stuck requests", error=e)
 
 
 class Scheduler:
