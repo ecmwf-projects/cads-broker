@@ -464,7 +464,6 @@ class Broker:
                 # try to cancel the job directly on the scheduler
                 cancel_jobs_on_scheduler(self.client, job_ids=[request.request_uid])
             kill_job_on_worker(self.client, request.request_uid)
-            kill_job_on_worker(self.client, request.request_uid)
             session = self.manage_dismissed_request(request, session)
         session.commit()
 
