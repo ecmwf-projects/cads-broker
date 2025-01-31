@@ -317,7 +317,6 @@ class QoS:
         limits_list = []
         for limit in self.limits_for(request):
             limit.remove_from_queue(request.request_uid)
-            print(f"---------DISMISS--------- {limit.info}: queued {len(limit.queued)}, running {limit.value}")
             limits_list.append(limit)
         if limits_list:
             scheduler.append(
