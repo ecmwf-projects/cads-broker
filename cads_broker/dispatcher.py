@@ -150,11 +150,7 @@ def cancel_stuck_requests(client: distributed.Client, session: sa.orm.Session) -
             f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
             stuck_requests=stuck_requests,
         )
-        try:
-            cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
-        except RuntimeError as e:
-            # avoid race condition when previous status is "released"
-            logger.error("error canceling stuck requests", error=e)
+        cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
 
 
 class Scheduler:
@@ -515,11 +511,22 @@ class Broker:
                             **db.logger_kwargs(request=finished_request),
                         )
                 # if the task is in processing, it means that the task is still running
-                if state == "processing":
+                elif state == "processing":
                     # notify start of request if it is not already notified
                     self.qos.notify_start_of_request(
                         request, scheduler=self.internal_scheduler
                     )
+                    continue
+                elif state == "released":
+                    # notify start of request if it is not already notified
+                    queued_request = db.requeue_request(
+                        request=request, session=session
+                    )
+                    if queued_request:
+                        self.queue.add(queued_request.request_uid, request)
+                        self.qos.notify_end_of_request(
+                            request, scheduler=self.internal_scheduler
+                        )
                     continue
             # if it doesn't find the request: re-queue it
             else:
