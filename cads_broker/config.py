@@ -42,6 +42,7 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_max_dismissed_requests: int = 100
     broker_cancel_stuck_requests_cache_ttl: int = 60
     broker_stuck_requests_limit_minutes: int = 15
+    broker_memory_error_user_visible_log: str = "Worker has been killed due to memory usage."
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):

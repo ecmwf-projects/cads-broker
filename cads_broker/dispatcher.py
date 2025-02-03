@@ -378,7 +378,7 @@ class Broker:
                         db.add_event(
                             event_type="user_visible_error",
                             request_uid=request_uid,
-                            message="Worker has been killed due to memory usage. ",
+                            message=CONFIG.broker_memory_error_user_visible_log,
                             session=session,
                         )
                         request = db.set_request_status(
