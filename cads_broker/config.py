@@ -46,8 +46,8 @@ class BrokerConfig(pydantic_settings.BaseSettings):
         "Worker has been killed due to memory usage."
     )
     broker_workers_gap: int = (
-        10
-    )  # max discrepancy of number of workers before qos rules are reloaded
+        10  # max discrepancy of workers number before qos rules are reloaded
+    )
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):
