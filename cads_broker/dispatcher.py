@@ -848,6 +848,13 @@ class Broker:
                 with self.session_maker_write(expire_on_commit=False) as session_write:
                     # reload qos rules if the number of workers has changed
                     self.update_number_of_workers(session_write)
+                    self.queue.add_accepted_requests(
+                        db.get_accepted_requests(
+                            session=session_write,
+                            last_created_at=self.queue.last_created_at,
+                            limit=CONFIG.broker_max_accepted_requests,
+                        )
+                    )
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
