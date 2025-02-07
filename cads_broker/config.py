@@ -43,6 +43,7 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_cancel_stuck_requests_cache_ttl: int = 60
     broker_stuck_requests_limit_minutes: int = 15
     broker_memory_error_user_visible_log: str = "Worker has been killed due to memory usage."
+    broker_workers_gap: int = 8 * 10  # max discrepancy of number of workers before qos rules are reloaded
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):

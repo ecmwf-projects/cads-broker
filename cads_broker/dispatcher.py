@@ -417,6 +417,16 @@ class Broker:
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
+    def update_number_of_workers(self, session_write):
+        """Reload qos rules if number of workers has changed by a number greater than BROKER_WORKERS_GAP."""
+        if (
+            abs(self.environment.number_of_workers - get_number_of_workers(self.client))
+            > CONFIG.broker_workers_gap
+        ):
+            self.set_number_of_workers()
+            reload_qos_rules(session_write, self.qos)
+            self.internal_scheduler.refresh()
+
     def set_request_error_status(
         self, exception, request_uid, session
     ) -> db.SystemRequest:
@@ -825,7 +835,9 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if get_rules_hash(self.qos.path) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos = instantiate_qos(session_read, self.environment.number_of_workers)
+                    self.qos = instantiate_qos(
+                        session_read, self.environment.number_of_workers
+                    )
                     with self.session_maker_write() as session_write:
                         reload_qos_rules(session_write, self.qos)
                         self.internal_scheduler.refresh()
@@ -834,17 +846,7 @@ class Broker:
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
                     # reload qos rules if the number of workers has changed
-                    if self.environment.number_of_workers != get_number_of_workers(self.client):
-                        self.set_number_of_workers()
-                        reload_qos_rules(session_write, self.qos)
-                        self.internal_scheduler.refresh()
-                    self.queue.add_accepted_requests(
-                        db.get_accepted_requests(
-                            session=session_write,
-                            last_created_at=self.queue.last_created_at,
-                            limit=CONFIG.broker_max_accepted_requests,
-                        )
-                    )
+                    self.update_number_of_workers(session_write)
                     self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
@@ -869,7 +871,9 @@ class Broker:
                 cancel_stuck_requests(client=self.client, session=session_read)
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
-                available_workers = self.environment.number_of_workers - running_requests
+                available_workers = (
+                    self.environment.number_of_workers - running_requests
+                )
                 if queue_length > 0:
                     logger.info(
                         "broker info",
