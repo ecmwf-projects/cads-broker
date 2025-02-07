@@ -652,21 +652,18 @@ def get_qos_status_from_request(
 def requeue_request(
     request: SystemRequest,
     session: sa.orm.Session,
-) -> SystemRequest | None:
-    if request.status == "running":
-        # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
-        # FIXME: use a specific column for resubmit_number
-        metadata = dict(request.request_metadata)
-        metadata.update(
-            {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
-        )
-        request.request_metadata = metadata
-        request.status = "accepted"
-        session.commit()
-        logger.info("requeueing request", **logger_kwargs(request=request))
-        return request
-    else:
-        return None
+) -> SystemRequest:
+    # ugly implementation because sqlalchemy doesn't allow to directly update JSONB
+    # FIXME: use a specific column for resubmit_number
+    metadata = dict(request.request_metadata)
+    metadata.update(
+        {"resubmit_number": request.request_metadata.get("resubmit_number", 0) + 1}
+    )
+    request.request_metadata = metadata
+    request.status = "accepted"
+    session.commit()
+    logger.info("requeueing request", **logger_kwargs(request=request))
+    return request
 
 
 def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Session):
@@ -680,11 +677,9 @@ def set_request_cache_id(request_uid: str, cache_id: int, session: sa.orm.Sessio
 def set_successful_request(
     request_uid: str,
     session: sa.orm.Session,
-) -> SystemRequest | None:
+) -> SystemRequest:
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
-    if request.status == "successful":
-        return None
     request.status = "successful"
     request.finished_at = sa.func.now()
     session.commit()
