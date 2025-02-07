@@ -426,6 +426,7 @@ class Broker:
             self.set_number_of_workers()
             reload_qos_rules(session_write, self.qos)
             self.internal_scheduler.refresh()
+            self.queue.reset()
 
     def set_request_error_status(
         self, exception, request_uid, session
@@ -842,6 +843,7 @@ class Broker:
                     with self.session_maker_write() as session_write:
                         reload_qos_rules(session_write, self.qos)
                         self.internal_scheduler.refresh()
+                        self.queue.reset()
                 self.qos.environment.set_session(session_read)
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
