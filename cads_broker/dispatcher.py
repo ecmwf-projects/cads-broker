@@ -409,8 +409,7 @@ class Broker:
         )
         return self
 
-    @property
-    def number_of_workers(self):
+    def set_number_of_workers(self):
         if self.client.scheduler is None:
             logger.info("Reconnecting to dask scheduler...")
             self.client = distributed.Client(self.address)
@@ -826,7 +825,7 @@ class Broker:
             with self.session_maker_read() as session_read:
                 if get_rules_hash(self.qos.path) != self.qos.rules_hash:
                     logger.info("reloading qos rules")
-                    self.qos = instantiate_qos(session_read, self.number_of_workers)
+                    self.qos = instantiate_qos(session_read, self.environment.number_of_workers)
                     with self.session_maker_write() as session_write:
                         reload_qos_rules(session_write, self.qos)
                         self.internal_scheduler.refresh()
@@ -834,6 +833,11 @@ class Broker:
                 # expire_on_commit=False is used to detach the accepted requests without an error
                 # this is not a problem because accepted requests cannot be modified in this loop
                 with self.session_maker_write(expire_on_commit=False) as session_write:
+                    # reload qos rules if the number of workers has changed
+                    if self.environment.number_of_workers != get_number_of_workers(self.client):
+                        self.set_number_of_workers()
+                        reload_qos_rules(session_write, self.qos)
+                        self.internal_scheduler.refresh()
                     self.queue.add_accepted_requests(
                         db.get_accepted_requests(
                             session=session_write,
@@ -865,13 +869,13 @@ class Broker:
                 cancel_stuck_requests(client=self.client, session=session_read)
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
-                available_workers = self.number_of_workers - running_requests
+                available_workers = self.environment.number_of_workers - running_requests
                 if queue_length > 0:
                     logger.info(
                         "broker info",
                         available_workers=available_workers,
                         running_requests=running_requests,
-                        number_of_workers=self.number_of_workers,
+                        number_of_workers=self.environment.number_of_workers,
                         futures=len(self.futures),
                     )
                     if available_workers > 0:
