@@ -16,7 +16,7 @@ classifiers = [
 dependencies = [
   "alembic",
   "attrs",
-  "boto3<1.36",
+  "boto3",
   "cacholote",
   "distributed",
   "sqlalchemy>=2.0.9",
