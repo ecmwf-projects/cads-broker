@@ -10,7 +10,7 @@ channels:
 dependencies:
 - alembic
 - attrs
-- boto3<1.36
+- boto3
 - cachetools
 - dask-core
 - distributed
