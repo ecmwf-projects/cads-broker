@@ -757,6 +757,7 @@ class Broker:
                     request_uid=request.request_uid,
                     message=exception.args[0],
                     session=session,
+                    commit=False,
                 )
                 request = db.get_request(request.request_uid, session=session)
                 request.status = "failed"
