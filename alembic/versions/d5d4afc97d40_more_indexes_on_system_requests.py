@@ -26,6 +26,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    alembic.op.drop_index("idx_system_requests_status")
-    alembic.op.drop_index("idx_system_requests_created_at")
-    alembic.op.drop_index("idx_system_requests_finished_at")
+    alembic.op.drop_index("idx_system_requests_status", if_exists=True)
+    alembic.op.drop_index("idx_system_requests_created_at", if_exists=True)
+    alembic.op.drop_index("idx_system_requests_finished_at", if_exists=True)
+    alembic.op.drop_index("ix_system_requests_status", if_exists=True)
+    alembic.op.drop_index("ix_system_requests_created_at", if_exists=True)
+    alembic.op.drop_index("ix_system_requests_finished_at", if_exists=True)
