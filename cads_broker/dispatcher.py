@@ -747,7 +747,6 @@ class Broker:
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
         """Cache the qos properties of the requests."""
         # copy list of requests to avoid RuntimeError: dictionary changed size during iteration
-        logger.info(f"caching qos properties for {len(requests)} requests")
         for request in list(requests):
             try:
                 self.qos._properties(request, check_permissions=True)
