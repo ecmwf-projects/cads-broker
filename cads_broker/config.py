@@ -28,7 +28,7 @@ dbsettings = None
 class BrokerConfig(pydantic_settings.BaseSettings):
     broker_priority_algorithm: str = "legacy"
     broker_priority_interval_hours: int = 24
-    broker_get_number_of_workers_cache_time: int = 60 * 10
+    broker_get_number_of_workers_cache_time: int = 60
     broker_qos_rules_cache_time: int = 10
     broker_get_tasks_from_scheduler_cache_time: int = 1
     broker_rules_path: str = "/src/rules.qos"
