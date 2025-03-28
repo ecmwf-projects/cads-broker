@@ -428,6 +428,7 @@ class Broker:
             > CONFIG.broker_workers_gap
         ):
             self.set_number_of_workers()
+            logger.info("qos_reload", reason="number_of_workers_changed")
             reload_qos_rules(session_write, self.qos)
             self.internal_scheduler.refresh()
             self.queue.reset()
@@ -840,7 +841,7 @@ class Broker:
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
                 if get_rules_hash(self.qos.path) != self.qos.rules_hash:
-                    logger.info("reloading qos rules")
+                    logger.info("qos_reload", reason="rules_file_changed")
                     self.qos = instantiate_qos(
                         session_read, self.environment.number_of_workers
                     )
