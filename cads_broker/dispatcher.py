@@ -414,9 +414,6 @@ class Broker:
         return self
 
     def set_number_of_workers(self):
-        if self.client.scheduler is None:
-            logger.info("Reconnecting to dask scheduler...")
-            self.client = distributed.Client(self.address)
         number_of_workers = get_number_of_workers(client=self.client)
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
@@ -428,6 +425,7 @@ class Broker:
             > CONFIG.broker_workers_gap
         ):
             self.set_number_of_workers()
+            logger.info("qos_reload", reason="number_of_workers_changed")
             reload_qos_rules(session_write, self.qos)
             self.internal_scheduler.refresh()
             self.queue.reset()
@@ -837,11 +835,14 @@ class Broker:
         """Run the broker loop."""
         while True:
             start_loop = time.perf_counter()
-            # reset the cache of the qos functions
+            # check if the scheduler is alive
+            if self.client.scheduler is None:
+                logger.info("Reconnecting to dask scheduler...")
+                self.client = distributed.Client(self.address)            # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
                 if get_rules_hash(self.qos.path) != self.qos.rules_hash:
-                    logger.info("reloading qos rules")
+                    logger.info("qos_reload", reason="rules_file_changed")
                     self.qos = instantiate_qos(
                         session_read, self.environment.number_of_workers
                     )
