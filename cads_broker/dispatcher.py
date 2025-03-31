@@ -414,9 +414,6 @@ class Broker:
         return self
 
     def set_number_of_workers(self):
-        if self.client.scheduler is None:
-            logger.info("Reconnecting to dask scheduler...")
-            self.client = distributed.Client(self.address)
         number_of_workers = get_number_of_workers(client=self.client)
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
@@ -837,6 +834,10 @@ class Broker:
         """Run the broker loop."""
         while True:
             start_loop = time.perf_counter()
+            # check if the scheduler is alive
+            if self.client.scheduler is None:
+                logger.info("Reconnecting to dask scheduler...")
+                self.client = distributed.Client(self.address)
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
