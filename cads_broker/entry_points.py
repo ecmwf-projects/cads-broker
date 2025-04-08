@@ -326,13 +326,12 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
 
 @app.command()
 def run(
-    scheduler_url: Annotated[Optional[List[str]], typer.Option()] = ["scheduler:8786"],
+    scheduler_url: List[str] = ["scheduler:8786"],
 ) -> None:
     """Start the broker.
 
     Parameters
     ----------
-    max_running_requests: maximum number of requests to run in parallel
     scheduler_url: schedulers' urls
     """
     typer.echo(
