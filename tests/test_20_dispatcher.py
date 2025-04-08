@@ -54,10 +54,10 @@ def test_broker_sync_database(
         rules=Rule.RuleSet(), environment=environment, rules_hash="", logger=logger
     )
     broker = dispatcher.Broker(
-        client=CLIENT,
+        clients={"scheduler-1": CLIENT},
         environment=environment,
         qos=qos,
-        address="scheduler-address",
+        schedulers=["scheduler-1"],
         session_maker_read=session_obj,
         session_maker_write=session_obj,
     )

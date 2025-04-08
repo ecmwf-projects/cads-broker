@@ -719,6 +719,7 @@ def set_request_status(
     error_reason: str | None = None,
     resubmit: bool | None = None,
     priority: float | None = None,
+    scheduler: str | None = None,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -733,6 +734,9 @@ def set_request_status(
         request.request_metadata = metadata
     if priority is not None:
         metadata.update({"priority": priority})
+        request.request_metadata = metadata
+    if scheduler is not None:
+        metadata.update({"scheduler": scheduler})
         request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
