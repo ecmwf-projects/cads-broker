@@ -17,11 +17,15 @@ dependencies = [
   "alembic",
   "attrs",
   "boto3",
+  "cachetools>=5.5.2",
   "cacholote",
   "distributed",
+  "prettytable>=3.16.0",
+  "psycopg2>=2.9.10",
+  "psycopg[binary]>=3.2.6",
   "sqlalchemy>=2.0.9",
   "sqlalchemy-utils",
-  "typer"
+  "typer",
 ]
 description = "CADS broker service"
 dynamic = ["version"]
@@ -81,3 +85,10 @@ write_to_template = '''
 # Do not change! Do not track in version control!
 __version__ = "{version}"
 '''
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-mock>=3.14.0",
+    "pytest-postgresql>=7.0.1",
+]
