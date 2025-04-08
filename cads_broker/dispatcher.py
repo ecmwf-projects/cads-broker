@@ -896,7 +896,6 @@ class Broker:
                 if client.scheduler is None:
                     logger.info(f"Reconnecting to dask scheduler {scheduler}")
                     self.schedulers[scheduler] = distributed.Client(scheduler)
-            logger.info("schedulers", schedulers=self.schedulers.keys())
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
