@@ -862,6 +862,7 @@ class Broker:
         for scheduler in random.sample(list(self.schedulers.keys()), k=len(self.schedulers)):
             client = self.schedulers[scheduler]
             resources = request.request_metadata.get("resources", {})
+            request.request_metadata["scheduler"] = scheduler
             # check if the resources are available on the workers pool
             if set(resources.keys()).issubset(get_workers_resources(client)):
                 request.request_metadata["scheduler"] = scheduler
@@ -875,7 +876,7 @@ class Broker:
                         user_uid=request.user_uid,
                         hostname=os.getenv("CDS_PROJECT_URL"),
                     ),
-                    resources=request.request_metadata.get("resources", {}),
+                    resources=resources,
                     metadata=request.request_metadata,
                 )
                 distributed.fire_and_forget(future)
