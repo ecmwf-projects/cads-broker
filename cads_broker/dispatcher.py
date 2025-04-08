@@ -315,6 +315,7 @@ def set_running_request(
     priority: int | None,
     qos: QoS.QoS,
     queue: Queue,
+    scheduler: str,
     internal_scheduler: Scheduler,
     session: sa.orm.Session,
 ) -> db.SystemRequest:
@@ -323,6 +324,7 @@ def set_running_request(
         request_uid=request.request_uid,
         status="running",
         priority=priority,
+        scheduler=scheduler,
         session=session,
     )
     qos.notify_start_of_request(request, scheduler=internal_scheduler)
@@ -850,14 +852,6 @@ class Broker:
         priority: int | None = None,
     ) -> None:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
-        request = set_running_request(
-            request=request,
-            priority=priority,
-            queue=self.queue,
-            qos=self.qos,
-            internal_scheduler=self.internal_scheduler,
-            session=session,
-        )
         # randomly select a scheduler to submit the request
         for scheduler in random.sample(list(self.schedulers.keys()), k=len(self.schedulers)):
             client = self.schedulers[scheduler]
@@ -865,7 +859,15 @@ class Broker:
             request.request_metadata["scheduler"] = scheduler
             # check if the resources are available on the workers pool
             if set(resources.keys()).issubset(get_workers_resources(client)):
-                request.request_metadata["scheduler"] = scheduler
+                request = set_running_request(
+                    request=request,
+                    priority=priority,
+                    queue=self.queue,
+                    qos=self.qos,
+                    scheduler=scheduler,
+                    internal_scheduler=self.internal_scheduler,
+                    session=session,
+                )
                 future = client.submit(
                     worker.submit_workflow,
                     key=request.request_uid,
