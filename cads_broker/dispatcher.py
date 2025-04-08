@@ -139,7 +139,9 @@ def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> N
             )
 
 
-def cancel_jobs_on_scheduler(client: distributed.Client | None, job_ids: list[str]) -> None:
+def cancel_jobs_on_scheduler(
+    client: distributed.Client | None, job_ids: list[str]
+) -> None:
     """Cancel jobs on the dask scheduler.
 
     This function is executed on the scheduler pod. This just cancel the jobs on the scheduler.
@@ -174,7 +176,7 @@ def cancel_stuck_requests(
         )
         if stuck_requests:
             logger.info(
-                f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} minutes",
+                f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} mins",
                 stuck_requests=stuck_requests,
             )
             cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
@@ -427,7 +429,9 @@ class Broker:
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
-            qos = instantiate_qos(session_read, get_number_of_workers(schedulers.values()))
+            qos = instantiate_qos(
+                session_read, get_number_of_workers(schedulers.values())
+            )
         with session_maker_write() as session:
             reload_qos_rules(session, qos)
         self = cls(
@@ -449,7 +453,8 @@ class Broker:
         """Reload qos rules if number of workers has changed by a number greater than BROKER_WORKERS_GAP."""
         if (
             abs(
-                self.environment.number_of_workers - get_number_of_workers(self.schedulers.values())
+                self.environment.number_of_workers
+                - get_number_of_workers(self.schedulers.values())
             )
             > CONFIG.broker_workers_gap
         ):
@@ -853,7 +858,9 @@ class Broker:
     ) -> None:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
         # randomly select a scheduler to submit the request
-        for scheduler in random.sample(list(self.schedulers.keys()), k=len(self.schedulers)):
+        for scheduler in random.sample(
+            list(self.schedulers.keys()), k=len(self.schedulers)
+        ):
             client = self.schedulers[scheduler]
             resources = request.request_metadata.get("resources", {})
             request.request_metadata["scheduler"] = scheduler
@@ -945,7 +952,9 @@ class Broker:
                         self.queue.values(), session_write
                     )
 
-                cancel_stuck_requests(clients=self.schedulers.values(), session=session_read)
+                cancel_stuck_requests(
+                    clients=self.schedulers.values(), session=session_read
+                )
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
                 available_workers = (
