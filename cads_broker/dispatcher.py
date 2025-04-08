@@ -417,7 +417,7 @@ class Broker:
     @classmethod
     def from_urls(
         cls,
-        scheduler_url=["scheduler:8786"],
+        scheduler_url: list[str] = ["scheduler:8786"],
         session_maker_read: sa.orm.sessionmaker | None = None,
         session_maker_write: sa.orm.sessionmaker | None = None,
     ):
