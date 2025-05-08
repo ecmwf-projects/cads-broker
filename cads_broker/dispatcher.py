@@ -423,7 +423,7 @@ class Broker:
         if (
             abs(self.environment.number_of_workers - get_number_of_workers(self.client))
             > CONFIG.broker_workers_gap
-        ):
+        ) or self.environment.number_of_workers == 0:
             self.set_number_of_workers()
             logger.info("qos_reload", reason="number_of_workers_changed")
             reload_qos_rules(session_write, self.qos)
