@@ -14,7 +14,7 @@ import sqlalchemy.exc
 import sqlalchemy.orm.exc
 import sqlalchemy_utils
 import structlog
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, insert
 from typing_extensions import Iterable
 
 import alembic.command
@@ -800,19 +800,15 @@ def ensure_adaptor_properties(
     session: sa.orm.Session,
 ) -> None:
     """Create adaptor properties (if not exists) or update its timestamp."""
-    try:
-        adaptor_properties = AdaptorProperties(hash=hash, config=config, form=form)
-        session.add(adaptor_properties)
-        session.commit()
-    except sa.exc.IntegrityError:  # hash already present
-        session.rollback()
-        statement = (
-            AdaptorProperties.__table__.update()
-            .where(AdaptorProperties.__table__.c.hash == hash)
-            .values(timestamp=datetime.datetime.now())
-        )
-        session.execute(statement)
-        session.commit()
+    insert_stmt = insert(AdaptorProperties.__table__).values(
+        hash=hash, config=config, form=form
+    )
+    do_update_stmt = insert_stmt.on_conflict_do_update(
+        constraint="adaptor_properties_pkey",
+        set_=dict(timestamp=datetime.datetime.now()),
+    )
+    session.execute(do_update_stmt)
+    session.commit()
 
 
 def add_event(
