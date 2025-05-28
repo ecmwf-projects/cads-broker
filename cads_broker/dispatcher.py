@@ -49,13 +49,18 @@ CONFIG = config.BrokerConfig()
     ),
     info=True,
 )
-def get_number_of_workers(clients: list[distributed.Client]) -> int:
+def get_number_of_workers(client: distributed.Client) -> int:
+    workers = client.scheduler_info().get("workers", {})
+    number_of_workers = len(
+        [w for w in workers.values() if w.get("status", None) == "running"]
+    )
+    return number_of_workers
+
+
+def get_total_number_of_workers(clients: Iterable[distributed.Client]) -> int:
     number_of_workers = 0
     for client in clients:
-        workers = client.scheduler_info().get("workers", {})
-        number_of_workers += len(
-            [w for w in workers.values() if w.get("status", None) == "running"]
-        )
+        number_of_workers += get_number_of_workers(client)
     return number_of_workers
 
 
@@ -299,6 +304,28 @@ class Queue:
             self.set_default_last_created_at()
 
 
+def plackett_luce_shuffle(elements: Iterable[str], weights: Iterable[int]) -> list[Any]:
+    # see https://statisticaloddsandends.wordpress.com/2024/04/24/what-is-the-plackett-luce-model/
+    # copy elements and weights to avoid RuntimeError
+    elements = list(elements)
+    weights = list(weights)
+    result = []
+
+    while elements:
+        total_weight = sum(weight for weight in weights)
+        r = random.uniform(0, total_weight)
+        upto = 0
+        for i, (element, weight) in enumerate(zip(elements, weights)):
+            upto += weight
+            if r <= upto:
+                result.append(element)
+                del elements[i]
+                del weights[i]
+                break
+
+    return result
+
+
 class QoSRules:
     def __init__(self, number_of_workers) -> None:
         self.environment = Environment.Environment(number_of_workers=number_of_workers)
@@ -430,7 +457,7 @@ class Broker:
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
             qos = instantiate_qos(
-                session_read, get_number_of_workers(schedulers.values())
+                session_read, get_total_number_of_workers(schedulers.values())
             )
         with session_maker_write() as session:
             reload_qos_rules(session, qos)
@@ -445,7 +472,9 @@ class Broker:
         return self
 
     def set_number_of_workers(self):
-        number_of_workers = get_number_of_workers(clients=self.schedulers.values())
+        number_of_workers = get_total_number_of_workers(
+            clients=self.schedulers.values()
+        )
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
 
@@ -454,7 +483,7 @@ class Broker:
         if (
             abs(
                 self.environment.number_of_workers
-                - get_number_of_workers(self.schedulers.values())
+                - get_total_number_of_workers(self.schedulers.values())
             )
             > CONFIG.broker_workers_gap
         ):
@@ -857,9 +886,10 @@ class Broker:
         priority: int | None = None,
     ) -> None:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
-        # randomly select a scheduler to submit the request
-        for scheduler in random.sample(
-            list(self.schedulers.keys()), k=len(self.schedulers)
+        # randomly shuffle the schedulers to balance the load based on the number of workers
+        for scheduler in plackett_luce_shuffle(
+            self.schedulers.keys(),
+            [get_number_of_workers(client) for client in self.schedulers.values()],
         ):
             client = self.schedulers[scheduler]
             resources = request.request_metadata.get("resources", {})
