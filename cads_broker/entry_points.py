@@ -318,9 +318,10 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
     }
     download_buckets: List[str] = object_storage.parse_data_volumes_config()
     for download_bucket in download_buckets:
-        object_storage.create_download_bucket(
-            download_bucket, object_storage_url, **storage_kws
-        )
+        if download_bucket.startswith("s3://"):
+            object_storage.create_download_bucket(
+                download_bucket, object_storage_url, **storage_kws
+            )
     print("successfully created the cache areas in the object storage.")
 
 
