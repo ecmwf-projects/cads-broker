@@ -427,7 +427,6 @@ class Broker:
     schedulers: dict[str, distributed.Client]
     environment: Environment.Environment
     qos: QoS.QoS
-    scheduler_url: str
     session_maker_read: sa.orm.sessionmaker
     session_maker_write: sa.orm.sessionmaker
     wait_time: float = CONFIG.broker_wait_time
@@ -467,7 +466,6 @@ class Broker:
             session_maker_write=session_maker_write,
             environment=qos.environment,
             qos=qos,
-            scheduler_url=scheduler_url,
         )
         return self
 
