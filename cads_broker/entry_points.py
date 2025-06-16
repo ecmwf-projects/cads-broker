@@ -297,7 +297,9 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     force: if True, drop the database structure and build again from scratch
     """
-    database.logger.info("starting creation/updating of broker db structure and storage cache area.")
+    database.logger.info(
+        "starting creation/updating of broker db structure and storage cache area."
+    )
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
@@ -324,7 +326,9 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
                 download_bucket, object_storage_url, **storage_kws
             )
     database.logger.info("successfully created the cache areas in the object storage.")
-    database.logger.info("end of creation/updating of broker db structure and storage cache area.")
+    database.logger.info(
+        "end of creation/updating of broker db structure and storage cache area."
+    )
 
 
 @app.command()
