@@ -596,7 +596,7 @@ class Broker:
         )
         previous_status = dismission_metadata.get("previous_status", "accepted")
         if dismission_metadata.get("reason", "DismissedRequest") == "PermissionError":
-            request.status = "failed"
+            request.status = "rejected"
         else:
             request.status = "deleted"
         if previous_status == "running":
