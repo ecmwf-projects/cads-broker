@@ -840,7 +840,7 @@ class Broker:
                     commit=False,
                 )
                 request = db.get_request(request.request_uid, session=session)
-                request.status = "failed"
+                request.status = "rejected"
                 request.finished_at = datetime.datetime.now()
                 request.response_error = {
                     "reason": "PermissionError",
