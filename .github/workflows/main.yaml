@@ -15,11 +15,8 @@ on:
 
 
 jobs:
-  build_helm_chart:
+  Build docker image:
     name: Build docker image
     uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
     with:
       dockerfile: 'Broker.Dockerfile'
-    secrets:
-      ECMWF_DOCKER_REGISTRY_USERNAME: ${{ secrets.HARBOR_USER }}
-      ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN: ${{ secrets.HARBOR_TOKEN }}
