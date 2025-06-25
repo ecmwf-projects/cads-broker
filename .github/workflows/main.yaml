@@ -15,7 +15,7 @@ on:
 
 
 jobs:
-  Build docker image:
+  build_docker_image:
     name: Build docker image
     uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
     with:
