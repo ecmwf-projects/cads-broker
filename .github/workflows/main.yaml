@@ -1,0 +1,25 @@
+name: Build cads-broker
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - cicdRefactor
+    tags:
+      - "v*"
+    pull_request:
+      branches:
+        - main
+
+
+
+jobs:
+  build_helm_chart:
+    name: Build docker image
+    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
+    with:
+      dockerfile: 'Broker.Dockerfile'
+    secrets:
+      ECMWF_DOCKER_REGISTRY_USERNAME: ${{ secrets.ECMWF_DOCKER_REGISTRY_USERNAME }}
+      ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN: ${{ secrets.ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN }}
