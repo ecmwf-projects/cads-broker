@@ -21,5 +21,3 @@ jobs:
     with:
       dockerfile: 'Broker.Dockerfile'
     secrets: inherit
-    #   ECMWF_DOCKER_REGISTRY_USERNAME: ${{ secrets.HARBOR_USER }}
-    #   ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN: ${{ secrets.HARBOR_TOKEN }}
