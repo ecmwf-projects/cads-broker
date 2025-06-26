@@ -20,4 +20,6 @@ jobs:
     uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
     with:
       dockerfile: 'Broker.Dockerfile'
-    secrets: inherit
+    secrets:
+      ECMWF_DOCKER_REGISTRY_USERNAME: ${{ secrets.HARBOR_USER }}
+      ECMWF_DOCKER_REGISTRY_ACCESS_TOKEN: ${{ secrets.HARBOR_TOKEN }}
