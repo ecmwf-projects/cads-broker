@@ -1,4 +1,4 @@
-name: Build cads-broker dockerfile
+name: Build cads-broker
 
 on:
   workflow_dispatch:
