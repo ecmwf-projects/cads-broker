@@ -20,4 +20,5 @@ jobs:
     uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
     with:
       dockerfile: 'Broker.Dockerfile'
+      chart-repo: 'ecmwf/dss-broker-chart'
     secrets: inherit
