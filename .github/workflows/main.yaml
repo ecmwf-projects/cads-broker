@@ -1,0 +1,24 @@
+name: Build cads-broker docker image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - cicdRefactor
+    tags:
+      - "v*"
+    pull_request:
+      branches:
+        - main
+
+
+
+jobs:
+  build_docker_image:
+    name: Build docker image
+    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
+    with:
+      dockerfile: 'Broker.Dockerfile'
+      chart-repo: 'ecmwf/dss-broker-chart'
+    secrets: inherit
