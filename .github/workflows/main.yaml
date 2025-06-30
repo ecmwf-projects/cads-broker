@@ -21,4 +21,6 @@ jobs:
     with:
       dockerfile: 'Broker.Dockerfile'
       chart-repo: 'ecmwf/dss-broker-chart'
+      repositories: |
+        ecmwf-projects/cads-worker
     secrets: inherit
