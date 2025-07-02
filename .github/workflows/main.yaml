@@ -25,4 +25,5 @@ jobs:
       package-ref: "CADS_BROKER_REF"
       repositories: |
         ecmwf-projects/cads-worker
+        ecmwf-projects/cads-processing-api-service
     secrets: inherit
