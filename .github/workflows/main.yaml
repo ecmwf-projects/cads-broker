@@ -8,9 +8,9 @@ on:
       - cicdRefactor
     tags:
       - "v*"
-    pull_request:
-      branches:
-        - main
+  pull_request:
+    branches:
+      - main
 
 
 
@@ -21,7 +21,6 @@ jobs:
     with:
       dockerfile: 'Broker.Dockerfile'
       chart-repo: 'ecmwf/dss-broker-chart'
-      enable-package-update: true
       package-ref: "CADS_BROKER_REF"
       repositories: |
         ecmwf-projects/cads-worker
