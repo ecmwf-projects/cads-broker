@@ -26,7 +26,14 @@ BaseModel = sa.orm.declarative_base()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 status_enum = sa.Enum(
-    "accepted", "running", "failed", "successful", "dismissed", "deleted", "rejected", name="status"
+    "accepted",
+    "running",
+    "failed",
+    "successful",
+    "dismissed",
+    "deleted",
+    "rejected",
+    name="status",
 )
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
