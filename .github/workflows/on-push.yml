@@ -151,6 +151,8 @@ jobs:
         include:
         - python-version: '3.11'
           extra: -integration
+        - python-version: '3.13'
+          extra: -integration
 
     steps:
     - uses: actions/checkout@v5
