@@ -19,6 +19,7 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering"
 ]
 dependencies = [
@@ -88,6 +89,7 @@ convention = "numpy"
 packages = ["cads_broker"]
 
 [tool.setuptools_scm]
+fallback_version = "999"
 write_to = "cads_broker/version.py"
 write_to_template = '''
 # Do not change! Do not track in version control!

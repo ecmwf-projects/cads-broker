@@ -6,6 +6,7 @@ CADS broker service.
 :caption: 'Contents:'
 :maxdepth: 2
 
+README.md
 API Reference <_api/cads_broker/index>
 ```
 

@@ -1,4 +1,4 @@
-"""add rejected status to status enum
+"""add rejected status to status enum.
 
 Revision ID: a52001eed6e1
 Revises: a4e8be715296
