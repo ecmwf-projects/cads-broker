@@ -16,7 +16,7 @@ on:
 jobs:
   build_docker_image:
     name: Build docker image
-    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml
+    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@main
     with:
       dockerfile: 'Broker.Dockerfile'
       chart-repo: 'ecmwf/dss-broker-chart'
