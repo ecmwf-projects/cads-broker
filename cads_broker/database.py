@@ -26,7 +26,14 @@ BaseModel = sa.orm.declarative_base()
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 status_enum = sa.Enum(
-    "accepted", "running", "failed", "successful", "dismissed", "deleted", name="status"
+    "accepted",
+    "running",
+    "failed",
+    "successful",
+    "dismissed",
+    "deleted",
+    "rejected",
+    name="status",
 )
 DISMISSED_MESSAGE = os.getenv(
     "DISMISSED_MESSAGE", "The request has been dismissed by the system."
@@ -740,7 +747,7 @@ def set_request_status(
         request.request_metadata = metadata
     if status == "successful":
         request.finished_at = sa.func.now()
-    elif status == "failed":
+    elif status in ("failed", "rejected"):
         request.finished_at = sa.func.now()
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
