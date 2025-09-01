@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - cicdRefactor
     tags:
       - "v*"
   pull_request:
@@ -17,7 +16,7 @@ on:
 jobs:
   build_docker_image:
     name: Build docker image
-    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml@helm-chart-pipeline
+    uses: ecmwf-projects/cads-build-farm/.github/workflows/docker-build.yaml
     with:
       dockerfile: 'Broker.Dockerfile'
       chart-repo: 'ecmwf/dss-broker-chart'
