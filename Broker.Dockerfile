@@ -10,6 +10,7 @@ COPY environment.${MODE} /src/environment
 COPY environment-common.yml /src/environment-common.yml
 COPY default-enviroment.yaml /src/environment.yml
 COPY environment-dask.yml /src/environment-dask.yml
+COPY . /src/cads-broker/
 
 RUN conda install -y -n base -c conda-forge gitpython typer conda-merge
 
@@ -20,7 +21,6 @@ RUN set -a && source environment \
     && python ./git-clone-repos.py --default-branch \
     cacholote \
     cads-adaptors \
-    cads-broker \
     cads-worker
 
 # NOTE: no environment for cads-adaptors as we only use basic features
