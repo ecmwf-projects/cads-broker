@@ -20,6 +20,7 @@ jobs:
       dockerfile: 'Broker.Dockerfile'
       chart-repo: 'ecmwf/dss-broker-chart'
       package-ref: "CADS_BROKER_REF"
+      image-name: broker
       repositories: |
         ecmwf-projects/cads-worker
         ecmwf-projects/cads-processing-api-service
