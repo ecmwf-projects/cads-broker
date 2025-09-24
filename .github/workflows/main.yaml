@@ -24,4 +24,5 @@ jobs:
       repositories: |
         ecmwf-projects/cads-worker
         ecmwf-projects/cads-processing-api-service
+        ecmwf/dss-operations-chart
     secrets: inherit
