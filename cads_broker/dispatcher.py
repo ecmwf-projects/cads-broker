@@ -75,7 +75,7 @@ def create_dask_client(scheduler_url):
 
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.broker_get_number_of_workers_cache_time
+        maxsize=1024, ttl=CONFIG.broker_get_workers_resources_cache_time
     ),
     info=True,
 )
