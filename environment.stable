@@ -1,4 +1,4 @@
 # CADS repositories versions
 CACHOLOTE_REF="v1.7.1"
-CADS_ADAPTORS_REF="vvv1.2.0-eumdac.1"
+CADS_ADAPTORS_REF="v1.1.43"
 CADS_WORKER_REF="v1.4.5"
