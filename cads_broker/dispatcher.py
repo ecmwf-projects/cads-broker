@@ -177,9 +177,7 @@ def cancel_jobs_on_scheduler(
     try:
         return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
     except (distributed.comm.core.CommClosedError, OSError, AttributeError):
-        logger.error(
-            "Cannot connect to scheduler", scheduler_url=client.scheduler.address
-        )
+        logger.error("Cannot connect to scheduler")
         return
 
 
