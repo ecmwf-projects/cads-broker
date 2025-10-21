@@ -123,7 +123,9 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
     try:
         return client.run_on_scheduler(get_tasks_on_scheduler)
     except (distributed.comm.core.CommClosedError, OSError):
-        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address)
+        logger.error(
+            "Cannot connect to scheduler", scheduler_url=client.scheduler.address
+        )
         return {}
 
 
@@ -143,7 +145,7 @@ def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> N
                 signal.SIGTERM,
                 workers=[worker_ip],
                 nanny=True,
-                on_error="ignore"
+                on_error="ignore",
             )
             logger.info(
                 "killed job on worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
@@ -177,7 +179,9 @@ def cancel_jobs_on_scheduler(
     try:
         return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
     except (distributed.comm.core.CommClosedError, OSError, AttributeError):
-        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address)
+        logger.error(
+            "Cannot connect to scheduler", scheduler_url=client.scheduler.address
+        )
         return
 
 
