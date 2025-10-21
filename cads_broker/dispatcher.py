@@ -64,9 +64,18 @@ def get_total_number_of_workers(clients: Iterable[distributed.Client]) -> int:
     return number_of_workers
 
 
+def create_dask_client(scheduler_url):
+    try:
+        client = distributed.Client(scheduler_url, heartbeat_interval=1000)
+        return client
+    except OSError:
+        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url)
+        return
+
+
 @cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.broker_get_number_of_workers_cache_time
+        maxsize=1024, ttl=CONFIG.broker_get_workers_resources_cache_time
     ),
     info=True,
 )
@@ -111,7 +120,13 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
             }
         return tasks
 
-    return client.run_on_scheduler(get_tasks_on_scheduler)
+    try:
+        return client.run_on_scheduler(get_tasks_on_scheduler)
+    except (distributed.comm.core.CommClosedError, OSError):
+        logger.error(
+            "Cannot connect to scheduler", scheduler_url=client.scheduler.address
+        )
+        return {}
 
 
 def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> None:
@@ -130,6 +145,7 @@ def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> N
                 signal.SIGTERM,
                 workers=[worker_ip],
                 nanny=True,
+                on_error="ignore",
             )
             logger.info(
                 "killed job on worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
@@ -160,9 +176,13 @@ def cancel_jobs_on_scheduler(
                     {job_id: "cancelled"}, stimulus_id="manual-cancel"
                 )
 
-    if client is None:
+    try:
+        return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
+    except (distributed.comm.core.CommClosedError, OSError, AttributeError):
+        logger.error(
+            "Cannot connect to scheduler", scheduler_url=client.scheduler.address
+        )
         return
-    return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
 
 
 @cachetools.cached(  # type: ignore
@@ -425,6 +445,7 @@ def requeue_request(
 @attrs.define
 class Broker:
     schedulers: dict[str, distributed.Client]
+    input_schedulers: list[str]
     environment: Environment.Environment
     qos: QoS.QoS
     session_maker_read: sa.orm.sessionmaker
@@ -451,7 +472,8 @@ class Broker:
     ):
         schedulers = {}
         for scheduler in scheduler_url:
-            schedulers[scheduler] = distributed.Client(scheduler)
+            if (client := create_dask_client(scheduler)) is not None:
+                schedulers[scheduler] = client
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
@@ -466,6 +488,7 @@ class Broker:
             session_maker_write=session_maker_write,
             environment=qos.environment,
             qos=qos,
+            input_schedulers=scheduler_url,
         )
         return self
 
@@ -930,10 +953,14 @@ class Broker:
         while True:
             start_loop = time.perf_counter()
             # check if the scheduler is alive
-            for scheduler, client in self.schedulers.items():
-                if client.scheduler is None:
+            for scheduler in self.input_schedulers:
+                client = self.schedulers.get(scheduler)
+                if client is None or client.scheduler is None:
                     logger.info(f"Reconnecting to dask scheduler {scheduler}")
-                    self.schedulers[scheduler] = distributed.Client(scheduler)
+                    if (client := create_dask_client(scheduler)) is not None:
+                        self.schedulers[scheduler] = client
+                    else:
+                        self.schedulers.pop(scheduler, None)
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
