@@ -48,6 +48,7 @@ class BrokerConfig(pydantic_settings.BaseSettings):
     broker_workers_gap: int = (
         10  # max discrepancy of workers number before qos rules are reloaded
     )
+    broker_get_workers_resources_cache_time: int = 60
 
 
 class SqlalchemySettings(pydantic_settings.BaseSettings):

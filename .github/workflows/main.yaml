@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+    - main
     tags:
-      - "v*"
+    - "v*"
   pull_request:
     branches:
-      - main
+    - main
 
 
 jobs:
@@ -24,4 +24,5 @@ jobs:
       repositories: |
         ecmwf-projects/cads-worker
         ecmwf-projects/cads-processing-api-service
+        ecmwf/dss-operations-chart
     secrets: inherit
