@@ -377,28 +377,6 @@ def get_events_from_request(
     return events
 
 
-def reset_qos_rules(session: sa.orm.Session, qos):
-    """Delete all QoS rules."""
-    session.execute(sa.text("delete from qos_rules cascade"))
-    # for rule in session.scalars(sa.select(QoSRule)):
-    #     # rule.system_requests = []
-    #     session.delete(rule)
-
-    cached_rules: dict[str, Any] = {}
-    for request in get_running_requests(session):
-        # Recompute the limits
-        # It just updates the database. Internal qos is already updated.
-        limits = qos.limits_for(request)
-        _, rules = delete_request_qos_status(
-            request_uid=request.request_uid,
-            rules=limits,
-            session=session,
-            rules_in_db=cached_rules,
-        )
-        cached_rules.update(rules)
-    session.commit()
-
-
 def count_system_request_qos_rule(session: sa.orm.Session) -> int:
     """Count the number of rows in system_request_qos_rule."""
     return session.query(SystemRequestQoSRule).count()

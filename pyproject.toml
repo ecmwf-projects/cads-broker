@@ -29,12 +29,14 @@ dependencies = [
   "cachetools>=5.5.2",
   "cacholote",
   "distributed",
+  "fakeredis[dev,json]>=2.33.0",
   "prettytable>=3.16.0",
   "psycopg2>=2.9.10",
   "psycopg[binary]>=3.2.6",
+  "redis-om<1.0.0",
   "sqlalchemy>=2.0.9",
   "sqlalchemy-utils",
-  "typer"
+  "typer",
 ]
 description = "CADS broker service"
 dynamic = ["version"]

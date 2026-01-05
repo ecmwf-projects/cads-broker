@@ -262,8 +262,8 @@ def instantiate_qos(session_read: sa.orm.Session, number_of_workers: int) -> QoS
 
 
 def reload_qos_rules(session: sa.orm.sessionmaker, qos: QoS.QoS) -> None:
+    qos.rules.reset()
     perf_logger(qos.reload_rules)(session=session)
-    perf_logger(db.reset_qos_rules)(session, qos)
 
 
 class Queue:
@@ -353,6 +353,7 @@ class QoSRules:
             parser = QoS.RulesParser(io.StringIO(""), logger=logger)
             self.rules = QoS.RuleSet()
             parser.parse_rules(self.rules, self.environment, raise_exception=False)
+            self.rules.migrate()
 
 
 def set_running_request(
@@ -361,7 +362,6 @@ def set_running_request(
     qos: QoS.QoS,
     queue: Queue,
     scheduler: str,
-    internal_scheduler: Scheduler,
     session: sa.orm.Session,
 ) -> db.SystemRequest:
     """Set the status of the request to running and notify the qos rules."""
@@ -372,7 +372,7 @@ def set_running_request(
         scheduler=scheduler,
         session=session,
     )
-    qos.notify_start_of_request(request, scheduler=internal_scheduler)
+    qos.notify_start_of_request(request)
     queue.pop(request.request_uid)
     return request
 
@@ -380,7 +380,6 @@ def set_running_request(
 def set_successful_request(
     request: db.SystemRequest,
     qos: QoS.QoS,
-    internal_scheduler: Scheduler,
     session: sa.orm.Session,
 ) -> db.SystemRequest:
     """Set the status of the request to successful and notify the qos rules."""
@@ -390,7 +389,7 @@ def set_successful_request(
         request_uid=request.request_uid,
         session=session,
     )
-    qos.notify_end_of_request(request, scheduler=internal_scheduler)
+    qos.notify_end_of_request(request)
     logger.info(
         "job has finished",
         **db.logger_kwargs(request=request),
@@ -403,7 +402,6 @@ def set_failed_request(
     error_message: str,
     error_reason: str,
     qos: QoS.QoS,
-    internal_scheduler: Scheduler,
     session: sa.orm.Session,
 ) -> db.SystemRequest:
     """Set the status of the request to failed and notify the qos rules."""
@@ -414,7 +412,7 @@ def set_failed_request(
         error_reason=error_reason,
         session=session,
     )
-    qos.notify_end_of_request(request, scheduler=internal_scheduler)
+    qos.notify_end_of_request(request)
     logger.info(
         "job has finished",
         **db.logger_kwargs(request=request),
@@ -426,13 +424,12 @@ def requeue_request(
     request: db.SystemRequest,
     qos: QoS.QoS,
     queue: Queue,
-    internal_scheduler: Scheduler,
     session: sa.orm.Session,
 ) -> db.SystemRequest:
     """Re-queue the request and notify the qos rules."""
     if request.status == "running":
         queued_request = db.requeue_request(request=request, session=session)
-        qos.notify_end_of_request(queued_request, scheduler=internal_scheduler)
+        qos.notify_end_of_request(queued_request)
         queue.add(queued_request.request_uid, request)
         return queued_request
     return request
@@ -456,7 +453,6 @@ class Broker:
         repr=lambda futures: " ".join(futures.keys()),
     )
     running_requests: int = 0
-    internal_scheduler: Scheduler = Scheduler()
     queue: Queue = Queue()
 
     @classmethod
@@ -507,7 +503,6 @@ class Broker:
             self.set_number_of_workers()
             logger.info("qos_reload", reason="number_of_workers_changed")
             reload_qos_rules(session_write, self.qos)
-            self.internal_scheduler.refresh()
             self.queue.reset()
 
     def set_request_error_status(
@@ -540,7 +535,6 @@ class Broker:
                     error_message=error_message,
                     error_reason=error_reason,
                     qos=self.qos,
-                    internal_scheduler=self.internal_scheduler,
                     session=session,
                 )
                 return request
@@ -576,7 +570,6 @@ class Broker:
                             error_message=error_message,
                             error_reason=error_reason,
                             qos=self.qos,
-                            internal_scheduler=self.internal_scheduler,
                             session=session,
                         )
                         requeue = False
@@ -590,7 +583,6 @@ class Broker:
                     request=request,
                     qos=self.qos,
                     queue=self.queue,
-                    internal_scheduler=self.internal_scheduler,
                     session=session,
                 )
         else:
@@ -599,7 +591,6 @@ class Broker:
                 error_message=error_message,
                 error_reason=error_reason,
                 qos=self.qos,
-                internal_scheduler=self.internal_scheduler,
                 session=session,
             )
         return request
@@ -619,12 +610,10 @@ class Broker:
         else:
             request.status = "deleted"
         if previous_status == "running":
-            self.qos.notify_end_of_request(request, scheduler=self.internal_scheduler)
+            self.qos.notify_end_of_request(request)
         elif previous_status == "accepted":
             self.queue.pop(request.request_uid, None)
-            self.qos.notify_dismission_of_request(
-                request, scheduler=self.internal_scheduler
-            )
+            self.qos.notify_dismission_of_request(request)
         # set finished_at if it is not set
         if request.finished_at is None:
             request.finished_at = datetime.datetime.now()
@@ -676,9 +665,7 @@ class Broker:
             # if request is in futures, go on
             if request.request_uid in self.futures:
                 # notify start of request if it is not already notified
-                self.qos.notify_start_of_request(
-                    request, scheduler=self.internal_scheduler
-                )
+                self.qos.notify_start_of_request(request)
             elif task := scheduler_tasks.get(request.request_uid, None):
                 if (state := task["state"]) == "memory":
                     # if the task is in memory and it is not in the futures
@@ -688,7 +675,6 @@ class Broker:
                     set_successful_request(
                         request=request,
                         qos=self.qos,
-                        internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
                 elif state == "erred":
@@ -701,16 +687,13 @@ class Broker:
                 # if the task is in processing, it means that the task is still running
                 elif state == "processing":
                     # notify start of request if it is not already notified
-                    self.qos.notify_start_of_request(
-                        request, scheduler=self.internal_scheduler
-                    )
+                    self.qos.notify_start_of_request(request)
                 elif state == "released":
                     # notify start of request if it is not already notified
                     requeue_request(
                         request=request,
                         qos=self.qos,
                         queue=self.queue,
-                        internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
             # if it doesn't find the request: re-queue it
@@ -721,7 +704,6 @@ class Broker:
                     set_successful_request(
                         request=request,
                         qos=self.qos,
-                        internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
                 # check how many times the request has been re-queued
@@ -737,7 +719,6 @@ class Broker:
                         request=request,
                         qos=self.qos,
                         queue=self.queue,
-                        internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
                 else:
@@ -746,41 +727,8 @@ class Broker:
                         error_message="Request not found in dask scheduler",
                         error_reason="not_found",
                         qos=self.qos,
-                        internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
-
-    @perf_logger
-    def sync_qos_rules(self, session_write) -> None:
-        """Sync the qos rules status with the database.
-
-        The update tasks to the qos_rules table are piled up in the internal_scheduler.
-        The internal_scheduler is used to minimize the number of updates to the database using:
-            - the same session
-            - the same qos_rules that are read from the database once and then updated at each step if needed
-            - the requests from the self.queue.
-              If a request is updated the relative self.queue entry is updated too
-        """
-        qos_rules = perf_logger(db.get_qos_rules)(session=session_write)
-        if tasks_number := len(self.internal_scheduler.queue):
-            logger.info("performance", tasks_number=tasks_number)
-        for task in list(self.internal_scheduler.queue)[
-            : CONFIG.broker_max_internal_scheduler_tasks
-        ]:
-            # the internal scheduler is used to asynchronously add qos rules to database
-            # it returns a new qos rule if a new qos rule is added to database
-            request, new_qos_rules = perf_logger(task["function"])(
-                session=session_write,
-                request=self.queue.get(task["kwargs"].get("request_uid")),
-                rules_in_db=qos_rules,
-                **task["kwargs"],
-            )
-            self.internal_scheduler.remove(task)
-            # if a new qos rule is added, the new qos rule is added to the list of qos rules
-            if request:
-                self.queue.add(task["kwargs"].get("request_uid"), request)
-            if new_qos_rules:
-                qos_rules.update(new_qos_rules)
 
     @perf_logger
     def sync_futures(self) -> None:
@@ -820,7 +768,6 @@ class Broker:
                 set_successful_request(
                     request=request,
                     qos=self.qos,
-                    internal_scheduler=self.internal_scheduler,
                     session=session,
                 )
             elif future.status == "error":
@@ -834,7 +781,6 @@ class Broker:
                     request=request,
                     qos=self.qos,
                     queue=self.queue,
-                    internal_scheduler=self.internal_scheduler,
                     session=session,
                 )
             else:
@@ -866,9 +812,7 @@ class Broker:
                     "message": exception.args[0],
                 }
                 self.queue.pop(request.request_uid, None)
-                self.qos.notify_dismission_of_request(
-                    request, scheduler=self.internal_scheduler
-                )
+                self.qos.notify_dismission_of_request(request)
                 logger.info("job has finished", **db.logger_kwargs(request=request))
         session.commit()
 
@@ -887,7 +831,7 @@ class Broker:
         )
         requests_counter = 0
         for request in queue:
-            if self.qos.can_run(request, scheduler=self.internal_scheduler):
+            if self.qos.can_run(request):
                 if requests_counter <= int(number_of_requests):
                     self.submit_request(
                         request,
@@ -919,7 +863,6 @@ class Broker:
                     queue=self.queue,
                     qos=self.qos,
                     scheduler=scheduler,
-                    internal_scheduler=self.internal_scheduler,
                     session=session,
                 )
                 future = client.submit(
@@ -982,7 +925,6 @@ class Broker:
                             limit=CONFIG.broker_max_accepted_requests,
                         )
                     )
-                    self.sync_qos_rules(session_write)
                     self.sync_futures()
                     self.sync_database(session=session_write)
                     session_write.commit()

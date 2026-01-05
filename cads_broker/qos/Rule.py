@@ -6,13 +6,31 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 #
+
+import io
+from typing import Optional
+
+from pydantic import model_validator
+from redis_om import Field, JsonModel, Migrator, get_redis_connection
+
+from cads_broker import config
+from cads_broker.expressions import RulesParser
+
+CONFIG = config.BrokerConfig()
+
+REDIS_DB = get_redis_connection(decode_responses=True)
+
 class Context:
     def __init__(self, request, environment):
         self.request = request
         self.environment = environment
 
 
-class QoSRule:
+def get_uid(*args):
+    return str(hash(" ".join(map(str, args))))
+
+
+class QoSRule(JsonModel):
     """
     It represents an QoS rule.
 
@@ -30,18 +48,44 @@ class QoSRule:
     an expression, so it can be evaluated dynamically later.
     """
 
-    def __init__(self, environment, info, condition, conclusion):
-        self.environment = environment
-        self.info = info
-        self.condition = condition
-        self.conclusion = conclusion
+    info: str = Field(index=False)
+    name: str = Field(index=True)
+    conclusion_str: str = Field(index=False)
+    condition_str: str = Field(index=False)
+    uid: Optional[str] = Field(default=None, primary_key=True)
+
+    def __post_init__(self, redis_client):
+        self.redis_client = redis_client
+
+    @model_validator(mode='after')
+    def compute_uid(self) -> 'QoSRule':
+        if self.uid is None:
+            self.uid = get_uid(
+                self.info,
+                self.name,
+                self.condition_str,
+                self.conclusion_str,
+            )
+        return self
+
+    @property
+    def condition(self):
+        c = io.StringIO(self.condition_str)
+        parser = RulesParser.RulesParser(c, logger=None)
+        return parser.parse_expression()
+
+    @property
+    def conclusion(self):
+        c = io.StringIO(self.conclusion_str)
+        parser = RulesParser.RulesParser(c, logger=None)
+        return parser.parse_expression()
 
     def evaluate(self, request):
-        return self.conclusion.evaluate(Context(request, self.environment))
+        return self.conclusion.evaluate(Context(request))
 
     def match(self, request):
         try:
-            ret_value = self.condition.evaluate(Context(request, self.environment))
+            ret_value = self.condition.evaluate(Context(request))
         except Exception as e:
             print(
                 f"Error evaluating condition {self.condition} for request {request.request_uid}"
@@ -52,11 +96,6 @@ class QoSRule:
 
     def dump(self, out):
         out(self)
-
-    def get_uid(self, request):
-        return str(
-            hash(f"{self.name} {self.info} {self.condition} : {self.evaluate(request)}")
-        )
 
     def __repr__(self):
         return f"{self.name} {self.info} {self.condition} : {self.conclusion}"
@@ -86,7 +125,12 @@ class Priority(QoSRule):
     requests.
     """
 
-    name = "priority"
+    name: str = "priority"
+
+    class Meta:
+        database = REDIS_DB
+        model_key_prefix = "priority"
+        global_key_prefix = "broker"
 
 
 class DynamicPriority(QoSRule):
@@ -102,20 +146,30 @@ class DynamicPriority(QoSRule):
     requests.
     """
 
-    name = "dynamic_priority"
+    name: str = "dynamic_priority"
+
+    class Meta:
+        database = REDIS_DB
+        model_key_prefix = "dynamic_priority"
+        global_key_prefix = "broker"
 
 
 class Permission(QoSRule):
     """
     It implements the permission rule.
 
-    Its 'conclusion' must evaluate to a .
+    Its 'conclusion' must evaluate to a boolean.
     If the evaluation returns True, the matching
     requests are granted execution, otherwise they are denied execution
     and are immediately set to aborted.
     """
 
-    name = "permission"
+    name: str = "permission"
+
+    class Meta:
+        database = REDIS_DB
+        model_key_prefix = "permission"
+        global_key_prefix = "broker"
 
 
 class Limit(QoSRule):
@@ -132,25 +186,27 @@ class Limit(QoSRule):
     capacity of the limit, no requests matching that limit can run.
     """
 
-    def __init__(self, environment, info, condition, conclusion):
-        super().__init__(environment, info, condition, conclusion)
-        self.queued = set()
-        self.running = set()
+    queued: set[str] = Field(default_factory=set, index=True)
+    running: set[str] = Field(default_factory=set)
 
     def increment(self, request_uid):
         self.remove_from_queue(request_uid)
         self.running.add(request_uid)
+        self.save()
 
     def remove_from_queue(self, request_uid):
         if request_uid in self.queued:
             self.queued.remove(request_uid)
+        self.save()
 
     def decrement(self, request_uid):
         if request_uid in self.running:
             self.running.remove(request_uid)
+        self.save()
 
     def queue(self, request_uid):
         self.queued.add(request_uid)
+        self.save()
 
     def capacity(self, request):
         return self.evaluate(request)
@@ -172,48 +228,110 @@ class GlobalLimit(Limit):
     Global limits are shared by all users.
     """
 
-    name = "limit"
+    name: str = "limit"
+
+    class Meta:
+        database = REDIS_DB
+        model_key_prefix = "limit"
+        global_key_prefix = "broker"
 
 
 class UserLimit(Limit):
-    name = "user"
+    name: str = "user"
 
     def clone(self):
         return UserLimit(
-            self.environment,
-            self.info,
-            self.condition,
-            self.conclusion,
+            info=self.info,
+            condition_str=self.condition_str,
+            conclusion_str=self.conclusion_str,
         )
+
+    class Meta:
+        database = REDIS_DB
+        model_key_prefix = "user"
+        global_key_prefix = "broker"
 
 
 class RuleSet:
     """It is used to store all rules in a single neat an tidy location."""
 
-    def __init__(self):
-        self.priorities = []
-        self.dynamic_priorities = []
-        self.global_limits = []
-        self.permissions = []
-        self.user_limits = []
-        self.variables = {}
+    def __init__(self, redis_client=REDIS_DB):
+        self.redis_client = redis_client
+
+    def migrate(self):
+        """Create Redis Search indexes for all QoS models."""
+        Migrator().run()
+
+    def reset(self):
+        Priority.find().delete()
+        DynamicPriority.find().delete()
+        GlobalLimit.find().delete()
+        Permission.find().delete()
+        UserLimit.find().delete()
+
+    @property
+    def priorities(self):
+        return Priority.find().all()
+
+    @property
+    def dynamic_priorities(self):
+        return DynamicPriority.find().all()
+
+    @property
+    def global_limits(self):
+        return GlobalLimit.find().all()
+
+    @property
+    def permissions(self):
+        try:
+            return Permission.find().all()
+        except Exception:  # FIXME: specify exception ResponseError --- IGNORE ---
+            return []
+
+    @property
+    def user_limits(self):
+        return UserLimit.find().all()
 
     def add_priority(self, environment, info, condition, conclusion):
-        self.priorities.append(Priority(environment, info, condition, conclusion))
+        Priority(
+            info=str(info),
+            condition_str=str(condition),
+            conclusion_str=str(conclusion),
+        ).save()
 
     def add_dynamic_priority(self, environment, info, condition, conclusion):
-        self.dynamic_priorities.append(
-            DynamicPriority(environment, info, condition, conclusion)
-        )
+        DynamicPriority(
+            info=str(info),
+            condition_str=str(condition),
+            conclusion_str=str(conclusion),
+        ).save()
 
     def add_permission(self, environment, info, condition, conclusion):
-        self.permissions.append(Permission(environment, info, condition, conclusion))
+        Permission(
+            info=str(info),
+            condition_str=str(condition),
+            conclusion_str=str(conclusion),
+        ).save()
 
     def add_user_limit(self, environment, info, condition, conclusion):
-        self.user_limits.append(UserLimit(environment, info, condition, conclusion))
+        UserLimit(
+            info=str(info),
+            condition_str=str(condition),
+            conclusion_str=str(conclusion),
+            queued=set(),
+            running=set(),
+        ).save()
 
     def add_global_limit(self, environment, info, condition, conclusion):
-        self.global_limits.append(GlobalLimit(environment, info, condition, conclusion))
+        limit = GlobalLimit(
+            info=str(info),
+            condition_str=str(condition),
+            conclusion_str=str(conclusion),
+            queued=set(),
+            running=set(),
+        )
+        print("Adding global limit:", limit)
+        limit.save()
 
     def dump(self, out=print):
         out()

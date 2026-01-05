@@ -62,6 +62,9 @@ class QoS:
         # Parse the rules
         parser.parse_rules(self.rules, self.environment, raise_exception=False)
 
+        # Create Redis Search indexes
+        self.rules.migrate()
+
         # Print the rules
         self.rules.dump()
 
@@ -94,27 +97,14 @@ class QoS:
                 limit.increment(request.request_uid)
 
     @locked
-    def can_run(self, request, scheduler):
+    def can_run(self, request):
         """Check if a request can run."""
         properties = self._properties(request=request)
         limits = []
-        new_limits = []
         for limit in properties.limits:
             if limit.full(request):
                 limit.queue(request.request_uid)
                 limits.append(limit)
-                if str(limit.__hash__()) not in [r.uid for r in request.qos_rules]:
-                    new_limits.append(limit)
-        if len(new_limits):
-            scheduler.append(
-                {
-                    "function": database.add_request_qos_status,
-                    "kwargs": {
-                        "request_uid": request.request_uid,
-                        "rules": limits,
-                    },
-                }
-            )
         permissions = []
         for permission in properties.permissions:
             if not permission.evaluate(request):
@@ -312,69 +302,31 @@ class QoS:
         return request
 
     @locked
-    def notify_dismission_of_request(self, request, scheduler):
+    def notify_dismission_of_request(self, request):
         """Notify the dismission of a request."""
-        limits_list = []
         for limit in self.limits_for(request):
             limit.remove_from_queue(request.request_uid)
-            limits_list.append(limit)
-        if limits_list:
-            scheduler.append(
-                {
-                    "function": database.delete_request_qos_status,
-                    "kwargs": {
-                        "rules": limits_list,
-                        "request_uid": request.request_uid,
-                    },
-                }
-            )
 
     @locked
-    def notify_start_of_request(self, request, scheduler):
+    def notify_start_of_request(self, request):
         """Notify the start of a request.
 
         Increment the limits matching that request so that other request
         sharing the same limits may be kept in the queue if a limit reaches
         its capacity.
         """
-        limits_list = []
         for limit in self.limits_for(request):
             if request.request_uid not in limit.running:
                 limit.increment(request.request_uid)
-                limits_list.append(limit)
-        if limits_list:
-            scheduler.append(
-                {
-                    "function": database.delete_request_qos_status,
-                    "kwargs": {
-                        "rules": limits_list,
-                        "request_uid": request.request_uid,
-                    },
-                }
-            )
-            # Keep track of the running request. This is needed by reconfigure(self)
 
     @locked
-    def notify_end_of_request(self, request, scheduler):
+    def notify_end_of_request(self, request):
         """Notify the end of a request.
 
         Decrement the limits matching that request so that other request
         sharing the same limits can run.
         """
-        limits_list = []
         for limit in self.limits_for(request):
             limit.decrement(request.request_uid)
-            limits_list.append(limit)
 
-        scheduler.append(
-            {
-                "function": database.decrement_qos_rule_running,
-                "kwargs": {
-                    "rules": limits_list,
-                    "request_uid": request.request_uid,
-                },
-            }
-        )
-
-        # Remove requests all collections
         self.requests_properties_cache.pop(request.request_uid)
