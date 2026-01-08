@@ -312,6 +312,7 @@ def count_requests(
     entry_point: str | list[str] | None = None,
     user_uid: str | list[str] | None = None,
     portal: str | list[str] | None = None,
+    limit: int | None = None,
 ) -> int:
     """Count requests."""
     statement = session.query(SystemRequest)
@@ -335,6 +336,8 @@ def count_requests(
         if isinstance(portal, str):
             portal = [portal]
         statement = statement.filter(SystemRequest.portal.in_(portal))
+    if limit is not None:
+        statement = statement.limit(limit)
     return statement.count()
 
 
