@@ -804,7 +804,7 @@ class Broker:
         If the status of the request in the database is not "running", it does nothing and returns None.
         """
         with self.session_maker_write() as session:
-            request_uid = future.key.strip("request-")
+            request_uid = future.key.removeprefix("request-")
             try:
                 request = db.get_request(request_uid, session=session)
             except db.NoResultFound:
