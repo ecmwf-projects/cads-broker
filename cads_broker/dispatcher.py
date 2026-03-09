@@ -804,15 +804,16 @@ class Broker:
         If the status of the request in the database is not "running", it does nothing and returns None.
         """
         with self.session_maker_write() as session:
+            request_uid = future.key.strip("request-")
             try:
-                request = db.get_request(future.key, session=session)
+                request = db.get_request(request_uid, session=session)
             except db.NoResultFound:
                 logger.warning(
                     "request not found",
-                    job_id=future.key,
+                    job_id=request_uid,
                     dask_status=future.status,
                 )
-                return future.key
+                return request_uid
             if request.status != "running":
                 return None
             if future.status == "finished":
@@ -826,7 +827,7 @@ class Broker:
             elif future.status == "error":
                 exception = future.exception()
                 self.set_request_error_status(
-                    exception=exception, request_uid=future.key, session=session
+                    exception=exception, request_uid=request_uid, session=session
                 )
             elif future.status != "cancelled":
                 # if the dask status is unknown, re-queue it
@@ -841,7 +842,7 @@ class Broker:
                 # if the dask status is cancelled, the qos has already been reset by sync_database
                 return None
             future.release()
-        return future.key
+        return request_uid
 
     @perf_logger
     def cache_requests_qos_properties(self, requests, session: sa.orm.Session) -> None:
@@ -924,7 +925,7 @@ class Broker:
                 )
                 future = client.submit(
                     worker.submit_workflow,
-                    key=request.request_uid,
+                    key="request-" + request.request_uid,
                     setup_code=request.request_body.get("setup_code", ""),
                     entry_point=request.entry_point,
                     config=dict(
