@@ -825,6 +825,14 @@ def ensure_adaptor_properties(
     session.commit()
 
 
+def get_worker_pid(request_uid: str, session: sa.orm.Session) -> list[dict[str, str]]:
+    """Get the worker pid for a request."""
+    events = get_events_from_request(
+        request_uid=request_uid, session=session, event_type="worker_pid"
+    )
+    return [json.loads(event.message) for event in events]
+
+
 def add_event(
     event_type: str,
     request_uid: str,

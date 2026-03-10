@@ -127,13 +127,14 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
         return {}
 
 
-def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> None:
+def kill_job_on_worker(client: distributed.Client | None, request_uid: str, session: sa.orm.Session) -> None:
     """Kill the job on the worker."""
     # loop on all the processes related to the request_uid
     if client is None:
         return
-    for worker_pid_event in client.get_events(request_uid):
-        _, worker_pid_event = worker_pid_event
+    # for worker_pid_event in client.get_events(request_uid):
+    for worker_pid_event in db.get_worker_pid(request_uid, session=session):
+        # _, worker_pid_event = worker_pid_event
         pid = worker_pid_event["pid"]
         worker_ip = worker_pid_event["worker"]
         try:
@@ -547,7 +548,8 @@ class Broker:
             worker_restart_events = client.get_events("worker-restart-memory")
             # get info on worker and pid of the killed request
             try:
-                worker_pid_event = client.get_events(request_uid)[0][1]
+                # worker_pid_event = client.get_events(request_uid)[0][1]
+                worker_pid_event = db.get_worker_pid(request_uid, session=session)[0]
             except IndexError:
                 worker_restart_events = False
                 requeue = True
@@ -657,7 +659,7 @@ class Broker:
                 # if the request is not in the futures, it means that the request has been lost by the broker
                 # try to cancel the job directly on the scheduler
                 cancel_jobs_on_scheduler(client, job_ids=[request.request_uid])
-            kill_job_on_worker(client, request.request_uid)
+            kill_job_on_worker(client, request.request_uid, session=session)
             session = self.manage_dismissed_request(request, session)
         session.commit()
 
