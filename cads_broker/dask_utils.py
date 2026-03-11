@@ -35,15 +35,15 @@ def clean_scheduler_memory(client: distributed.Client):
     This prevents memory leaks from massive task payloads during high-throughput load tests.
     """
     def flush_network_logs(dask_scheduler):
-    import gc
+        import gc
 
-    from distributed.batched import BatchedSend
+        from distributed.batched import BatchedSend
 
-    # Find all active and dead network buffers
-    for obj in gc.get_objects():
-        if isinstance(obj, BatchedSend) and hasattr(obj, 'recent_message_log'):
-            # Empty the log to sever the task references
-            obj.recent_message_log.clear()
+        # Find all active and dead network buffers
+        for obj in gc.get_objects():
+            if isinstance(obj, BatchedSend) and hasattr(obj, 'recent_message_log'):
+                # Empty the log to sever the task references
+                obj.recent_message_log.clear()
 
     client.run_on_scheduler(flush_network_logs)
 
