@@ -3,6 +3,9 @@ import time
 from typing import Iterable
 
 import distributed
+import structlog
+
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 class Schedulers:
@@ -26,9 +29,13 @@ class Schedulers:
         with self.lock:
             return self.clients.values()
 
-    def get_client_addresses(self) -> Iterable[str]:
+    def get_clients_addresses(self) -> Iterable[str]:
         with self.lock:
             return self.clients.keys()
+
+    def get_clients_items(self):
+        with self.lock:
+            return self.clients.items()
 
 
 def clean_scheduler_memory(client: distributed.Client):
@@ -52,8 +59,22 @@ def clean_scheduler_memory(client: distributed.Client):
     client.run_on_scheduler(flush_network_logs)
 
 
-def clean_scheduler_memory_for_all_clients(schedulers: Schedulers, timeout_seconds: int = 300):
+def clean_scheduler_memory_for_all_clients(
+    schedulers: Schedulers, timeout_seconds: int = 300
+):
+    logger.info(
+        "Starting periodic scheduler memory cleanup thread",
+        timeout_seconds=timeout_seconds,
+    )
     while True:
         time.sleep(timeout_seconds)
-        for client in schedulers.get_clients_list():
+        for client_address, client in schedulers.get_clients_items():
+            logger.info(
+                "Cleaning scheduler memory for client",
+                client_address=client_address,
+            )
             clean_scheduler_memory(client)
+            logger.info(
+                "Finished cleaning scheduler memory for client",
+                client_address=client_address,
+            )

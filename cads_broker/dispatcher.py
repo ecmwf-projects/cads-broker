@@ -914,7 +914,7 @@ class Broker:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
         # randomly shuffle the schedulers to balance the load based on the number of workers
         for scheduler in plackett_luce_shuffle(
-            self.schedulers.get_client_addresses(),
+            self.schedulers.get_clients_addresses(),
             [
                 get_number_of_workers(client)
                 for client in self.schedulers.get_clients_list()
@@ -960,7 +960,7 @@ class Broker:
         """Run the broker loop."""
         cleanup_scheduler_memory_thread = threading.Thread(
             target=dask_utils.clean_scheduler_memory_for_all_clients,
-            args=(self.schedulers, 300),
+            args=(self.schedulers, CONFIG.broker_clean_scheduler_memory_interval_seconds),
             daemon=True,
         )
         cleanup_scheduler_memory_thread.start()
