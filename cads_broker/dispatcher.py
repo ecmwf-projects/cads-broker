@@ -22,7 +22,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from cads_broker import Environment, config, factory
+from cads_broker import Environment, config, dask_utils, factory
 from cads_broker import database as db
 from cads_broker.qos import QoS
 
@@ -127,7 +127,9 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
         return {}
 
 
-def kill_job_on_worker(client: distributed.Client | None, request_uid: str, session: sa.orm.Session) -> None:
+def kill_job_on_worker(
+    client: distributed.Client | None, request_uid: str, session: sa.orm.Session
+) -> None:
     """Kill the job on the worker."""
     # loop on all the processes related to the request_uid
     if client is None:
@@ -441,7 +443,7 @@ def requeue_request(
 
 @attrs.define
 class Broker:
-    schedulers: dict[str, distributed.Client]
+    schedulers: dask_utils.Schedulers
     input_schedulers: list[str]
     environment: Environment.Environment
     qos: QoS.QoS
@@ -467,15 +469,15 @@ class Broker:
         session_maker_read: sa.orm.sessionmaker | None = None,
         session_maker_write: sa.orm.sessionmaker | None = None,
     ):
-        schedulers = {}
+        schedulers = dask_utils.Schedulers()
         for scheduler in scheduler_url:
             if (client := create_dask_client(scheduler)) is not None:
-                schedulers[scheduler] = client
+                schedulers.add_client(scheduler, client)
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
             qos = instantiate_qos(
-                session_read, get_total_number_of_workers(schedulers.values())
+                session_read, get_total_number_of_workers(schedulers.get_clients_list())
             )
         with session_maker_write() as session:
             reload_qos_rules(session, qos)
@@ -491,7 +493,7 @@ class Broker:
 
     def set_number_of_workers(self):
         number_of_workers = get_total_number_of_workers(
-            clients=self.schedulers.values()
+            clients=self.schedulers.get_clients_list()
         )
         self.environment.number_of_workers = number_of_workers
         return number_of_workers
@@ -501,7 +503,7 @@ class Broker:
         if (
             abs(
                 self.environment.number_of_workers
-                - get_total_number_of_workers(self.schedulers.values())
+                - get_total_number_of_workers(self.schedulers.get_clients_list())
             )
             > CONFIG.broker_workers_gap
         ) or self.environment.number_of_workers == 0:
@@ -528,7 +530,9 @@ class Broker:
             return request
         requeue = CONFIG.broker_requeue_on_killed_worker_requests
         if error_reason == "KilledWorker":
-            client = self.schedulers.get(request.request_metadata.get("scheduler"))
+            client = self.schedulers.get_client(
+                request.request_metadata.get("scheduler")
+            )
             if client is None:
                 logger.warning(
                     "scheduler not found",
@@ -652,7 +656,9 @@ class Broker:
             session, limit=CONFIG.broker_max_dismissed_requests
         )
         for request in dismissed_requests:
-            client = self.schedulers.get(request.request_metadata.get("scheduler"))
+            client = self.schedulers.get_client(
+                request.request_metadata.get("scheduler")
+            )
             if future := self.futures.pop(request.request_uid, None):
                 future.cancel()
             else:
@@ -665,7 +671,7 @@ class Broker:
 
         # get all the tasks from the schedulers pool
         scheduler_tasks = {}
-        for client in self.schedulers.values():
+        for client in self.schedulers.get_clients_list():
             scheduler_tasks.update(get_tasks_from_scheduler(client))
 
         requests = db.get_running_requests(session=session)
@@ -908,10 +914,13 @@ class Broker:
         """Submit the request to the dask scheduler and update the qos rules accordingly."""
         # randomly shuffle the schedulers to balance the load based on the number of workers
         for scheduler in plackett_luce_shuffle(
-            self.schedulers.keys(),
-            [get_number_of_workers(client) for client in self.schedulers.values()],
+            self.schedulers.get_client_addresses(),
+            [
+                get_number_of_workers(client)
+                for client in self.schedulers.get_clients_list()
+            ],
         ):
-            client = self.schedulers[scheduler]
+            client = self.schedulers.get_client(scheduler)
             resources = request.request_metadata.get("resources", {})
             request.request_metadata["scheduler"] = scheduler
             # check if the resources are available on the workers pool
@@ -949,17 +958,23 @@ class Broker:
 
     def run(self) -> None:
         """Run the broker loop."""
+        cleanup_scheduler_memory_thread = threading.Thread(
+            target=dask_utils.clean_scheduler_memory_for_all_clients,
+            args=(self.schedulers, 300),
+            daemon=True,
+        )
+        cleanup_scheduler_memory_thread.start()
         while True:
             start_loop = time.perf_counter()
             # check if the scheduler is alive
             for scheduler in self.input_schedulers:
-                client = self.schedulers.get(scheduler)
+                client = self.schedulers.get_client(scheduler)
                 if client is None or client.scheduler is None:
                     logger.info(f"Reconnecting to dask scheduler {scheduler}")
                     if (client := create_dask_client(scheduler)) is not None:
-                        self.schedulers[scheduler] = client
+                        self.schedulers.add_client(scheduler, client)
                     else:
-                        self.schedulers.pop(scheduler, None)
+                        self.schedulers.pop_client(scheduler)
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
@@ -1007,7 +1022,7 @@ class Broker:
                     )
 
                 cancel_stuck_requests(
-                    clients=self.schedulers.values(), session=session_read
+                    clients=self.schedulers.get_clients_list(), session=session_read
                 )
                 running_requests = len(db.get_running_requests(session=session_read))
                 queue_length = self.queue.len()
