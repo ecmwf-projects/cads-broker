@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import Iterable
 
 import distributed
@@ -51,6 +52,8 @@ def clean_scheduler_memory(client: distributed.Client):
     client.run_on_scheduler(flush_network_logs)
 
 
-def clean_scheduler_memory_for_all_clients(schedulers: Schedulers):
-    for client in schedulers.get_clients_list():
-        clean_scheduler_memory(client)
+def clean_scheduler_memory_for_all_clients(schedulers: Schedulers, timeout_seconds: int = 300):
+    while True:
+        time.sleep(timeout_seconds)
+        for client in schedulers.get_clients_list():
+            clean_scheduler_memory(client)
