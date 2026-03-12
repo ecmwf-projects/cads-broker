@@ -812,7 +812,7 @@ class Broker:
         If the status of the request in the database is not "running", it does nothing and returns None.
         """
         with self.session_maker_write() as session:
-            request_uid = future.key.removeprefix("request-")
+            request_uid = future.key.removeprefix(f"{CONFIG.broker_request_prefix}-")
             try:
                 request = db.get_request(request_uid, session=session)
             except db.NoResultFound:
@@ -936,7 +936,7 @@ class Broker:
                 )
                 future = client.submit(
                     worker.submit_workflow,
-                    key="request-" + request.request_uid,
+                    key=f"{CONFIG.broker_request_prefix}-{request.request_uid}",
                     setup_code=request.request_body.get("setup_code", ""),
                     entry_point=request.entry_point,
                     config=dict(
