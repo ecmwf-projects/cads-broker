@@ -73,7 +73,14 @@ def clean_scheduler_memory_for_all_clients(
                 "Cleaning scheduler memory for client",
                 client_address=client_address,
             )
-            clean_scheduler_memory(client)
+            try:
+                clean_scheduler_memory(client)
+            except Exception as e:
+                logger.error(
+                    "Error while cleaning scheduler memory for client",
+                    client_address=client_address,
+                    error=str(e),
+                )
             logger.info(
                 "Finished cleaning scheduler memory for client",
                 client_address=client_address,
