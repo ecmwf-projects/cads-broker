@@ -690,7 +690,7 @@ def set_successful_request(
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
     request.status = "successful"
-    request.finished_at = sa.func.now()
+    request.finished_at = datetime.datetime.now()
     return request
 
 
@@ -748,12 +748,12 @@ def set_request_status(
         metadata.update({"scheduler": scheduler})
         request.request_metadata = metadata
     if status == "successful":
-        request.finished_at = sa.func.now()
+        request.finished_at = datetime.datetime.now()
     elif status in ("failed", "rejected"):
-        request.finished_at = sa.func.now()
+        request.finished_at = datetime.datetime.now()
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
-        request.started_at = sa.func.now()
+        request.started_at = datetime.datetime.now()
         request.qos_status = {}
     if cache_id is not None:
         request.cache_id = cache_id
