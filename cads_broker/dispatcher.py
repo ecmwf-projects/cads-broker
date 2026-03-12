@@ -374,6 +374,7 @@ def set_running_request(
         priority=priority,
         scheduler=scheduler,
         session=session,
+        commit=False,
     )
     qos.notify_start_of_request(request, scheduler=internal_scheduler)
     queue.pop(request.request_uid)
@@ -416,6 +417,7 @@ def set_failed_request(
         error_message=error_message,
         error_reason=error_reason,
         session=session,
+        commit=False,
     )
     qos.notify_end_of_request(request, scheduler=internal_scheduler)
     logger.info(
@@ -570,12 +572,14 @@ class Broker:
                             message="Worker has been killed by the Nanny due to memory usage."
                             f"{job['worker']=}, {job['pid']=}, {job['rss']=}",
                             session=session,
+                            commit=False,
                         )
                         db.add_event(
                             event_type="user_visible_error",
                             request_uid=request_uid,
                             message=CONFIG.broker_memory_error_user_visible_log,
                             session=session,
+                            commit=False,
                         )
                         request = set_failed_request(
                             request=request,
@@ -757,6 +761,7 @@ class Broker:
                         internal_scheduler=self.internal_scheduler,
                         session=session,
                     )
+        session.commit()
 
     @perf_logger
     def sync_qos_rules(self, session_write) -> None:
@@ -791,7 +796,7 @@ class Broker:
                 qos_rules.update(new_qos_rules)
 
     @perf_logger
-    def sync_futures(self) -> None:
+    def sync_futures(self, session: sa.orm.Session) -> None:
         """Check if the futures are finished, error or cancelled and update the database accordingly.
 
         In a previous version of the broker used to call the client.add_done_callback method but
@@ -802,54 +807,54 @@ class Broker:
         finished_futures = []
         for future in self.futures.values():
             if future.status in ("finished", "error", "cancelled"):
-                finished_futures.append(self.on_future_done(future))
+                finished_futures.append(self.on_future_done(future, session))
+        session.commit()
         for key in finished_futures:
             self.futures.pop(key, None)
 
-    def on_future_done(self, future: distributed.Future) -> str | None:
+    def on_future_done(self, future: distributed.Future, session: sa.orm.Session) -> str | None:
         """Update the database status of the request according to the status of the future.
 
         If the status of the request in the database is not "running", it does nothing and returns None.
         """
-        with self.session_maker_write() as session:
-            request_uid = future.key.removeprefix(f"{CONFIG.broker_request_prefix}-")
-            try:
-                request = db.get_request(request_uid, session=session)
-            except db.NoResultFound:
-                logger.warning(
-                    "request not found",
-                    job_id=request_uid,
-                    dask_status=future.status,
-                )
-                return request_uid
-            if request.status != "running":
-                return None
-            if future.status == "finished":
-                # the result is updated in the database by the worker
-                set_successful_request(
-                    request=request,
-                    qos=self.qos,
-                    internal_scheduler=self.internal_scheduler,
-                    session=session,
-                )
-            elif future.status == "error":
-                exception = future.exception()
-                self.set_request_error_status(
-                    exception=exception, request_uid=request_uid, session=session
-                )
-            elif future.status != "cancelled":
-                # if the dask status is unknown, re-queue it
-                requeue_request(
-                    request=request,
-                    qos=self.qos,
-                    queue=self.queue,
-                    internal_scheduler=self.internal_scheduler,
-                    session=session,
-                )
-            else:
-                # if the dask status is cancelled, the qos has already been reset by sync_database
-                return None
-            future.release()
+        request_uid = future.key.removeprefix(f"{CONFIG.broker_request_prefix}-")
+        try:
+            request = db.get_request(request_uid, session=session)
+        except db.NoResultFound:
+            logger.warning(
+                "request not found",
+                job_id=request_uid,
+                dask_status=future.status,
+            )
+            return request_uid
+        if request.status != "running":
+            return None
+        if future.status == "finished":
+            # the result is updated in the database by the worker
+            set_successful_request(
+                request=request,
+                qos=self.qos,
+                internal_scheduler=self.internal_scheduler,
+                session=session,
+            )
+        elif future.status == "error":
+            exception = future.exception()
+            self.set_request_error_status(
+                exception=exception, request_uid=request_uid, session=session
+            )
+        elif future.status != "cancelled":
+            # if the dask status is unknown, re-queue it
+            requeue_request(
+                request=request,
+                qos=self.qos,
+                queue=self.queue,
+                internal_scheduler=self.internal_scheduler,
+                session=session,
+            )
+        else:
+            # if the dask status is cancelled, the qos has already been reset by sync_database
+            return None
+        future.release()
         return request_uid
 
     @perf_logger
@@ -904,6 +909,7 @@ class Broker:
                         priority=self.qos.priority(request),
                     )
                 requests_counter += 1
+        session_write.commit()
 
     def submit_request(
         self,
@@ -1001,7 +1007,7 @@ class Broker:
                         )
                     )
                     self.sync_qos_rules(session_write)
-                    self.sync_futures()
+                    self.sync_futures(session_write)
                     self.sync_database(session=session_write)
                     session_write.commit()
                     if (queue_length := self.queue.len()) != (

@@ -671,7 +671,6 @@ def requeue_request(
     )
     request.request_metadata = metadata
     request.status = "accepted"
-    session.commit()
     logger.info("requeueing request", **logger_kwargs(request=request))
     return request
 
@@ -692,7 +691,6 @@ def set_successful_request(
     request = session.scalars(statement).one()
     request.status = "successful"
     request.finished_at = sa.func.now()
-    session.commit()
     return request
 
 
@@ -730,6 +728,7 @@ def set_request_status(
     resubmit: bool | None = None,
     priority: float | None = None,
     scheduler: str | None = None,
+    commit: bool = True,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -760,7 +759,8 @@ def set_request_status(
         request.cache_id = cache_id
     # FIXME: logs can't be live updated
     request.status = status
-    session.commit()
+    if commit:
+        session.commit()
     return request
 
 
