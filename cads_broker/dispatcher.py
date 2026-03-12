@@ -444,7 +444,7 @@ def requeue_request(
 @attrs.define
 class Broker:
     schedulers: dask_utils.Schedulers
-    input_schedulers: list[str]
+    schedulers_url: list[str]
     environment: Environment.Environment
     qos: QoS.QoS
     session_maker_read: sa.orm.sessionmaker
@@ -487,7 +487,7 @@ class Broker:
             session_maker_write=session_maker_write,
             environment=qos.environment,
             qos=qos,
-            input_schedulers=scheduler_url,
+            schedulers_url=scheduler_url,
         )
         return self
 
@@ -970,14 +970,14 @@ class Broker:
         while True:
             start_loop = time.perf_counter()
             # check if the scheduler is alive
-            for scheduler in self.input_schedulers:
-                client = self.schedulers.get_client(scheduler)
+            for scheduler_url in self.schedulers_url:
+                client = self.schedulers.get_client(scheduler_url)
                 if client is None or client.scheduler is None:
-                    logger.info(f"Reconnecting to dask scheduler {scheduler}")
-                    if (client := create_dask_client(scheduler)) is not None:
-                        self.schedulers.add_client(scheduler, client)
+                    logger.info(f"Reconnecting to dask scheduler {scheduler_url}")
+                    if (client := create_dask_client(scheduler_url)) is not None:
+                        self.schedulers.add_client(scheduler_url, client)
                     else:
-                        self.schedulers.pop_client(scheduler)
+                        self.schedulers.pop_client(scheduler_url)
             # reset the cache of the qos functions
             db.QOS_FUNCTIONS_CACHE.clear()
             with self.session_maker_read() as session_read:
