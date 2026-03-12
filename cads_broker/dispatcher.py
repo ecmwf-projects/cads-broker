@@ -519,9 +519,10 @@ class Broker:
         """Set the status of the request to failed and write the error message and reason.
 
         If the error reason is "KilledWorker":
-            - if the worker has been killed by the Nanny for memory usage, it add the event for the user
-            - if the worker is killed for unknown reasons, it re-queues the request
-              if the requeue limit is not reached. This is configurable with the environment variable
+            - if the worker has been killed by the Nanny for memory usage, it adds the message to the user 
+              in the event table
+            - if the worker is killed for unknown reasons, it re-queues the request if the requeue limit is
+              not reached. This is configurable with the environment variable
         """
         error_message = "".join(traceback.format_exception(exception))
         error_reason = exception.__class__.__name__
