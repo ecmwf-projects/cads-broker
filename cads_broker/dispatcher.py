@@ -134,9 +134,7 @@ def kill_job_on_worker(
     # loop on all the processes related to the request_uid
     if client is None:
         return
-    # for worker_pid_event in client.get_events(request_uid):
     for worker_pid_event in db.get_worker_pid(request_uid, session=session):
-        # _, worker_pid_event = worker_pid_event
         pid = worker_pid_event["pid"]
         worker_ip = worker_pid_event["worker"]
         try:
@@ -554,7 +552,6 @@ class Broker:
             worker_restart_events = client.get_events("worker-restart-memory")
             # get info on worker and pid of the killed request
             try:
-                # worker_pid_event = client.get_events(request_uid)[0][1]
                 worker_pid_event = db.get_worker_pid(request_uid, session=session)[0]
             except IndexError:
                 worker_restart_events = False
