@@ -4,7 +4,6 @@ import io
 import os
 import pickle
 import random
-import signal
 import threading
 import time
 import traceback
@@ -44,49 +43,6 @@ CONFIG = config.BrokerConfig()
 
 
 @cachetools.cached(  # type: ignore
-    cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.broker_get_number_of_workers_cache_time
-    ),
-    info=True,
-)
-def get_number_of_workers(client: distributed.Client) -> int:
-    workers = client.scheduler_info().get("workers", {})
-    number_of_workers = len(
-        [w for w in workers.values() if w.get("status", None) == "running"]
-    )
-    return number_of_workers
-
-
-def get_total_number_of_workers(clients: Iterable[distributed.Client]) -> int:
-    number_of_workers = 0
-    for client in clients:
-        number_of_workers += get_number_of_workers(client)
-    return number_of_workers
-
-
-def create_dask_client(scheduler_url):
-    try:
-        client = distributed.Client(scheduler_url, heartbeat_interval=1000)
-        return client
-    except OSError:
-        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url)
-        return
-
-
-@cachetools.cached(  # type: ignore
-    cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.broker_get_workers_resources_cache_time
-    ),
-    info=True,
-)
-def get_workers_resources(client: distributed.Client) -> list[str]:
-    workers_resources = []
-    for worker in client.scheduler_info().get("workers", {}).values():
-        workers_resources.extend(list(worker.get("resources", {}).keys()))
-    return workers_resources
-
-
-@cachetools.cached(  # type: ignore
     cache=cachetools.TTLCache(maxsize=1024, ttl=CONFIG.broker_qos_rules_cache_time),
     info=True,
 )
@@ -97,89 +53,6 @@ def get_rules_hash(rules_path: str):
         with open(rules_path) as f:
             rules = f.read()
     return hashlib.md5(rules.encode()).hexdigest()
-
-
-@cachetools.cached(  # type: ignore
-    cache=cachetools.TTLCache(
-        maxsize=1024, ttl=CONFIG.broker_get_tasks_from_scheduler_cache_time
-    ),
-    info=True,
-)
-def get_tasks_from_scheduler(client: distributed.Client) -> Any:
-    """Get the tasks from the scheduler.
-
-    This function is executed on the scheduler pod.
-    """
-
-    def get_tasks_on_scheduler(dask_scheduler: distributed.Scheduler) -> dict[str, Any]:
-        tasks = {}
-        for task_id, task in dask_scheduler.tasks.items():
-            tasks[task_id] = {
-                "state": task.state,
-                "exception": task.exception,
-            }
-        return tasks
-
-    try:
-        return client.run_on_scheduler(get_tasks_on_scheduler)
-    except (distributed.comm.core.CommClosedError, OSError):
-        logger.error("Cannot connect to scheduler")
-        return {}
-
-
-def kill_job_on_worker(
-    client: distributed.Client | None, request_uid: str, session: sa.orm.Session
-) -> None:
-    """Kill the job on the worker."""
-    # loop on all the processes related to the request_uid
-    if client is None:
-        return
-    for worker_pid_event in db.get_worker_pid(request_uid, session=session):
-        pid = worker_pid_event["pid"]
-        worker_ip = worker_pid_event["worker"]
-        try:
-            client.run(
-                os.kill,
-                pid,
-                signal.SIGTERM,
-                workers=[worker_ip],
-                nanny=True,
-                on_error="ignore",
-            )
-            logger.info(
-                "killed job on worker", job_id=request_uid, pid=pid, worker_ip=worker_ip
-            )
-        except (KeyError, NameError):
-            logger.warning(
-                "worker not found", job_id=request_uid, pid=pid, worker_ip=worker_ip
-            )
-        except ProcessLookupError:
-            logger.warning(
-                "process not found", job_id=request_uid, pid=pid, worker_ip=worker_ip
-            )
-
-
-def cancel_jobs_on_scheduler(
-    client: distributed.Client | None, job_ids: list[str]
-) -> None:
-    """Cancel jobs on the dask scheduler.
-
-    This function is executed on the scheduler pod. This just cancel the jobs on the scheduler.
-    See https://stackoverflow.com/questions/49203128/how-do-i-stop-a-running-task-in-dask.
-    """
-
-    def cancel_jobs(dask_scheduler: distributed.Scheduler, job_ids: list[str]) -> None:
-        for job_id in job_ids:
-            if job_id in dask_scheduler.tasks:
-                dask_scheduler.transitions(
-                    {job_id: "cancelled"}, stimulus_id="manual-cancel"
-                )
-
-    try:
-        return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
-    except (distributed.comm.core.CommClosedError, OSError, AttributeError):
-        logger.error("Cannot connect to scheduler")
-        return
 
 
 @cachetools.cached(  # type: ignore
@@ -201,7 +74,7 @@ def cancel_stuck_requests(
                 f"canceling stuck requests for more than {CONFIG.broker_stuck_requests_limit_minutes} mins",
                 stuck_requests=stuck_requests,
             )
-            cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
+            dask_utils.cancel_jobs_on_scheduler(client, job_ids=stuck_requests)
 
 
 class Scheduler:
@@ -471,13 +344,13 @@ class Broker:
     ):
         schedulers = dask_utils.Schedulers()
         for scheduler in scheduler_url:
-            if (client := create_dask_client(scheduler)) is not None:
+            if (client := dask_utils.create_dask_client(scheduler)) is not None:
                 schedulers.add_client(scheduler, client)
         session_maker_read = db.ensure_session_obj(session_maker_read, mode="r")
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
             qos = instantiate_qos(
-                session_read, get_total_number_of_workers(schedulers.get_clients_list())
+                session_read, dask_utils.get_total_number_of_workers(schedulers.get_clients_list())
             )
         with session_maker_write() as session:
             reload_qos_rules(session, qos)
@@ -492,7 +365,7 @@ class Broker:
         return self
 
     def set_number_of_workers(self):
-        number_of_workers = get_total_number_of_workers(
+        number_of_workers = dask_utils.get_total_number_of_workers(
             clients=self.schedulers.get_clients_list()
         )
         self.environment.number_of_workers = number_of_workers
@@ -503,7 +376,7 @@ class Broker:
         if (
             abs(
                 self.environment.number_of_workers
-                - get_total_number_of_workers(self.schedulers.get_clients_list())
+                - dask_utils.get_total_number_of_workers(self.schedulers.get_clients_list())
             )
             > CONFIG.broker_workers_gap
         ) or self.environment.number_of_workers == 0:
@@ -666,15 +539,15 @@ class Broker:
             else:
                 # if the request is not in the futures, it means that the request has been lost by the broker
                 # try to cancel the job directly on the scheduler
-                cancel_jobs_on_scheduler(client, job_ids=[request.request_uid])
-            kill_job_on_worker(client, request.request_uid, session=session)
+                dask_utils.cancel_jobs_on_scheduler(client, job_ids=[request.request_uid])
+            dask_utils.kill_job_on_worker(client, request.request_uid, session=session)
             session = self.manage_dismissed_request(request, session)
         session.commit()
 
         # get all the tasks from the schedulers pool
         scheduler_tasks = {}
         for client in self.schedulers.get_clients_list():
-            scheduler_tasks.update(get_tasks_from_scheduler(client))
+            scheduler_tasks.update(dask_utils.get_tasks_from_scheduler(client))
 
         requests = db.get_running_requests(session=session)
         if len(scheduler_tasks) == 0 and len(self.futures):
@@ -920,7 +793,7 @@ class Broker:
         for scheduler in plackett_luce_shuffle(
             self.schedulers.get_clients_addresses(),
             [
-                get_number_of_workers(client)
+                dask_utils.get_number_of_workers(client)
                 for client in self.schedulers.get_clients_list()
             ],
         ):
@@ -928,7 +801,7 @@ class Broker:
             resources = request.request_metadata.get("resources", {})
             request.request_metadata["scheduler"] = scheduler
             # check if the resources are available on the workers pool
-            if set(resources.keys()).issubset(get_workers_resources(client)):
+            if set(resources.keys()).issubset(dask_utils.get_workers_resources(client)):
                 request = set_running_request(
                     request=request,
                     priority=priority,
@@ -975,7 +848,7 @@ class Broker:
                 client = self.schedulers.get_client(scheduler_url)
                 if client is None or client.scheduler is None:
                     logger.info(f"Reconnecting to dask scheduler {scheduler_url}")
-                    if (client := create_dask_client(scheduler_url)) is not None:
+                    if (client := dask_utils.create_dask_client(scheduler_url)) is not None:
                         self.schedulers.add_client(scheduler_url, client)
                     else:
                         self.schedulers.pop_client(scheduler_url)
