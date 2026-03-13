@@ -175,7 +175,7 @@ def clean_scheduler_memory(client: distributed.Client):
     """
     Safely flushes Dask's internal BatchedSend network logs.
 
-    This prevents memory leaks from massive task payloads during high-throughput load tests.
+    This prevents dask scheduler memory leaks.
     """
 
     def flush_network_logs(dask_scheduler):
