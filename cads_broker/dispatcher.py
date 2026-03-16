@@ -68,8 +68,8 @@ def create_dask_client(scheduler_url):
     try:
         client = distributed.Client(scheduler_url, heartbeat_interval=1000)
         return client
-    except OSError:
-        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url)
+    except OSError as e:
+        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url, error=str(e))
         return
 
 
@@ -122,8 +122,8 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
     try:
         return client.run_on_scheduler(get_tasks_on_scheduler)
-    except (distributed.comm.core.CommClosedError, OSError):
-        logger.error("Cannot connect to scheduler")
+    except (distributed.comm.core.CommClosedError, OSError) as e:
+        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address, error=str(e))
         return {}
 
 
@@ -159,7 +159,7 @@ def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> N
 
 
 def cancel_jobs_on_scheduler(
-    client: distributed.Client | None, job_ids: list[str]
+    client: distributed.Client, job_ids: list[str]
 ) -> None:
     """Cancel jobs on the dask scheduler.
 
@@ -176,8 +176,8 @@ def cancel_jobs_on_scheduler(
 
     try:
         return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
-    except (distributed.comm.core.CommClosedError, OSError, AttributeError):
-        logger.error("Cannot connect to scheduler")
+    except (distributed.comm.core.CommClosedError, OSError, AttributeError) as e:
+        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address, error=str(e))
         return
 
 
