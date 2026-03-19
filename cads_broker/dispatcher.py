@@ -131,7 +131,6 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
         logger.error(
             "Cannot connect to scheduler",
             function="get_tasks_from_scheduler",
-            scheduler_url=client.scheduler.address,
             error=str(e),
         )
         return {}
@@ -189,7 +188,6 @@ def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> 
             "Cannot connect to scheduler",
             function="cancel_jobs_on_scheduler",
             job_ids=job_ids,
-            scheduler_url=client.scheduler.address,
             error=str(e),
         )
         return
