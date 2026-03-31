@@ -68,8 +68,13 @@ def create_dask_client(scheduler_url):
     try:
         client = distributed.Client(scheduler_url, heartbeat_interval=1000)
         return client
-    except OSError:
-        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url)
+    except OSError as e:
+        logger.error(
+            "Cannot connect to scheduler",
+            function="create_dask_client",
+            scheduler_url=scheduler_url,
+            error=str(e),
+        )
         return
 
 
@@ -122,8 +127,12 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
 
     try:
         return client.run_on_scheduler(get_tasks_on_scheduler)
-    except (distributed.comm.core.CommClosedError, OSError):
-        logger.error("Cannot connect to scheduler")
+    except (distributed.comm.core.CommClosedError, OSError) as e:
+        logger.error(
+            "Cannot connect to scheduler",
+            function="get_tasks_from_scheduler",
+            error=str(e),
+        )
         return {}
 
 
@@ -158,9 +167,7 @@ def kill_job_on_worker(client: distributed.Client | None, request_uid: str) -> N
             )
 
 
-def cancel_jobs_on_scheduler(
-    client: distributed.Client | None, job_ids: list[str]
-) -> None:
+def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> None:
     """Cancel jobs on the dask scheduler.
 
     This function is executed on the scheduler pod. This just cancel the jobs on the scheduler.
@@ -176,8 +183,13 @@ def cancel_jobs_on_scheduler(
 
     try:
         return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
-    except (distributed.comm.core.CommClosedError, OSError, AttributeError):
-        logger.error("Cannot connect to scheduler")
+    except (distributed.comm.core.CommClosedError, OSError, AttributeError) as e:
+        logger.error(
+            "Cannot connect to scheduler",
+            function="cancel_jobs_on_scheduler",
+            job_ids=job_ids,
+            error=str(e),
+        )
         return
 
 
@@ -667,11 +679,6 @@ class Broker:
             scheduler_tasks.update(get_tasks_from_scheduler(client))
 
         requests = db.get_running_requests(session=session)
-        if len(scheduler_tasks) == 0 and len(self.futures):
-            logger.info(
-                f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
-            )
-            self.futures = {}
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:

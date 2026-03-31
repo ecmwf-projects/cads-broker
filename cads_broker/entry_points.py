@@ -2,19 +2,18 @@
 
 import datetime
 import enum
-import os
 import random
 import time
 import uuid
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import prettytable
 import sqlalchemy as sa
 import typer
 from typing_extensions import Annotated
 
-from cads_broker import config, database, dispatcher, object_storage
+from cads_broker import config, database, dispatcher
 
 app = typer.Typer()
 
@@ -297,38 +296,12 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     force: if True, drop the database structure and build again from scratch
     """
-    database.logger.info(
-        "starting creation/updating of broker db structure and storage cache area."
-    )
+    database.logger.info("starting creation/updating of broker db structure.")
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
     database.init_database(connection_string, force=force)
     database.logger.info("successfully created/updated the broker database structure.")
-
-    # get storage parameters from environment
-    for key in ("OBJECT_STORAGE_URL", "STORAGE_ADMIN", "STORAGE_PASSWORD"):
-        if key not in os.environ:
-            msg = (
-                "key %r must be defined in the environment in order to use the object storage"
-                % key
-            )
-            raise KeyError(msg)
-    object_storage_url = os.environ["OBJECT_STORAGE_URL"]
-    storage_kws: dict[str, Any] = {
-        "aws_access_key_id": os.environ["STORAGE_ADMIN"],
-        "aws_secret_access_key": os.environ["STORAGE_PASSWORD"],
-    }
-    download_buckets: List[str] = object_storage.parse_data_volumes_config()
-    for download_bucket in download_buckets:
-        if download_bucket.startswith("s3://"):
-            object_storage.create_download_bucket(
-                download_bucket, object_storage_url, **storage_kws
-            )
-    database.logger.info("successfully created the cache areas in the object storage.")
-    database.logger.info(
-        "end of creation/updating of broker db structure and storage cache area."
-    )
 
 
 @app.command()
