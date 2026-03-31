@@ -2,19 +2,18 @@
 
 import datetime
 import enum
-import os
 import random
 import time
 import uuid
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import prettytable
 import sqlalchemy as sa
 import typer
 from typing_extensions import Annotated
 
-from cads_broker import config, database, dispatcher, object_storage
+from cads_broker import config, database, dispatcher
 
 app = typer.Typer()
 
@@ -297,9 +296,7 @@ def init_db(connection_string: Optional[str] = None, force: bool = False) -> Non
     connection_string: something like 'postgresql://user:password@netloc:port/dbname'
     force: if True, drop the database structure and build again from scratch
     """
-    database.logger.info(
-        "starting creation/updating of broker db structure."
-    )
+    database.logger.info("starting creation/updating of broker db structure.")
     if not connection_string:
         dbsettings = config.ensure_settings(config.dbsettings)
         connection_string = dbsettings.connection_string
