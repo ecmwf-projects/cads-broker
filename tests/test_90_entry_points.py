@@ -76,27 +76,11 @@ def test_init_db(postgresql: Connection[str], tmpdir, mocker) -> None:
     query = sa.text(
         "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
     )
-    # FIXME: to be moved to cads-worker
-    # object_storage_url = "http://myobject-storage:myport/"
-    # object_storage_kws: dict[str, Any] = {
-    #     "aws_access_key_id": "storage_user",
-    #     "aws_secret_access_key": "storage_password",
-    # }
-    # result = runner.invoke(
-    #     entry_points.app,
-    #     ["init-db", "--connection-string", connection_string, "--force"],
-    #     env={
-    #         "OBJECT_STORAGE_URL": object_storage_url,
-    #         "STORAGE_ADMIN": object_storage_kws["aws_access_key_id"],
-    #         "STORAGE_PASSWORD": object_storage_kws["aws_secret_access_key"],
-    #         "DATA_VOLUMES_CONFIG": data_volumes_config_path,
-    #     },
-    # )
-    # assert result.exit_code == 0
-    # assert patch_storage.mock_calls == [
-    #     unittest.mock.call("s3://mybucket1", object_storage_url, **object_storage_kws),
-    #     unittest.mock.call("s3://mybucket2", object_storage_url, **object_storage_kws),
-    # ]
+    result = runner.invoke(
+        entry_points.app,
+        ["init-db", "--connection-string", connection_string, "--force"],
+    )
+    assert result.exit_code == 0
     assert set(conn.execute(query).scalars()) == set(
         database.BaseModel.metadata.tables
     ).union(
