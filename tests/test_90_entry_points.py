@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import os
-import unittest.mock
 import uuid
 from typing import Any
 
@@ -63,7 +62,7 @@ def mock_config(
 
 
 def test_init_db(postgresql: Connection[str], tmpdir, mocker) -> None:
-    patch_storage = mocker.patch.object(object_storage, "create_download_bucket")
+    mocker.patch.object(object_storage, "create_download_bucket")
     data_volumes_config_path = os.path.join(str(tmpdir), "data_volumes.config")
     with open(data_volumes_config_path, "w") as fp:
         fp.writelines(["s3://mybucket1\n", "s3://mybucket2\n"])
