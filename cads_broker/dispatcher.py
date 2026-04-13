@@ -550,11 +550,6 @@ class Broker:
             scheduler_tasks.update(dask_utils.get_tasks_from_scheduler(client))
 
         requests = db.get_running_requests(session=session)
-        if len(scheduler_tasks) == 0 and len(self.futures):
-            logger.info(
-                f"Scheduler is empty, but futures are {len(self.futures)}. Resetting futures."
-            )
-            self.futures = {}
         for request in requests:
             # if request is in futures, go on
             if request.request_uid in self.futures:

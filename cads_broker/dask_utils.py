@@ -71,7 +71,12 @@ def create_dask_client(scheduler_url):
         client = distributed.Client(scheduler_url, heartbeat_interval=1000)
         return client
     except OSError as e:
-        logger.error("Cannot connect to scheduler", scheduler_url=scheduler_url, error=str(e))
+        logger.error(
+            "Cannot connect to scheduler",
+            function="create_dask_client",
+            scheduler_url=scheduler_url,
+            error=str(e),
+        )
         return
 
 
@@ -167,8 +172,12 @@ def cancel_jobs_on_scheduler(client: distributed.Client, job_ids: list[str]) -> 
     try:
         return client.run_on_scheduler(cancel_jobs, job_ids=job_ids)
     except (distributed.comm.core.CommClosedError, OSError, AttributeError) as e:
-        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address, error=str(e))
-        return
+        logger.error(
+            "Cannot connect to scheduler",
+            function="cancel_jobs_on_scheduler",
+            job_ids=job_ids,
+            error=str(e),
+        )
 
 
 def clean_scheduler_memory(client: distributed.Client):
