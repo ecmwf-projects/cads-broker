@@ -8,6 +8,8 @@ import os
 import uuid
 from typing import Any
 
+import alembic.command
+import alembic.config
 import cacholote
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -17,8 +19,6 @@ import structlog
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from typing_extensions import Iterable
 
-import alembic.command
-import alembic.config
 from cads_broker import alembic_cli, config
 
 BaseModel = sa.orm.declarative_base()
