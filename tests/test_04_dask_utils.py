@@ -19,6 +19,7 @@ def test_add_client() -> None:
     retrieved_client = schedulers.get_client("client_1")
     assert retrieved_client is mock_client
 
+
 def test_pop_client() -> None:
     """Test popping a client from the schedulers dict."""
     schedulers = dask_utils.Schedulers()
@@ -30,6 +31,7 @@ def test_pop_client() -> None:
     assert popped_client is mock_client
     assert schedulers.get_client("client_1") is None
 
+
 def test_pop_client_not_found() -> None:
     """Test popping a non-existent client returns None."""
     schedulers = dask_utils.Schedulers()
@@ -37,6 +39,7 @@ def test_pop_client_not_found() -> None:
     popped_client = schedulers.pop_client("non_existent")
 
     assert popped_client is None
+
 
 def test_get_client() -> None:
     """Test getting a client from the schedulers dict."""
@@ -48,6 +51,7 @@ def test_get_client() -> None:
 
     assert retrieved_client is mock_client
 
+
 def test_get_client_not_found() -> None:
     """Test getting a non-existent client returns None."""
     schedulers = dask_utils.Schedulers()
@@ -55,6 +59,7 @@ def test_get_client_not_found() -> None:
     retrieved_client = schedulers.get_client("non_existent")
 
     assert retrieved_client is None
+
 
 def test_get_clients_list() -> None:
     """Test getting all clients as a list."""
@@ -70,6 +75,7 @@ def test_get_clients_list() -> None:
     assert mock_client_1 in clients
     assert mock_client_2 in clients
 
+
 def test_get_clients_addresses() -> None:
     """Test getting all client addresses (keys)."""
     schedulers = dask_utils.Schedulers()
@@ -84,6 +90,7 @@ def test_get_clients_addresses() -> None:
     assert "client_1" in addresses
     assert "client_2" in addresses
 
+
 def test_get_clients_items() -> None:
     """Test getting all client items."""
     schedulers = dask_utils.Schedulers()
@@ -97,6 +104,7 @@ def test_get_clients_items() -> None:
     assert len(items) == 2
     assert ("client_1", mock_client_1) in items
     assert ("client_2", mock_client_2) in items
+
 
 def test_thread_safety() -> None:
     """Test thread safety of Schedulers class."""
@@ -144,6 +152,7 @@ def test_get_number_of_workers_all_running() -> None:
 
     assert result == 3
 
+
 def test_get_number_of_workers_mixed_statuses() -> None:
     """Test getting number of workers with mixed statuses."""
     mock_client = Mock(spec=Client)
@@ -163,6 +172,7 @@ def test_get_number_of_workers_mixed_statuses() -> None:
 
     assert result == 2
 
+
 def test_get_number_of_workers_no_workers() -> None:
     """Test getting number of workers when no workers are available."""
     mock_client = Mock(spec=Client)
@@ -174,6 +184,7 @@ def test_get_number_of_workers_no_workers() -> None:
     result = dask_utils.get_number_of_workers(mock_client)
 
     assert result == 0
+
 
 def test_get_number_of_workers_no_status() -> None:
     """Test getting number of workers when status is missing."""
@@ -218,6 +229,7 @@ def test_get_total_number_of_workers() -> None:
 
     assert result == 3
 
+
 def test_get_total_number_of_workers_empty_list() -> None:
     """Test getting total number of workers with no clients."""
     # Clear cache before test
@@ -240,6 +252,7 @@ def test_create_dask_client_success() -> None:
             "tcp://scheduler:8786", heartbeat_interval=1000
         )
         assert result is mock_client_instance
+
 
 def test_create_dask_client_oserror(mocker) -> None:
     """Test create_dask_client logs error on OSError."""
@@ -278,6 +291,7 @@ def test_get_workers_resources() -> None:
     assert "memory" in result
     assert len(result) == 3
 
+
 def test_get_workers_resources_no_workers() -> None:
     """Test getting workers resources when no workers are available."""
     mock_client = Mock(spec=Client)
@@ -289,6 +303,7 @@ def test_get_workers_resources_no_workers() -> None:
     result = dask_utils.get_workers_resources(mock_client)
 
     assert result == []
+
 
 def test_get_workers_resources_no_resources() -> None:
     """Test getting workers resources when workers have no resources."""
@@ -325,6 +340,7 @@ def test_get_tasks_from_scheduler_success() -> None:
 
     assert result == expected_tasks
 
+
 def test_get_tasks_from_scheduler_commclosed_error(mocker) -> None:
     """Test get_tasks_from_scheduler handles CommClosedError."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
@@ -342,6 +358,7 @@ def test_get_tasks_from_scheduler_commclosed_error(mocker) -> None:
 
     assert result == {}
     mock_logger.error.assert_called_once()
+
 
 def test_get_tasks_from_scheduler_oserror(mocker) -> None:
     """Test get_tasks_from_scheduler handles OSError."""
@@ -367,13 +384,12 @@ def test_kill_job_on_worker_no_client(mocker) -> None:
     # Should not raise any error
     dask_utils.kill_job_on_worker(None, "request_123", mock_session)
 
+
 def test_kill_job_on_worker_success(mocker) -> None:
     """Test successfully killing a job on worker."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
     mock_session = Mock()
-    mock_database_get_worker_pid = mocker.patch(
-        "cads_broker.database.get_worker_pid"
-    )
+    mock_database_get_worker_pid = mocker.patch("cads_broker.database.get_worker_pid")
     mock_client = Mock(spec=Client)
 
     mock_database_get_worker_pid.return_value = [
@@ -386,13 +402,12 @@ def test_kill_job_on_worker_success(mocker) -> None:
     assert mock_client.run.call_count == 2
     mock_logger.info.assert_called()
 
+
 def test_kill_job_on_worker_keyerror(mocker) -> None:
     """Test kill_job_on_worker handles KeyError."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
     mock_session = Mock()
-    mock_database_get_worker_pid = mocker.patch(
-        "cads_broker.database.get_worker_pid"
-    )
+    mock_database_get_worker_pid = mocker.patch("cads_broker.database.get_worker_pid")
     mock_client = Mock(spec=Client)
 
     mock_database_get_worker_pid.return_value = [
@@ -404,13 +419,12 @@ def test_kill_job_on_worker_keyerror(mocker) -> None:
 
     mock_logger.warning.assert_called()
 
+
 def test_kill_job_on_worker_process_lookup_error(mocker) -> None:
     """Test kill_job_on_worker handles ProcessLookupError."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
     mock_session = Mock()
-    mock_database_get_worker_pid = mocker.patch(
-        "cads_broker.database.get_worker_pid"
-    )
+    mock_database_get_worker_pid = mocker.patch("cads_broker.database.get_worker_pid")
     mock_client = Mock(spec=Client)
 
     mock_database_get_worker_pid.return_value = [
@@ -434,6 +448,7 @@ def test_cancel_jobs_on_scheduler_success() -> None:
     call_kwargs = mock_client.run_on_scheduler.call_args[1]
     assert call_kwargs["job_ids"] == job_ids
 
+
 def test_cancel_jobs_on_scheduler_commclosed_error(mocker) -> None:
     """Test cancel_jobs_on_scheduler handles CommClosedError."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
@@ -448,6 +463,7 @@ def test_cancel_jobs_on_scheduler_commclosed_error(mocker) -> None:
 
     mock_logger.error.assert_called_once()
 
+
 def test_cancel_jobs_on_scheduler_oserror(mocker) -> None:
     """Test cancel_jobs_on_scheduler handles OSError."""
     mock_logger = mocker.patch("cads_broker.dask_utils.logger")
@@ -459,6 +475,7 @@ def test_cancel_jobs_on_scheduler_oserror(mocker) -> None:
     dask_utils.cancel_jobs_on_scheduler(mock_client, job_ids)
 
     mock_logger.error.assert_called_once()
+
 
 def test_cancel_jobs_on_scheduler_attribute_error(mocker) -> None:
     """Test cancel_jobs_on_scheduler handles AttributeError."""
@@ -499,12 +516,15 @@ def test_clean_scheduler_memory_for_all_clients(mocker) -> None:
     mock_sleep.side_effect = [None, KeyboardInterrupt()]
 
     with pytest.raises(KeyboardInterrupt):
-        dask_utils.clean_scheduler_memory_for_all_clients(schedulers, timeout_seconds=60)
+        dask_utils.clean_scheduler_memory_for_all_clients(
+            schedulers, timeout_seconds=60
+        )
 
     # Check that sleep was called with the correct timeout
     mock_sleep.assert_called_with(60)
     # Check that clean_scheduler_memory was called for each client
     assert mock_clean.call_count == 2
+
 
 def test_clean_scheduler_memory_for_all_clients_with_error(mocker) -> None:
     """Test cleaning scheduler memory handles errors."""
@@ -522,7 +542,9 @@ def test_clean_scheduler_memory_for_all_clients_with_error(mocker) -> None:
     mock_sleep.side_effect = [None, KeyboardInterrupt()]
 
     with pytest.raises(KeyboardInterrupt):
-        dask_utils.clean_scheduler_memory_for_all_clients(schedulers, timeout_seconds=60)
+        dask_utils.clean_scheduler_memory_for_all_clients(
+            schedulers, timeout_seconds=60
+        )
 
     # Check that error logging was called
     mock_logger.error.assert_called()
