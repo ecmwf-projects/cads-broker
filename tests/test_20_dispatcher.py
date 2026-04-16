@@ -7,7 +7,7 @@ import distributed
 import pytest_mock
 import sqlalchemy as sa
 
-from cads_broker import Environment, dispatcher
+from cads_broker import Environment, dask_utils, dispatcher
 from cads_broker import database as db
 from cads_broker.qos import QoS, Rule
 
@@ -53,13 +53,15 @@ def test_broker_sync_database(
     qos = QoS.QoS(
         rules=Rule.RuleSet(), environment=environment, rules_hash="", logger=logger
     )
+    schedulers = dask_utils.Schedulers()
+    schedulers.add_client("scheduler-1", CLIENT)
     broker = dispatcher.Broker(
-        schedulers={"scheduler-1": CLIENT},
+        schedulers=schedulers,
+        schedulers_url=["scheduler-1"],
         environment=environment,
         qos=qos,
         session_maker_read=session_obj,
         session_maker_write=session_obj,
-        input_schedulers=["scheduler-1"],
     )
 
     in_futures_request_uid = str(uuid.uuid4())
@@ -99,7 +101,7 @@ def test_broker_sync_database(
         return {in_dask_request_uid: {"state": "...", "exception": None}}
 
     mocker.patch(
-        "cads_broker.dispatcher.get_tasks_from_scheduler",
+        "cads_broker.dask_utils.get_tasks_from_scheduler",
         return_value=mock_get_tasks(),
     )
     broker.futures = {in_futures_request_uid: "..."}

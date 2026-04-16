@@ -671,7 +671,6 @@ def requeue_request(
     )
     request.request_metadata = metadata
     request.status = "accepted"
-    session.commit()
     logger.info("requeueing request", **logger_kwargs(request=request))
     return request
 
@@ -691,8 +690,7 @@ def set_successful_request(
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
     request = session.scalars(statement).one()
     request.status = "successful"
-    request.finished_at = sa.func.now()
-    session.commit()
+    request.finished_at = datetime.datetime.now()
     return request
 
 
@@ -730,6 +728,7 @@ def set_request_status(
     resubmit: bool | None = None,
     priority: float | None = None,
     scheduler: str | None = None,
+    commit: bool = True,
 ) -> SystemRequest:
     """Set the status of a request."""
     statement = sa.select(SystemRequest).where(SystemRequest.request_uid == request_uid)
@@ -749,18 +748,19 @@ def set_request_status(
         metadata.update({"scheduler": scheduler})
         request.request_metadata = metadata
     if status == "successful":
-        request.finished_at = sa.func.now()
+        request.finished_at = datetime.datetime.now()
     elif status in ("failed", "rejected"):
-        request.finished_at = sa.func.now()
+        request.finished_at = datetime.datetime.now()
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
-        request.started_at = sa.func.now()
+        request.started_at = datetime.datetime.now()
         request.qos_status = {}
     if cache_id is not None:
         request.cache_id = cache_id
     # FIXME: logs can't be live updated
     request.status = status
-    session.commit()
+    if commit:
+        session.commit()
     return request
 
 
@@ -823,6 +823,14 @@ def ensure_adaptor_properties(
     )
     session.execute(do_update_stmt)
     session.commit()
+
+
+def get_worker_pid(request_uid: str, session: sa.orm.Session) -> list[dict[str, str]]:
+    """Get the worker pid for a request."""
+    events = get_events_from_request(
+        request_uid=request_uid, session=session, event_type="worker_pid"
+    )
+    return [json.loads(event.message) for event in events]
 
 
 def add_event(
