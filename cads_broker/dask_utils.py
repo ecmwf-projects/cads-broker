@@ -117,7 +117,11 @@ def get_tasks_from_scheduler(client: distributed.Client) -> Any:
     try:
         return client.run_on_scheduler(get_tasks_on_scheduler)
     except (distributed.comm.core.CommClosedError, OSError) as e:
-        logger.error("Cannot connect to scheduler", scheduler_url=client.scheduler.address, error=str(e))
+        logger.error(
+            "Cannot connect to scheduler",
+            scheduler_url=client.scheduler.address,
+            error=str(e),
+        )
         return {}
 
 

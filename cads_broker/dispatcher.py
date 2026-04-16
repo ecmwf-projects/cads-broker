@@ -350,7 +350,8 @@ class Broker:
         session_maker_write = db.ensure_session_obj(session_maker_write, mode="w")
         with session_maker_read() as session_read:
             qos = instantiate_qos(
-                session_read, dask_utils.get_total_number_of_workers(schedulers.get_clients_list())
+                session_read,
+                dask_utils.get_total_number_of_workers(schedulers.get_clients_list()),
             )
         with session_maker_write() as session:
             reload_qos_rules(session, qos)
@@ -376,7 +377,9 @@ class Broker:
         if (
             abs(
                 self.environment.number_of_workers
-                - dask_utils.get_total_number_of_workers(self.schedulers.get_clients_list())
+                - dask_utils.get_total_number_of_workers(
+                    self.schedulers.get_clients_list()
+                )
             )
             > CONFIG.broker_workers_gap
         ) or self.environment.number_of_workers == 0:
@@ -392,7 +395,7 @@ class Broker:
         """Set the status of the request to failed and write the error message and reason.
 
         If the error reason is "KilledWorker":
-            - if the worker has been killed by the Nanny for memory usage, it adds the message to the user 
+            - if the worker has been killed by the Nanny for memory usage, it adds the message to the user
               in the event table
             - if the worker is killed for unknown reasons, it re-queues the request if the requeue limit is
               not reached. This is configurable with the environment variable
@@ -539,7 +542,9 @@ class Broker:
             else:
                 # if the request is not in the futures, it means that the request has been lost by the broker
                 # try to cancel the job directly on the scheduler
-                dask_utils.cancel_jobs_on_scheduler(client, job_ids=[request.request_uid])
+                dask_utils.cancel_jobs_on_scheduler(
+                    client, job_ids=[request.request_uid]
+                )
             dask_utils.kill_job_on_worker(client, request.request_uid, session=session)
             session = self.manage_dismissed_request(request, session)
         session.commit()
@@ -678,7 +683,9 @@ class Broker:
         for key in finished_futures:
             self.futures.pop(key, None)
 
-    def on_future_done(self, future: distributed.Future, session: sa.orm.Session) -> str | None:
+    def on_future_done(
+        self, future: distributed.Future, session: sa.orm.Session
+    ) -> str | None:
         """Update the database status of the request according to the status of the future.
 
         If the status of the request in the database is not "running", it does nothing and returns None.
@@ -832,7 +839,10 @@ class Broker:
         """Run the broker loop."""
         cleanup_scheduler_memory_thread = threading.Thread(
             target=dask_utils.clean_scheduler_memory_for_all_clients,
-            args=(self.schedulers, CONFIG.broker_clean_scheduler_memory_interval_seconds),
+            args=(
+                self.schedulers,
+                CONFIG.broker_clean_scheduler_memory_interval_seconds,
+            ),
             daemon=True,
         )
         cleanup_scheduler_memory_thread.start()
@@ -843,7 +853,9 @@ class Broker:
                 client = self.schedulers.get_client(scheduler_url)
                 if client is None or client.scheduler is None:
                     logger.info(f"Reconnecting to dask scheduler {scheduler_url}")
-                    if (client := dask_utils.create_dask_client(scheduler_url)) is not None:
+                    if (
+                        client := dask_utils.create_dask_client(scheduler_url)
+                    ) is not None:
                         self.schedulers.add_client(scheduler_url, client)
                     else:
                         self.schedulers.pop_client(scheduler_url)
