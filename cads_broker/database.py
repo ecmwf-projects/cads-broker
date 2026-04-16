@@ -691,6 +691,7 @@ def set_successful_request(
     request = session.scalars(statement).one()
     request.status = "successful"
     request.finished_at = datetime.datetime.now()
+    request.updated_at = request.finished_at
     return request
 
 
@@ -749,8 +750,10 @@ def set_request_status(
         request.request_metadata = metadata
     if status == "successful":
         request.finished_at = datetime.datetime.now()
+        request.updated_at = request.finished_at
     elif status in ("failed", "rejected"):
         request.finished_at = datetime.datetime.now()
+        request.updated_at = request.finished_at
         request.response_error = {"message": error_message, "reason": error_reason}
     elif status == "running":
         request.started_at = datetime.datetime.now()
