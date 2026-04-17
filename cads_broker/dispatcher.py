@@ -716,15 +716,6 @@ class Broker:
             self.set_request_error_status(
                 exception=exception, request_uid=request_uid, session=session
             )
-        # elif future.status != "cancelled":
-            # # if the dask status is unknown, re-queue it
-            # requeue_request(
-            #     request=request,
-            #     qos=self.qos,
-            #     queue=self.queue,
-            #     internal_scheduler=self.internal_scheduler,
-            #     session=session,
-            # )
         else:
             # if the dask status is unknown or cancelled, re-queue it
             requeue_request(
