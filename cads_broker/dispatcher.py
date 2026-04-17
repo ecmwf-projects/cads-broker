@@ -715,8 +715,8 @@ class Broker:
             self.set_request_error_status(
                 exception=exception, request_uid=request_uid, session=session
             )
-        elif future.status != "cancelled":
-            # if the dask status is unknown, re-queue it
+        else:
+            # if the dask status is unknown or cancelled, re-queue it
             requeue_request(
                 request=request,
                 qos=self.qos,
@@ -724,9 +724,6 @@ class Broker:
                 internal_scheduler=self.internal_scheduler,
                 session=session,
             )
-        else:
-            # if the dask status is cancelled, the qos has already been reset by sync_database
-            return None
         future.release()
         return request_uid
 
