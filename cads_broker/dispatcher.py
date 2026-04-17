@@ -677,6 +677,7 @@ class Broker:
         """
         finished_futures = []
         for future in self.futures.values():
+            logger.info("FUTURE STATUS", future_status=future.status)
             if future.status in ("finished", "error", "cancelled"):
                 finished_futures.append(self.on_future_done(future, session))
         session.commit()
